@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { GoogleLogo } from './UI.jsx';
-import { TAKEN_NICKNAMES } from '../lib/data.js';
+import { TAKEN_NICKNAMES } from './data.js';
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
 function LoginScreen({ onGoogleLogin }) {
