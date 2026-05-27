@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import CSS from './styles.js';
-import { MATCHES, calcBreakdown, calcPoints } from './lib/data.js';
+import { MATCHES, calcBreakdown, calcPoints } from './data.js';
 import { LoginScreen, NicknameScreen } from './screens/AuthScreens.jsx';
 import MatchesScreen from './screens/MatchesScreen.jsx';
 import LeaderboardScreen from './screens/LeaderboardScreen.jsx';
