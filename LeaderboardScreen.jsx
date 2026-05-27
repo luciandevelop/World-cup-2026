@@ -3,11 +3,9 @@ import {
   MATCHES, QUALIFY_PCT, CURRENT_STAGE, MOCK_PREDICTIONS_FINISHED,
   buildLeaderboard, getBadge, getPredictionStyle, getAvatarRing,
   getRivalryMessage, getPlayerForm,
-} from '../lib/data.js';
+} from './data.js';
 
 function LeaderboardScreen({ currentUser, predictions }) {
-  // Build allPlayerPreds: merge current user's live predictions with demo peers
-  // In production this comes from Supabase; here we simulate 4 friends
   const demoFriends = {
     "RaduGoalz":  { 7: MOCK_PREDICTIONS_FINISHED[0] },
     "AndreiFC":   { 7: MOCK_PREDICTIONS_FINISHED[1] },
@@ -15,7 +13,6 @@ function LeaderboardScreen({ currentUser, predictions }) {
     "AlexTactic": { 7: MOCK_PREDICTIONS_FINISHED[3] },
   };
 
-  // Convert current user's predictions (keyed by matchId string) to numeric keys
   const myPreds = Object.fromEntries(
     Object.entries(predictions).map(([id, p]) => [Number(id), p])
   );
@@ -33,7 +30,6 @@ function LeaderboardScreen({ currentUser, predictions }) {
 
   const medals = ["🥇","🥈","🥉"];
 
-  // Movement: compare rank to previous snapshot (stored in sessionStorage for demo)
   const getPrevRanks = () => {
     try { return JSON.parse(sessionStorage.getItem("prevRanks")||"{}"); } catch { return {}; }
   };
@@ -43,7 +39,6 @@ function LeaderboardScreen({ currentUser, predictions }) {
     return prev != null ? prev - rank : 0;
   };
 
-  // Biggest climber / dropper among players with movement
   const movements = sorted.map(p => ({ nick: p.nickname, mov: getMovement(p.nickname, p.rank) }));
   const climber = movements.reduce((best, x) => x.mov > best.mov ? x : best, { mov: -Infinity });
   const dropper = movements.reduce((best, x) => x.mov < best.mov ? x : best, { mov: Infinity });
@@ -121,12 +116,12 @@ function LeaderboardScreen({ currentUser, predictions }) {
 
       {/* ── Rows ── */}
       {sorted.map((e, i) => {
-        const isMe  = e.nickname === currentUser;
-        const mov   = getMovement(e.nickname, e.rank);
+        const isMe    = e.nickname === currentUser;
+        const mov     = getMovement(e.nickname, e.rank);
         const isQLine = i === cutoff - 1;
-        const badge = getBadge(e.exactScores, e.points);
-        const pStyle = getPredictionStyle(e.exactScores, e.points, e.exactScores);
-        const ring   = getAvatarRing(pStyle);
+        const badge   = getBadge(e.exactScores, e.points);
+        const pStyle  = getPredictionStyle(e.exactScores, e.points, e.exactScores);
+        const ring    = getAvatarRing(pStyle);
 
         return (
           <div key={e.nickname}>
@@ -180,6 +175,7 @@ function LeaderboardScreen({ currentUser, predictions }) {
                 )}
               </div>
             </div>
+
             {/* Qualification cut line */}
             {isQLine && i < sorted.length - 1 && (
               <div style={{ display:"flex",alignItems:"center",gap:8,margin:"6px 0 10px",opacity:0.7 }}>
