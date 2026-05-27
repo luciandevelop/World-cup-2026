@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import CSS from './styles.js';
 import { MATCHES, calcBreakdown, calcPoints } from './data.js';
-import { LoginScreen, NicknameScreen } from './screens/AuthScreens.jsx';
-import MatchesScreen from './screens/MatchesScreen.jsx';
-import LeaderboardScreen from './screens/LeaderboardScreen.jsx';
-import AdminScreen from './screens/AdminScreen.jsx';
-import HowToPlayScreen from './screens/HowToPlayScreen.jsx';
-import PredictionModal from './components/PredictionModal.jsx';
+import { LoginScreen, NicknameScreen } from './AuthScreens.jsx';
+import MatchesScreen from './MatchesScreen.jsx';
+import LeaderboardScreen from './LeaderboardScreen.jsx';
+import AdminScreen from './AdminScreen.jsx';
+import HowToPlayScreen from './HowToPlayScreen.jsx';
+import PredictionModal from './PredictionModal.jsx';
 
 // ─── VERSION ─────────────────────────────────────────────────────────────────
 export const APP_VERSION = 'v0.2-alpha';
@@ -42,15 +42,15 @@ function PerfectHitOverlay({ pts, onDone }) {
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [stage, setStage]                   = useState('login');
-  const [googleUser, setGoogleUser]         = useState(null);
-  const [user, setUser]                     = useState(null);
-  const [tab, setTab]                       = useState('matches');
-  const [predictions, setPredictions]       = useState({});
+  const [stage, setStage]                     = useState('login');
+  const [googleUser, setGoogleUser]           = useState(null);
+  const [user, setUser]                       = useState(null);
+  const [tab, setTab]                         = useState('matches');
+  const [predictions, setPredictions]         = useState({});
   const [predictingMatch, setPredictingMatch] = useState(null);
-  const [adminMode, setAdminMode]           = useState(false);
-  const [adminTaps, setAdminTaps]           = useState(0);
-  const [perfectHit, setPerfectHit]         = useState(null);
+  const [adminMode, setAdminMode]             = useState(false);
+  const [adminTaps, setAdminTaps]             = useState(0);
+  const [perfectHit, setPerfectHit]           = useState(null);
 
   const totalPts = Object.entries(predictions).reduce((sum, [id, p]) => {
     const m = MATCHES.find(x => x.id === Number(id));
@@ -70,9 +70,9 @@ export default function App() {
   };
 
   const TABS = [
-    { id: 'matches',     label: 'Meciuri',  icon: '⚽' },
-    { id: 'leaderboard', label: 'Clasament', icon: '🏆' },
-    { id: 'rules',       label: 'Reguli',    icon: '📋' },
+    { id: 'matches',     label: 'Meciuri',   icon: '⚽' },
+    { id: 'leaderboard', label: 'Clasament',  icon: '🏆' },
+    { id: 'rules',       label: 'Reguli',     icon: '📋' },
   ];
 
   if (stage === 'login') return (
