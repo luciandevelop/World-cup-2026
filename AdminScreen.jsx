@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { ScoreInput, StepInput, PossessionInput } from '../components/UI.jsx';
-import { MATCHES, formatTime } from '../lib/data.js';
+import { ScoreInput, StepInput, PossessionInput } from './UI.jsx';
+import { MATCHES, formatTime } from './data.js';
 
 function AdminScreen() {
   const [sel,setSel]=useState(null);
