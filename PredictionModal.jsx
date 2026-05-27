@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ScoreInput, StepInput, PossessionInput } from './UI.jsx';
-import { formatTime } from '../lib/data.js';
+import { formatTime } from './data.js';
 
 function PredictionModal({ match, existing, onSave, onClose }) {
   const [sA,setSA]=useState(existing?.scoreA??1);
