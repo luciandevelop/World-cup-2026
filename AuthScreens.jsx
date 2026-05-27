@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GoogleLogo } from '../components/UI.jsx';
+import { GoogleLogo } from './UI.jsx';
 import { TAKEN_NICKNAMES } from '../lib/data.js';
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
