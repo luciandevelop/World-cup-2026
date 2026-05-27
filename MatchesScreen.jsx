@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { ScoreInput, StepInput, PossessionInput } from '../components/UI.jsx';
+import { ScoreInput, StepInput, PossessionInput } from './UI.jsx';
 import {
   MATCHES, GROUPS, LOCK_BEFORE_MS, MOCK_PREDICTIONS_FINISHED,
   POPULAR_PICKS, MOST_PREDICTED, LIVE_FEED_EVENTS, TYPE_COLOR, LIVE_STUB,
   calcBreakdown, calcPoints, matchLockState, formatTime,
-} from '../lib/data.js';
+} from './data.js';
 
 // ─── MATCHES SCREEN ───────────────────────────────────────────────────────────
 // Score breakdown block shown after a finished match
@@ -74,40 +74,22 @@ function PopularPicks({ matchId, prediction }) {
   );
 }
 
-
-// Match drama tag — ONE optional contextual tag per card.
-// Logic is deterministic from match data (no random). Returns null for most matches.
-// In production: enrich with real pick% from Supabase `match_picks_summary` view.
 function getMatchDramaTag(match, prediction) {
   if (match.isFinished || match.isLocked) return null;
   const picks = POPULAR_PICKS[match.id];
   const lockInfo = matchLockState(match);
-
-  // Locks soon — highest urgency, always shown if applicable
-  if (lockInfo.state === "soon") return null; // lockdown UI handles this itself
-
+  if (lockInfo.state === "soon") return null;
   if (!picks) return null;
-
-  const minPct = Math.min(picks.homeWin, picks.draw, picks.awayWin);
   const drawPct = picks.draw;
-
-  // Only 8% picked draw — rare call signal
   if (drawPct <= 10) return { icon:"⚠", text:`Doar ${drawPct}% mizează pe egal`, color:"#FFC107" };
-
-  // Potential upset: away team heavily underestimated
   if (picks.awayWin <= 12) return { icon:"💣", text:"Surpriză posibilă", color:"#FF6B6B" };
-
-  // Majority consensus — if you're going against the grain
   if (prediction) {
     const userResult = prediction.scoreA > prediction.scoreB ? "1"
       : prediction.scoreA < prediction.scoreB ? "2" : "X";
     const userPct = userResult === "1" ? picks.homeWin : userResult === "2" ? picks.awayWin : picks.draw;
     if (userPct <= 15) return { icon:"🧠", text:"Risc ridicat · ricompensă mare", color:"#7B5EA7" };
   }
-
-  // Popular match — many picked home win
   if (picks.homeWin >= 72) return { icon:"🔥", text:`${picks.homeWin}% mizează pe gazdă`, color:"#4A9EFF" };
-
   return null;
 }
 
@@ -117,7 +99,6 @@ function MatchCard({ match, prediction, onPredict, showOtherPreds }) {
   const pts = prediction && match.isFinished ? calcPoints(prediction, match) : null;
   const [expanded, setExpanded] = useState(false);
 
-  // Badge colours per state
   const badgeStyle = {
     open:     { bg:"rgba(74,158,255,0.15)",  color:"#4A9EFF" },
     soon:     { bg:"rgba(255,193,7,0.18)",   color:"#FFC107" },
@@ -126,7 +107,6 @@ function MatchCard({ match, prediction, onPredict, showOtherPreds }) {
     finished: { bg:"rgba(0,229,160,0.15)",   color:"#00E5A0" },
   }[lockInfo.state] || { bg:"rgba(255,107,107,0.15)", color:"#FF6B6B" };
 
-  // Top bar accent colour
   const barBg = match.isFinished
     ? "linear-gradient(90deg,#00E5A0,#00C27A)"
     : lockInfo.state === "soon"
@@ -153,7 +133,6 @@ function MatchCard({ match, prediction, onPredict, showOtherPreds }) {
         onMouseEnter={e=>{if(isEditable||match.isFinished)e.currentTarget.style.transform="translateY(-1px)"}}
         onMouseLeave={e=>{e.currentTarget.style.transform=""}}>
         <div style={{ position:"absolute",top:0,left:0,right:0,height:2,background:barBg }}/>
-        {/* stadium atmosphere — subtle radial glow from top colour strip */}
         <div style={{ position:"absolute",top:0,left:0,right:0,height:60,
           background: match.isFinished
             ? "linear-gradient(180deg,rgba(0,229,160,0.03),transparent)"
@@ -161,16 +140,13 @@ function MatchCard({ match, prediction, onPredict, showOtherPreds }) {
               ? "linear-gradient(180deg,rgba(255,193,7,0.04),transparent)"
               : "linear-gradient(180deg,rgba(74,158,255,0.03),transparent)",
           pointerEvents:"none" }}/>
-        {/* live pulse dot */}
         {lockInfo.state === "live" && <div style={{ position:"absolute",top:8,right:10,width:7,height:7,borderRadius:"50%",background:"#FF4444",animation:"livePulse 1.4s infinite" }}/>}
-        {/* Top row */}
         <div style={{ display:"flex",justifyContent:"space-between",marginBottom:10 }}>
           <div style={{ fontSize:10,color:"#444" }}>{formatTime(match.time)} · {match.venue}</div>
           <div style={{ fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,background:badgeStyle.bg,color:badgeStyle.color }}>
             {lockInfo.label}
           </div>
         </div>
-        {/* Teams row */}
         <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10 }}>
           <div style={{ flex:1,textAlign:"center" }}>
             <div style={{ fontSize:28,marginBottom:2 }}>{match.flagA}</div>
@@ -187,7 +163,6 @@ function MatchCard({ match, prediction, onPredict, showOtherPreds }) {
             <div style={{ fontSize:12,fontWeight:700,color:"#fff" }}>{match.teamB}</div>
           </div>
         </div>
-        {/* Bottom row: prediction summary or CTA + drama tag */}
         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
           <div style={{ flex:1,minWidth:0 }}>
             {prediction
@@ -215,7 +190,6 @@ function MatchCard({ match, prediction, onPredict, showOtherPreds }) {
         </div>
       </div>
 
-      {/* Expanded: breakdown + other predictions */}
       {match.isFinished && expanded && (
         <div style={{ padding:"0 4px" }}>
           {prediction && <ScoreBreakdown pred={prediction} match={match}/>}
@@ -242,95 +216,22 @@ function MatchCard({ match, prediction, onPredict, showOtherPreds }) {
         </div>
       )}
 
-      {/* Locked but not finished: hide predictions, show lock message */}
       {match.isLocked && !match.isFinished && prediction && (
         <div style={{ padding:"6px 8px",marginTop:-4,background:"rgba(255,107,107,0.06)",border:"1px solid rgba(255,107,107,0.1)",borderTop:"none",borderRadius:"0 0 12px 12px",fontSize:11,color:"#FF6B6B55",textAlign:"center" }}>
           🔒 Predicțiile prietenilor vizibile după meci
         </div>
       )}
-      {/* social picks for open matches */}
       {isEditable && <PopularPicks matchId={match.id} prediction={prediction}/>}
     </div>
   );
 }
 
-function PredictionModal({ match, existing, onSave, onClose }) {
-  const [sA,setSA]=useState(existing?.scoreA??1);
-  const [sB,setSB]=useState(existing?.scoreB??1);
-  const [poss,setPoss]=useState(existing?.possession??50);
-  const [corn,setCorn]=useState(existing?.corners??9);
-  const [saved,setSaved]=useState(false);
-  const result=sA>sB?match.teamA:sA<sB?match.teamB:"Egal";
-  const save=()=>{onSave(match.id,{scoreA:sA,scoreB:sB,possession:poss,corners:corn});setSaved(true);setTimeout(onClose,700);};
-  return (
-    <div style={{ position:"fixed",inset:0,zIndex:100,background:"rgba(0,0,0,0.85)",backdropFilter:"blur(8px)",display:"flex",flexDirection:"column",justifyContent:"flex-end",animation:"fadeIn 0.2s" }} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{ background:"linear-gradient(180deg,#0E1A14,#080C09)",borderRadius:"24px 24px 0 0",padding:"24px 20px 40px",border:"1px solid rgba(255,255,255,0.08)",borderBottom:"none",animation:"slideUp 0.3s cubic-bezier(0.34,1.2,0.64,1)",maxHeight:"90dvh",overflowY:"auto" }}>
-        <div style={{ width:40,height:4,background:"#333",borderRadius:2,margin:"0 auto 20px" }}/>
-        <div style={{ display:"flex",justifyContent:"space-between",marginBottom:18 }}>
-          <div>
-            <div style={{ fontSize:11,color:"#00E5A0",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4 }}>Grupă {match.group} · {match.venue}</div>
-            <div style={{ fontSize:17,fontWeight:800,color:"#fff" }}>{match.flagA} {match.teamA} vs {match.teamB} {match.flagB}</div>
-            <div style={{ fontSize:11,color:"#555",marginTop:2 }}>{formatTime(match.time)}</div>
-          </div>
-          <button onClick={onClose} style={{ background:"none",border:"none",color:"#555",fontSize:24,cursor:"pointer",alignSelf:"flex-start" }}>×</button>
-        </div>
-
-        {/* Score */}
-        <div style={{ background:"rgba(255,255,255,0.03)",borderRadius:16,padding:20,marginBottom:12,border:"1px solid rgba(255,255,255,0.06)" }}>
-          <div style={{ fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:16,textAlign:"center" }}>Scor final</div>
-          <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between" }}>
-            <div style={{ textAlign:"center" }}>
-              <div style={{ fontSize:26,marginBottom:4 }}>{match.flagA}</div>
-              <div style={{ fontSize:11,color:"#aaa",marginBottom:10,fontWeight:600 }}>{match.teamA}</div>
-              <ScoreInput value={sA} onChange={setSA}/>
-            </div>
-            <div style={{ textAlign:"center",padding:"0 6px" }}>
-              <div style={{ fontSize:11,fontWeight:700,padding:"5px 10px",borderRadius:20,background:sA>sB?"rgba(0,229,160,0.15)":sA<sB?"rgba(255,107,107,0.15)":"rgba(255,215,0,0.15)",color:sA>sB?"#00E5A0":sA<sB?"#FF6B6B":"#FFD700",transition:"all 0.3s",whiteSpace:"nowrap" }}>{result}</div>
-            </div>
-            <div style={{ textAlign:"center" }}>
-              <div style={{ fontSize:26,marginBottom:4 }}>{match.flagB}</div>
-              <div style={{ fontSize:11,color:"#aaa",marginBottom:10,fontWeight:600 }}>{match.teamB}</div>
-              <ScoreInput value={sB} onChange={setSB}/>
-            </div>
-          </div>
-        </div>
-
-        {/* Possession */}
-        <div style={{ background:"rgba(255,255,255,0.03)",borderRadius:16,padding:"16px 20px",marginBottom:12,border:"1px solid rgba(255,255,255,0.06)" }}>
-          <PossessionInput value={poss} onChange={setPoss} teamA={match.teamA} teamB={match.teamB} flagA={match.flagA} flagB={match.flagB}/>
-        </div>
-
-        {/* Corners */}
-        <div style={{ background:"rgba(255,255,255,0.03)",borderRadius:16,padding:"16px 20px",marginBottom:18,border:"1px solid rgba(255,255,255,0.06)",display:"flex",justifyContent:"center" }}>
-          <StepInput value={corn} onChange={setCorn} min={0} max={25} label="Cornere totale" unit="" color="#FFD700" wide/>
-        </div>
-
-        {/* Max pts */}
-        <div style={{ background:"rgba(0,229,160,0.06)",borderRadius:12,padding:"11px 16px",marginBottom:16,border:"1px solid rgba(0,229,160,0.12)",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-          <span style={{ fontSize:12,color:"#00E5A066" }}>Max puncte posibile</span>
-          <span style={{ fontSize:18,fontWeight:900,color:"#00E5A0",fontFamily:"'DM Mono',monospace" }}>200 pts</span>
-        </div>
-        <button onClick={save} style={{ width:"100%",padding:18,background:saved?"linear-gradient(135deg,#00C27A,#009960)":"linear-gradient(135deg,#00E5A0,#00C27A)",border:"none",borderRadius:14,color:"#060C09",fontSize:17,fontWeight:900,cursor:"pointer",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:"0.06em",boxShadow:"0 8px 32px #00E5A044",transition:"all 0.2s",animation:saved?"none":"breatheGreen 2s ease-in-out infinite" }}>
-          {saved?"✓ SALVAT!":"🔒 SALVEAZĂ PREDICȚIA"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// LiveFeed data imported from ../lib/data.js
-
 function LiveFeed() {
   const [expanded, setExpanded] = useState(false);
-
   const latest = LIVE_FEED_EVENTS[0];
-
   return (
     <div style={{ marginBottom:8,background:"rgba(255,255,255,0.025)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:12,overflow:"hidden",position:"relative" }}>
-      {/* animated top border */}
       <div style={{ position:"absolute",top:0,left:0,right:0,height:1,background:"linear-gradient(90deg,transparent,#00E5A0,#4A9EFF,transparent)",animation:"scanline 3s linear infinite",opacity:0.5 }}/>
-
-      {/* collapsed state — always visible, max ~72px */}
       <div style={{ display:"flex",alignItems:"center",gap:9,padding:"9px 12px" }}>
         <div style={{ width:6,height:6,borderRadius:"50%",background:"#00E5A0",flexShrink:0,animation:"livePulse 1.8s infinite" }}/>
         <span style={{ fontSize:9,fontWeight:800,color:"#333",letterSpacing:"0.12em",textTransform:"uppercase",flexShrink:0 }}>Feed</span>
@@ -342,8 +243,6 @@ function LiveFeed() {
           {expanded?"▲":"▼"}
         </button>
       </div>
-
-      {/* expanded state */}
       {expanded && (
         <div style={{ borderTop:"1px solid rgba(255,255,255,0.04)",padding:"6px 12px 10px",display:"flex",flexDirection:"column",gap:5 }}>
           {LIVE_FEED_EVENTS.slice(1).map((ev, i) => (
@@ -360,43 +259,32 @@ function LiveFeed() {
   );
 }
 
-// ─── PERFECT HIT OVERLAY ─────────────────────────────────────────────────────
-// Shown when user saves a prediction that matches a finished result perfectly.
-// Trigger: call showPerfectHit() from App after saving a prediction on finished match.
 function PerfectHitOverlay({ pts, onDone }) {
-  const [phase, setPhase] = useState(0); // 0=flash, 1=content, 2=fading
+  const [phase, setPhase] = useState(0);
   useEffect(() => {
     const t1 = setTimeout(() => setPhase(1), 80);
     const t2 = setTimeout(() => setPhase(2), 3200);
     const t3 = setTimeout(() => onDone(), 3700);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, []);
-
-  // Simple CSS particle dots
   const particles = [
     {x:20,y:30,c:"#FFD700",s:6},{x:75,y:20,c:"#00E5A0",s:4},{x:50,y:15,c:"#fff",s:3},
     {x:85,y:55,c:"#FFD700",s:5},{x:10,y:65,c:"#4A9EFF",s:4},{x:60,y:80,c:"#00E5A0",s:6},
     {x:35,y:85,c:"#FFD700",s:3},{x:90,y:35,c:"#fff",s:4},{x:25,y:50,c:"#FF9800",s:5},
   ];
-
   return (
     <div style={{ position:"fixed",inset:0,zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",
       background:"rgba(0,0,0,0.92)",
       opacity: phase===0?0:phase===2?0:1,
       transition: phase===2?"opacity 0.5s ease":"opacity 0.15s ease",
       pointerEvents:"auto" }} onClick={onDone}>
-
-      {/* particle field */}
       {phase===1 && particles.map((p,i) => (
         <div key={i} style={{ position:"absolute",left:`${p.x}%`,top:`${p.y}%`,
           width:p.s,height:p.s,borderRadius:"50%",background:p.c,
           animation:`particlePop 1.2s ${i*0.08}s ease-out forwards`,
           pointerEvents:"none" }}/>
       ))}
-
-      {/* core content */}
       <div style={{ textAlign:"center",animation:phase===1?"celebrationPop 0.5s cubic-bezier(0.34,1.56,0.64,1) both":"none",padding:"0 32px" }}>
-        {/* gold flash ring */}
         <div style={{ width:100,height:100,borderRadius:"50%",margin:"0 auto 20px",
           background:"linear-gradient(135deg,#FFD700,#FF9800)",
           display:"flex",alignItems:"center",justifyContent:"center",
@@ -404,48 +292,33 @@ function PerfectHitOverlay({ pts, onDone }) {
           animation:"goldRing 1.5s ease-out forwards" }}>
           <div style={{ fontSize:44,lineHeight:1 }}>🎯</div>
         </div>
-
-        <div style={{ fontSize:11,color:"rgba(255,215,0,0.6)",letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:8,fontWeight:700 }}>
-          Perfect Hit
-        </div>
-        <div style={{ fontSize:52,fontWeight:900,color:"#FFD700",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:"0.06em",lineHeight:1,
-          textShadow:"0 0 32px rgba(255,215,0,0.5)",marginBottom:4 }}>
-          +{pts} PTS
-        </div>
-        <div style={{ fontSize:14,color:"rgba(255,255,255,0.5)",marginBottom:24 }}>
-          Scor, posesie și cornere — toate exacte
-        </div>
-
+        <div style={{ fontSize:11,color:"rgba(255,215,0,0.6)",letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:8,fontWeight:700 }}>Perfect Hit</div>
+        <div style={{ fontSize:52,fontWeight:900,color:"#FFD700",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:"0.06em",lineHeight:1,textShadow:"0 0 32px rgba(255,215,0,0.5)",marginBottom:4 }}>+{pts} PTS</div>
+        <div style={{ fontSize:14,color:"rgba(255,255,255,0.5)",marginBottom:24 }}>Scor, posesie și cornere — toate exacte</div>
         <div style={{ display:"inline-flex",alignItems:"center",gap:8,padding:"10px 20px",
           background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.25)",
           borderRadius:24,animation:"breatheGold 1.8s ease-in-out infinite" }}>
           <span style={{ fontSize:11,color:"#FFD700",fontWeight:700,letterSpacing:"0.06em" }}>CLASAMENTUL SE ACTUALIZEAZĂ</span>
           <div style={{ width:8,height:8,borderRadius:"50%",background:"#FFD700",animation:"livePulse 1.4s infinite" }}/>
         </div>
-
         <div style={{ marginTop:20,fontSize:11,color:"rgba(255,255,255,0.2)" }}>atinge pentru a închide</div>
       </div>
     </div>
   );
 }
 
-// ─── MATCH HYPE SECTION — MOST_PREDICTED imported from ../lib/data.js ──────────
 function MatchHype({ match, prediction }) {
   const picks = POPULAR_PICKS[match.id];
   const topScore = MOST_PREDICTED[match.id];
   if (!picks || match.isLocked || match.isFinished) return null;
-
   const max = Math.max(picks.homeWin, picks.draw, picks.awayWin);
   const labels = ["1","X","2"];
   const pcts   = [picks.homeWin, picks.draw, picks.awayWin];
-
   const userResult = prediction
     ? (prediction.scoreA > prediction.scoreB ? 0 : prediction.scoreA < prediction.scoreB ? 2 : 1)
     : null;
-
   return (
     <div style={{ marginBottom:6,padding:"11px 14px",background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.05)",borderRadius:12 }}>
-      {/* result bars */}
       <div style={{ display:"flex",gap:5,marginBottom:9 }}>
         {pcts.map((pct, i) => {
           const isUser = userResult === i;
@@ -459,7 +332,6 @@ function MatchHype({ match, prediction }) {
           );
         })}
       </div>
-      {/* most predicted score */}
       {topScore && (
         <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:7,borderTop:"1px solid rgba(255,255,255,0.04)" }}>
           <span style={{ fontSize:9,color:"#3a3a3a",letterSpacing:"0.08em",textTransform:"uppercase" }}>Scor cel mai prezis</span>
@@ -475,19 +347,14 @@ function MatchHype({ match, prediction }) {
   );
 }
 
-// ─── LIVE MATCH VIEW MODAL — LIVE_STUB imported from ../lib/data.js ────────────
-// In production: replace LIVE_STUB with real fetch from livescore API
-
 function LiveMatchView({ match, predictions, peerPreds, onClose }) {
-  const live = LIVE_STUB; // swap with real data hook
+  const live = LIVE_STUB;
   const picks = POPULAR_PICKS[match.id];
   return (
     <div style={{ position:"fixed",inset:0,zIndex:100,background:"rgba(0,0,0,0.92)",backdropFilter:"blur(10px)",display:"flex",flexDirection:"column",justifyContent:"flex-end",animation:"fadeIn 0.18s" }}
       onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div style={{ background:"linear-gradient(180deg,#0D1911,#080C09)",borderRadius:"22px 22px 0 0",padding:"20px 18px 36px",border:"1px solid rgba(255,255,255,0.07)",borderBottom:"none",maxHeight:"88dvh",overflowY:"auto",animation:"slideUp 0.28s cubic-bezier(0.32,1.2,0.64,1)" }}>
         <div style={{ width:36,height:3,background:"rgba(255,255,255,0.15)",borderRadius:2,margin:"0 auto 16px" }}/>
-
-        {/* match header */}
         <div style={{ textAlign:"center",marginBottom:16 }}>
           <div style={{ fontSize:9,color:"#FF4444",letterSpacing:"0.14em",textTransform:"uppercase",fontWeight:800,marginBottom:6 }}>
             {live.matchStatus==="live"?"🔴 Live":"🔒 Blocat"} · {match.venue}
@@ -497,7 +364,6 @@ function LiveMatchView({ match, predictions, peerPreds, onClose }) {
               <div style={{ fontSize:30 }}>{match.flagA}</div>
               <div style={{ fontSize:11,fontWeight:700,color:"#ddd",marginTop:3 }}>{match.teamA}</div>
             </div>
-            {/* live score placeholder */}
             <div style={{ textAlign:"center",padding:"8px 16px",background:"rgba(255,255,255,0.04)",borderRadius:12,border:"1px solid rgba(255,255,255,0.07)" }}>
               {live.liveHomeScore !== null
                 ? <div style={{ fontSize:28,fontWeight:900,color:"#fff",fontFamily:"'DM Mono',monospace" }}>{live.liveHomeScore}–{live.liveAwayScore}</div>
@@ -510,8 +376,6 @@ function LiveMatchView({ match, predictions, peerPreds, onClose }) {
             </div>
           </div>
         </div>
-
-        {/* community split */}
         {picks && (
           <div style={{ display:"flex",gap:5,marginBottom:14 }}>
             {[{l:"1",p:picks.homeWin},{l:"X",p:picks.draw},{l:"2",p:picks.awayWin}].map((o,i)=>(
@@ -522,11 +386,7 @@ function LiveMatchView({ match, predictions, peerPreds, onClose }) {
             ))}
           </div>
         )}
-
-        {/* friends predictions */}
-        <div style={{ fontSize:9,color:"#3a3a3a",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8,fontWeight:700 }}>
-          Predicțiile prietenilor
-        </div>
+        <div style={{ fontSize:9,color:"#3a3a3a",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8,fontWeight:700 }}>Predicțiile prietenilor</div>
         {peerPreds.map((p,i)=>(
           <div key={i} style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 12px",borderRadius:10,marginBottom:5,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.05)",animation:`revealFlip 0.35s ${i*0.07}s both` }}>
             <div style={{ display:"flex",alignItems:"center",gap:8 }}>
@@ -539,7 +399,6 @@ function LiveMatchView({ match, predictions, peerPreds, onClose }) {
             </div>
           </div>
         ))}
-
         <button onClick={onClose} style={{ width:"100%",marginTop:14,padding:14,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,color:"#666",fontSize:13,fontWeight:700,cursor:"pointer" }}>
           Închide
         </button>
@@ -548,20 +407,17 @@ function LiveMatchView({ match, predictions, peerPreds, onClose }) {
   );
 }
 
-// ─── NEXT MATCH HERO ─────────────────────────────────────────────────────────
 function NextMatchHero({ match, prediction, onPredict }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 30000); // refresh every 30s
+    const id = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(id);
   }, []);
-
   if (!match) return null;
   const kickoff    = new Date(match.time).getTime();
   const msToKick   = kickoff - now;
   const msToLock   = kickoff - LOCK_BEFORE_MS - now;
   const isEditable = msToLock > 0;
-
   const fmtCountdown = ms => {
     if (ms <= 0) return null;
     const h = Math.floor(ms / 3600000);
@@ -573,13 +429,9 @@ function NextMatchHero({ match, prediction, onPredict }) {
   const kickdownLabel = fmtCountdown(msToKick);
   const lockdownLabel = fmtCountdown(msToLock);
   const soonLocking   = msToLock > 0 && msToLock < LOCK_BEFORE_MS;
-
   return (
     <div style={{ margin:"10px 0 8px",background:"linear-gradient(135deg,rgba(74,158,255,0.06),rgba(0,229,160,0.04))",border:`1px solid ${soonLocking?"rgba(255,193,7,0.28)":"rgba(255,255,255,0.08)"}`,borderRadius:18,padding:"14px 16px",position:"relative",overflow:"hidden",animation:soonLocking?"lockGlow 2.4s ease-in-out infinite":"none" }}>
-      {/* top accent */}
       <div style={{ position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,#4A9EFF,#00E5A0)" }}/>
-
-      {/* label row */}
       <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:11 }}>
         <div style={{ fontSize:9,color:"#4A9EFF88",letterSpacing:"0.14em",textTransform:"uppercase",fontWeight:800 }}>
           Următor meci · Gr. {match.group}
@@ -597,8 +449,6 @@ function NextMatchHero({ match, prediction, onPredict }) {
           )}
         </div>
       </div>
-
-      {/* teams */}
       <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12 }}>
         <div style={{ flex:1,textAlign:"center" }}>
           <div style={{ fontSize:34,lineHeight:1,marginBottom:4 }}>{match.flagA}</div>
@@ -617,15 +467,13 @@ function NextMatchHero({ match, prediction, onPredict }) {
           <div style={{ fontSize:13,fontWeight:800,color:"#fff" }}>{match.teamB}</div>
         </div>
       </div>
-
-      {/* CTA */}
       <button
         onClick={() => isEditable && onPredict(match)}
         disabled={!isEditable}
         style={{ width:"100%",padding:"11px",borderRadius:12,border:"none",cursor:isEditable?"pointer":"default",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:"0.06em",fontSize:14,fontWeight:900,transition:"all 0.2s",
           background: prediction
             ? isEditable ? "rgba(0,229,160,0.12)" : "rgba(255,255,255,0.04)"
-            : isEditable ? "linear-gradient(135deg,#00E5A0,#00C27A)"  : "rgba(255,255,255,0.04)",
+            : isEditable ? "linear-gradient(135deg,#00E5A0,#00C27A)" : "rgba(255,255,255,0.04)",
           color: prediction
             ? isEditable ? "#00E5A0" : "#444"
             : isEditable ? "#060C09" : "#444",
@@ -647,23 +495,15 @@ function MatchesScreen({ predictions, onPredict }) {
   const locked   = MATCHES.filter(m=>{ const s=matchLockState(m).state; return (s==="locked"||s==="soon"||s==="live")&&!m.isFinished; });
   const upcoming = MATCHES.filter(m=>matchLockState(m).state==="open"&&!m.isFinished);
 
-  // Next match = first upcoming sorted by kickoff time
   const nextMatch = [...upcoming].sort((a,b)=>new Date(a.time)-new Date(b.time))[0] || null;
-
   const filter = m => activeGroup==="all" || m.group===activeGroup;
-  // Exclude nextMatch from the regular upcoming list to avoid duplicate
   const upcomingRest = upcoming.filter(m => m.id !== nextMatch?.id);
 
   return (
     <div style={{ padding:"0 16px" }}>
-
-      {/* 1. NEXT MATCH HERO — always first */}
       <NextMatchHero match={nextMatch} prediction={predictions[nextMatch?.id]} onPredict={onPredict}/>
-
-      {/* 2. LIVE FEED — compact, collapsed by default */}
       <LiveFeed/>
 
-      {/* 3. LIVE match CTA if any */}
       {locked.filter(m=>matchLockState(m).state==="live").length > 0 && (
         <div style={{ marginBottom:8 }}>
           {locked.filter(m=>matchLockState(m).state==="live").map(m=>(
@@ -679,7 +519,6 @@ function MatchesScreen({ predictions, onPredict }) {
         </div>
       )}
 
-      {/* 4. Group filter */}
       <div style={{ display:"flex",gap:6,overflowX:"auto",padding:"6px 0 8px",scrollbarWidth:"none" }}>
         {["all",...GROUPS].map(g=>(
           <button key={g} onClick={()=>setActiveGroup(g)} style={{ flexShrink:0,padding:"5px 12px",borderRadius:20,border:`1px solid ${activeGroup===g?"#00E5A0":"rgba(255,255,255,0.08)"}`,background:activeGroup===g?"rgba(0,229,160,0.12)":"rgba(255,255,255,0.03)",color:activeGroup===g?"#00E5A0":"#555",fontSize:11,fontWeight:700,cursor:"pointer",letterSpacing:"0.06em" }}>
@@ -688,7 +527,6 @@ function MatchesScreen({ predictions, onPredict }) {
         ))}
       </div>
 
-      {/* 5. Match lists */}
       {finished.filter(filter).length>0&&<>
         <div style={{ fontSize:9,color:"#333",letterSpacing:"0.12em",textTransform:"uppercase",margin:"6px 0 6px",fontWeight:700 }}>✓ Terminate — atinge pentru detalii</div>
         {finished.filter(filter).map(m=>(
@@ -709,7 +547,6 @@ function MatchesScreen({ predictions, onPredict }) {
         ))}
       </>}
 
-      {/* Live match view modal */}
       {liveViewMatch && (
         <LiveMatchView
           match={liveViewMatch}
