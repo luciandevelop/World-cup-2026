@@ -288,3 +288,96 @@ export const TYPE_COLOR = {
   exact:"#FFD700", rank:"#00E5A0", miss:"#FF6B6B", streak:"#FF9800",
   stat:"#4A9EFF",  pts:"#00E5A0",  social:"#7B5EA7", leader:"#FFD700",
 };
+
+// ─── ADMIN EMAILS (from env + hardcoded fallback) ─────────────────────────────
+// Set VITE_ADMIN_EMAILS=email1,email2 in your .env file
+export const ADMIN_EMAILS_RUNTIME = (() => {
+  const fromEnv = import.meta.env.VITE_ADMIN_EMAILS || '';
+  const extra = fromEnv.split(',').map(e => e.trim()).filter(Boolean);
+  return [...new Set(['admin@worldcup2026.app', ...extra])];
+})();
+
+// ─── GROUP STANDINGS ──────────────────────────────────────────────────────────
+// Calculate group table from finished matches.
+// Returns array sorted by: points → GD → goals scored → name
+export function buildGroupStandings(groupLetter, finishedResults = FINISHED_RESULTS) {
+  const matches = buildMatches(finishedResults).filter(
+    m => m.group === groupLetter && m.isFinished
+  );
+
+  // Collect all teams in group
+  const allGroupMatches = MATCHES.filter(m => m.group === groupLetter);
+  const teamMap = {};
+  allGroupMatches.forEach(m => {
+    if (!teamMap[m.teamA]) teamMap[m.teamA] = { team:m.teamA, flag:m.flagA, p:0,w:0,d:0,l:0,gf:0,ga:0,gd:0,pts:0 };
+    if (!teamMap[m.teamB]) teamMap[m.teamB] = { team:m.teamB, flag:m.flagB, p:0,w:0,d:0,l:0,gf:0,ga:0,gd:0,pts:0 };
+  });
+
+  matches.forEach(m => {
+    const a = teamMap[m.teamA];
+    const b = teamMap[m.teamB];
+    if (!a || !b) return;
+    const ga = m.realScoreA, gb = m.realScoreB;
+    a.p++; b.p++;
+    a.gf += ga; a.ga += gb; a.gd += ga - gb;
+    b.gf += gb; b.ga += ga; b.gd += gb - ga;
+    if (ga > gb) { a.w++; a.pts += 3; b.l++; }
+    else if (ga < gb) { b.w++; b.pts += 3; a.l++; }
+    else { a.d++; b.d++; a.pts++; b.pts++; }
+  });
+
+  return Object.values(teamMap).sort(
+    (a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || a.team.localeCompare(b.team)
+  );
+}
+
+// ─── KNOCKOUT BRACKET SEEDING ─────────────────────────────────────────────────
+// WC 2026 Round of 32 pairings (1A vs 2B pattern)
+// Returns array of { id, home, away } — null slots when group not done
+export const R32_PAIRINGS = [
+  { id:'r32_1',  pos1:{group:'A',rank:1}, pos2:{group:'B',rank:2} },
+  { id:'r32_2',  pos1:{group:'C',rank:1}, pos2:{group:'D',rank:2} },
+  { id:'r32_3',  pos1:{group:'E',rank:1}, pos2:{group:'F',rank:2} },
+  { id:'r32_4',  pos1:{group:'G',rank:1}, pos2:{group:'H',rank:2} },
+  { id:'r32_5',  pos1:{group:'I',rank:1}, pos2:{group:'J',rank:2} },
+  { id:'r32_6',  pos1:{group:'K',rank:1}, pos2:{group:'L',rank:2} },
+  { id:'r32_7',  pos1:{group:'B',rank:1}, pos2:{group:'A',rank:2} },
+  { id:'r32_8',  pos1:{group:'D',rank:1}, pos2:{group:'C',rank:2} },
+  { id:'r32_9',  pos1:{group:'F',rank:1}, pos2:{group:'E',rank:2} },
+  { id:'r32_10', pos1:{group:'H',rank:1}, pos2:{group:'G',rank:2} },
+  { id:'r32_11', pos1:{group:'J',rank:1}, pos2:{group:'I',rank:2} },
+  { id:'r32_12', pos1:{group:'L',rank:1}, pos2:{group:'K',rank:2} },
+  // 3rd-place teams (4 slots, ranked 1-4 from 12 third-place teams)
+  { id:'r32_13', pos1:{group:'3rd',rank:1}, pos2:{group:'3rd',rank:4} },
+  { id:'r32_14', pos1:{group:'3rd',rank:2}, pos2:{group:'3rd',rank:3} },
+  { id:'r32_15', pos1:{group:'3rd',rank:5}, pos2:{group:'3rd',rank:8} },
+  { id:'r32_16', pos1:{group:'3rd',rank:6}, pos2:{group:'3rd',rank:7} },
+];
+
+export function buildKnockoutSlots(finishedResults = FINISHED_RESULTS) {
+  const ALL_G = ['A','B','C','D','E','F','G','H','I','J','K','L'];
+  // Check if all group matches for a group are done
+  const fm = buildMatches(finishedResults);
+  const groupDone = (g) => fm.filter(m => m.group === g).every(m => m.isFinished);
+  const standings = {};
+  ALL_G.forEach(g => {
+    if (groupDone(g)) standings[g] = buildGroupStandings(g, finishedResults);
+  });
+
+  return R32_PAIRINGS.map(pair => {
+    const resolve = (pos) => {
+      if (pos.group === '3rd') return null; // complex — skip for now
+      const table = standings[pos.group];
+      if (!table) return null;
+      const entry = table[pos.rank - 1];
+      return entry ? { team:entry.team, flag:entry.flag } : null;
+    };
+    return {
+      id:   pair.id,
+      home: resolve(pair.pos1),
+      away: resolve(pair.pos2),
+      homeLabel: `${pair.pos1.rank}° Gr.${pair.pos1.group}`,
+      awayLabel: `${pair.pos2.rank}° Gr.${pair.pos2.group}`,
+    };
+  });
+}
