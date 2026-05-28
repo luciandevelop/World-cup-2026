@@ -9,7 +9,7 @@ import HowToPlayScreen from './HowToPlayScreen.jsx';
 import PredictionModal from './PredictionModal.jsx';
 
 // ─── VERSION ─────────────────────────────────────────────────────────────────
-export const APP_VERSION = 'v0.2-alpha';
+export const APP_VERSION = 'PREMIUM v1';
 
 // ─── PERFECT HIT OVERLAY ─────────────────────────────────────────────────────
 function PerfectHitOverlay({ pts, onDone }) {
@@ -94,16 +94,20 @@ export default function App() {
 
   return (
     <><style>{CSS}</style>
-    <div style={{ fontFamily:"'Syne',sans-serif",background:"#080C09",minHeight:"100dvh",color:"#fff",maxWidth:430,margin:"0 auto",display:"flex",flexDirection:"column" }}>
+    <div style={{ fontFamily:"'Space Grotesk','Syne',sans-serif",background:"radial-gradient(circle at 50% -10%, rgba(255,215,0,0.22), transparent 34%), radial-gradient(circle at 8% 18%, rgba(0,229,160,0.18), transparent 28%), linear-gradient(180deg,#061018 0%,#07090d 48%,#020304 100%)",minHeight:"100dvh",color:"#fff",maxWidth:430,margin:"0 auto",display:"flex",flexDirection:"column",position:"relative",overflow:"hidden",boxShadow:"0 0 80px rgba(0,0,0,0.7)" }}>
+
+      {/* ── Premium background texture ── */}
+      <div style={{ position:"fixed",inset:0,pointerEvents:"none",opacity:0.28,background:"linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px)",backgroundSize:"34px 34px",maskImage:"linear-gradient(to bottom, black, transparent 65%)" }} />
 
       {/* ── Header ── */}
-      <div style={{ position:"sticky",top:0,zIndex:50,background:"rgba(8,12,9,0.94)",backdropFilter:"blur(16px)",borderBottom:"1px solid rgba(255,255,255,0.05)",padding:"12px 16px 10px",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+      <div style={{ position:"sticky",top:0,zIndex:50,background:"linear-gradient(180deg,rgba(4,8,13,0.96),rgba(4,8,13,0.78))",backdropFilter:"blur(22px)",borderBottom:"1px solid rgba(255,215,0,0.12)",padding:"14px 16px 12px",display:"flex",justifyContent:"space-between",alignItems:"center",boxShadow:"0 12px 40px rgba(0,0,0,0.28)" }}>
         <div>
-          <div style={{ fontSize:9,color:"rgba(0,229,160,0.35)",letterSpacing:"0.15em",textTransform:"uppercase" }}>FIFA World Cup 2026</div>
-          <div style={{ fontSize:17,fontWeight:900,color:"#fff",lineHeight:1.1 }}>
-            Predicții ⚽{' '}
-            <span style={{ fontSize:8,color:"#1e1e1e",fontWeight:400,fontFamily:"'DM Mono',monospace" }}>{APP_VERSION}</span>
+          <div style={{ fontSize:9,color:"rgba(255,215,0,0.62)",letterSpacing:"0.20em",textTransform:"uppercase",fontWeight:800 }}>FIFA World Cup 2026</div>
+          <div style={{ fontSize:20,fontWeight:900,color:"#fff",lineHeight:1.05,letterSpacing:"-0.04em" }}>
+            World Cup Arena
+            <span style={{ marginLeft:6,fontSize:8,color:"#00E5A0",fontWeight:800,fontFamily:"'DM Mono',monospace" }}>{APP_VERSION}</span>
           </div>
+          <div style={{ marginTop:5,display:"inline-flex",alignItems:"center",gap:6,padding:"4px 9px",borderRadius:999,background:"rgba(0,229,160,0.08)",border:"1px solid rgba(0,229,160,0.18)",fontSize:9,color:"#00E5A0",fontWeight:800,letterSpacing:"0.06em" }}>● LIVE PREDICTIONS</div>
         </div>
         <div style={{ display:"flex",alignItems:"center",gap:10 }}>
           {totalPts > 0 && (
@@ -113,7 +117,7 @@ export default function App() {
           )}
           <div
             onClick={() => { const t = adminTaps + 1; setAdminTaps(t); if (t >= 5) { setAdminMode(true); setAdminTaps(0); } }}
-            style={{ width:34,height:34,borderRadius:"50%",background:"linear-gradient(135deg,#4285F4,#34A853)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,cursor:"pointer",border:adminMode?"2px solid #FF6B6B":"none" }}>
+            style={{ width:34,height:34,borderRadius:"50%",background:"linear-gradient(135deg,#FFD700,#00E5A0)",boxShadow:"0 0 22px rgba(0,229,160,0.35)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,cursor:"pointer",border:adminMode?"2px solid #FF6B6B":"none" }}>
             {user.nickname[0].toUpperCase()}
           </div>
         </div>
@@ -137,10 +141,10 @@ export default function App() {
 
       {/* ── Tab bar ── */}
       {!adminMode && (
-        <div style={{ position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:"rgba(8,12,9,0.97)",backdropFilter:"blur(20px)",borderTop:"1px solid rgba(255,255,255,0.05)",padding:"9px 16px 20px",display:"flex",justifyContent:"space-around" }}>
+        <div style={{ position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:"linear-gradient(180deg,rgba(8,12,18,0.78),rgba(2,3,5,0.98))",backdropFilter:"blur(24px)",borderTop:"1px solid rgba(255,215,0,0.12)",padding:"10px 14px 20px",display:"flex",justifyContent:"space-around",boxShadow:"0 -18px 45px rgba(0,0,0,0.45)" }}>
           {TABS.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{ flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,background:"none",border:"none",cursor:"pointer",color:tab===t.id?"#00E5A0":"#333",transition:"color 0.18s",padding:"5px 0",position:"relative" }}>
-              {tab === t.id && <div style={{ position:"absolute",top:-9,left:"50%",transform:"translateX(-50%)",width:18,height:2,borderRadius:1,background:"#00E5A0",boxShadow:"0 0 6px rgba(0,229,160,0.5)" }}/>}
+            <button key={t.id} onClick={() => setTab(t.id)} style={{ flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,background:tab===t.id?"linear-gradient(135deg,rgba(255,215,0,0.16),rgba(0,229,160,0.12))":"transparent",border:tab===t.id?"1px solid rgba(255,215,0,0.18)":"1px solid transparent",borderRadius:18,cursor:"pointer",color:tab===t.id?"#FFD700":"rgba(255,255,255,0.42)",transition:"all 0.18s",padding:"8px 0",position:"relative" }}>
+              
               <span style={{ fontSize:21,lineHeight:1 }}>{t.icon}</span>
               <span style={{ fontSize:9,fontWeight:tab===t.id?800:400,letterSpacing:"0.05em" }}>{t.label}</span>
             </button>
