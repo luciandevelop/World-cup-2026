@@ -11,6 +11,7 @@ import {
 } from '../data/gameData.js';
 import { ALL_GROUPS } from '../data/matches.js';
 import { StatusPill, SectionDivider } from '../components/UI.jsx';
+import GroupStandings from '../components/GroupStandings.jsx';
 
 // ─── GROUP TEAMS (derived) ────────────────────────────────────────────────────
 const GROUP_TEAMS = ALL_GROUPS.reduce((acc, g) => {
@@ -303,7 +304,7 @@ function LiveFeed() {
 }
 
 // ─── MATCHES SCREEN ───────────────────────────────────────────────────────────
-export default function MatchesScreen({ predictions, onPredict }) {
+export default function MatchesScreen({ predictions, onPredict, finishedResults }) {
   const [tab, setTab]              = useState("toate"); // "toate" | "mele" | "prieteni"
   const [collapsedGroups, setCollapsedGroups] = useState(new Set());
   const [groupFilter, setGroupFilter] = useState("toate");
@@ -358,6 +359,7 @@ export default function MatchesScreen({ predictions, onPredict }) {
         />
         {!collapsed && (
           <div style={{ background:"rgba(255,255,255,0.01)", border:"1px solid rgba(255,255,255,0.06)", borderTop:"none", borderRadius:"0 0 12px 12px", padding:"10px 10px 4px" }}>
+            {tab === "toate" && <GroupStandings group={g} finishedResults={finishedResults}/>}
             {matches.map(m => (
               <MatchCard key={m.id} match={m} prediction={predictions[m.id]} onPredict={onPredict}/>
             ))}
@@ -437,10 +439,31 @@ export default function MatchesScreen({ predictions, onPredict }) {
         )}
 
         {tab === "prieteni" && friendMatches.length === 0 && (
-          <div style={{ textAlign:"center", padding:"60px 20px", color:"rgba(255,255,255,0.25)" }}>
-            <div style={{ fontSize:40, marginBottom:12 }}>👥</div>
-            <div style={{ fontSize:15, fontWeight:600, marginBottom:6 }}>Vizibil după startul meciului</div>
-            <div style={{ fontSize:13 }}>Predicțiile prietenilor apar când meciul începe</div>
+          <div style={{ padding:"0 4px" }}>
+            <div style={{ padding:"14px 14px 10px", display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+              <span style={{ fontSize:16 }}>🔒</span>
+              <div>
+                <div style={{ fontSize:13, fontWeight:700, color:"rgba(255,255,255,0.6)" }}>Predicțiile prietenilor</div>
+                <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)" }}>Se deblochează la startul meciului</div>
+              </div>
+            </div>
+            {[0,1,2].map(i => (
+              <div key={i} style={{ marginBottom:8, borderRadius:14, overflow:"hidden", border:"1px solid rgba(255,255,255,0.05)" }}>
+                <div style={{ padding:"12px 14px", background:"rgba(255,255,255,0.02)", filter:"blur(2px)", opacity:0.5 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
+                    <div style={{ width:60, height:10, borderRadius:4, background:"rgba(255,255,255,0.08)" }}/>
+                    <div style={{ width:40, height:10, borderRadius:4, background:"rgba(255,255,255,0.06)" }}/>
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                      <div style={{ width:28, height:28, borderRadius:"50%", background:"rgba(255,255,255,0.08)" }}/>
+                      <div style={{ width:80, height:10, borderRadius:4, background:"rgba(255,255,255,0.06)" }}/>
+                    </div>
+                    <div style={{ width:36, height:14, borderRadius:4, background:"rgba(255,255,255,0.1)" }}/>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
