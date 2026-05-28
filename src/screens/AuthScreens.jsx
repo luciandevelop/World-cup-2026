@@ -107,42 +107,79 @@ function AuthBtn({ icon, label, loading, disabled, onClick, muted }) {
   );
 }
 
-// ─── AVATAR PICKER (used in NicknameScreen) ───────────────────────────────────
+// ─── RARITY CONFIG ────────────────────────────────────────────────────────────
+const RARITY_CONFIG = {
+  common:    { label:'Comun',     color:'rgba(255,255,255,0.35)', bg:'rgba(255,255,255,0.04)' },
+  rare:      { label:'Rar',       color:'#4A9EFF',               bg:'rgba(74,158,255,0.08)'  },
+  epic:      { label:'Epic',      color:'#9B59B6',               bg:'rgba(155,89,182,0.10)'  },
+  legendary: { label:'Legendar',  color:'#FFD700',               bg:'rgba(255,215,0,0.08)'   },
+};
+
+// ─── AVATAR CATEGORIES ────────────────────────────────────────────────────────
+const AVATAR_CATEGORIES = [
+  { id:'personality', label:'Personalități',  filter: av => !av.rarity || av.rarity === 'common' && !av.id.startsWith('flag_') && !av.id.startsWith('kit_') },
+  { id:'nations',     label:'🌍 Naționale',   filter: av => av.id.startsWith('flag_') },
+  { id:'jerseys',     label:'👕 Echipamente', filter: av => av.id.startsWith('kit_') },
+  { id:'stars',       label:'⭐ Superstele',  filter: av => av.rarity === 'epic' },
+  { id:'legendary',   label:'🔮 Legendar',    filter: av => av.rarity === 'legendary' },
+];
+
+// ─── AVATAR PICKER ────────────────────────────────────────────────────────────
 function AvatarPicker({ selected, onSelect }) {
+  const [cat, setCat] = useState('personality');
+  const catAvatars = AVATAR_CATEGORIES.find(c => c.id === cat)?.filter;
+  const visible = catAvatars ? AVATARS.filter(catAvatars) : AVATARS;
+  const selAv = AVATARS.find(a => a.id === selected);
+  const rar = selAv?.rarity ? RARITY_CONFIG[selAv.rarity] : null;
+
   return (
     <div>
-      <div style={{ fontSize:10, color:'rgba(255,255,255,0.25)', letterSpacing:'0.12em', textTransform:'uppercase', marginBottom:10, fontWeight:600 }}>
+      <div style={{ fontSize:10, color:'rgba(255,255,255,0.25)', letterSpacing:'0.12em', textTransform:'uppercase', marginBottom:8, fontWeight:600 }}>
         Alege avatarul tău
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:6, maxHeight:180, overflowY:'auto' }}>
-        {AVATARS.map(av => (
-          <div
-            key={av.id}
-            onClick={() => onSelect(av.id)}
-            title={av.name}
-            style={{
-              width:'100%', aspectRatio:'1', borderRadius:12,
-              background: av.bg,
-              border:`2px solid ${selected === av.id ? av.accent : 'rgba(255,255,255,0.06)'}`,
-              display:'flex', alignItems:'center', justifyContent:'center',
-              fontSize:22, cursor:'pointer', transition:'all 0.15s',
-              boxShadow: selected === av.id ? `0 0 12px ${av.accent}55` : 'none',
-            }}
-          >{av.emoji}</div>
+      {/* Category tabs */}
+      <div style={{ display:'flex', gap:4, overflowX:'auto', marginBottom:8 }}>
+        {AVATAR_CATEGORIES.map(c => (
+          <button key={c.id} onClick={()=>setCat(c.id)} style={{ flexShrink:0, padding:'4px 9px', borderRadius:20, fontSize:10, fontWeight:700, cursor:'pointer', transition:'all 0.12s', background:cat===c.id?'rgba(255,255,255,0.1)':'rgba(255,255,255,0.03)', border:`1px solid ${cat===c.id?'rgba(255,255,255,0.2)':'rgba(255,255,255,0.07)'}`, color:cat===c.id?'#fff':'rgba(255,255,255,0.4)' }}>
+            {c.label}
+          </button>
         ))}
       </div>
-      {selected && (() => {
-        const av = AVATARS.find(a => a.id === selected);
-        return av ? (
-          <div style={{ marginTop:8, padding:'6px 10px', background:'rgba(255,255,255,0.04)', borderRadius:8, display:'flex', alignItems:'center', gap:8 }}>
-            <span style={{ fontSize:20 }}>{av.emoji}</span>
-            <div>
-              <div style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{av.name}</div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)' }}>{av.desc}</div>
+      {/* Grid */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:5, maxHeight:170, overflowY:'auto' }}>
+        {visible.map(av => {
+          const isSel = selected === av.id;
+          const rc = av.rarity ? RARITY_CONFIG[av.rarity] : null;
+          return (
+            <div key={av.id} onClick={()=>onSelect(av.id)} title={av.name} style={{
+              width:'100%', aspectRatio:'1', borderRadius:10,
+              background: av.bg,
+              border:`2px solid ${isSel ? av.accent : 'rgba(255,255,255,0.06)'}`,
+              display:'flex', alignItems:'center', justifyContent:'center',
+              fontSize:20, cursor:'pointer', transition:'all 0.12s', position:'relative',
+              boxShadow: isSel ? `0 0 14px ${av.accent}55` : av.shine ? `0 0 6px ${av.accent}22` : 'none',
+            }}>
+              {av.emoji}
+              {rc && rc.label !== 'Comun' && (
+                <div style={{ position:'absolute', bottom:0, right:0, width:8, height:8, borderRadius:'50%', background:rc.color, border:'1px solid rgba(0,0,0,0.5)' }}/>
+              )}
             </div>
+          );
+        })}
+      </div>
+      {/* Selected preview */}
+      {selAv && (
+        <div style={{ marginTop:8, padding:'7px 10px', background:'rgba(255,255,255,0.04)', borderRadius:8, display:'flex', alignItems:'center', gap:8 }}>
+          <span style={{ fontSize:22 }}>{selAv.emoji}</span>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'#fff', display:'flex', alignItems:'center', gap:6 }}>
+              {selAv.name}
+              {rar && rar.label !== 'Comun' && <span style={{ fontSize:9, padding:'1px 6px', borderRadius:10, background:rar.bg, color:rar.color, fontWeight:700 }}>{rar.label}</span>}
+            </div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)' }}>{selAv.desc}</div>
           </div>
-        ) : null;
-      })()}
+        </div>
+      )}
     </div>
   );
 }
