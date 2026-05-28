@@ -49,24 +49,68 @@ function PerfectHitOverlay({ pts, onDone }) {
   );
 }
 
+// ─── RARITY CONFIG (mirrors AuthScreens) ─────────────────────────────────────
+const RARITY_CFG = {
+  common:    { label:'',        color:'transparent',             bg:'transparent' },
+  rare:      { label:'Rar',     color:'#4A9EFF',                bg:'rgba(74,158,255,0.08)' },
+  epic:      { label:'Epic',    color:'#9B59B6',                bg:'rgba(155,89,182,0.10)' },
+  legendary: { label:'Legendar',color:'#FFD700',                bg:'rgba(255,215,0,0.08)' },
+};
+
+const AV_CATS = [
+  { id:'all',       label:'Toate' },
+  { id:'nations',   label:'🌍 Naționale',   filter: a => a.id.startsWith('flag_') },
+  { id:'jerseys',   label:'👕 Echipamente', filter: a => a.id.startsWith('kit_') },
+  { id:'stars',     label:'⭐ Stele',       filter: a => a.rarity==='epic' },
+  { id:'legendary', label:'🔮 Legendar',    filter: a => a.rarity==='legendary' },
+  { id:'person',    label:'😄 Personaje',   filter: a => !a.rarity || (a.rarity==='common' && !a.id.startsWith('flag_') && !a.id.startsWith('kit_')) },
+];
+
 // ─── AVATAR CHANGE MODAL ──────────────────────────────────────────────────────
 function AvatarChangeModal({ currentId, onSelect, onClose }) {
   const [sel, setSel] = useState(currentId);
-  const av = AVATARS.find(a => a.id === sel) || AVATARS[0];
+  const [cat, setCat] = useState('all');
+  const av  = AVATARS.find(a => a.id === sel) || AVATARS[0];
+  const rc  = av?.rarity ? RARITY_CFG[av.rarity] : null;
+  const catObj = AV_CATS.find(c => c.id === cat);
+  const visible = cat === 'all' ? AVATARS : AVATARS.filter(catObj?.filter || (()=>true));
+
   return (
     <div style={{ position:'fixed',inset:0,zIndex:90,background:'rgba(0,0,0,0.85)',backdropFilter:'blur(8px)',display:'flex',flexDirection:'column',justifyContent:'flex-end',animation:'fadeIn 0.15s' }} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{ background:'#111820',borderRadius:'22px 22px 0 0',padding:'18px 16px 36px',border:'1px solid rgba(255,255,255,0.08)',borderBottom:'none',animation:'slideUp 0.28s ease',maxHeight:'80dvh',overflowY:'auto' }}>
-        <div style={{ width:36,height:3,background:'rgba(255,255,255,0.15)',borderRadius:2,margin:'0 auto 16px' }}/>
-        <div style={{ fontSize:14,fontWeight:800,color:'#fff',marginBottom:4 }}>Schimbă avatarul</div>
-        <div style={{ fontSize:11,color:'rgba(255,255,255,0.3)',marginBottom:14 }}>{av.name} — {av.desc}</div>
-        <div style={{ display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:7,marginBottom:16 }}>
-          {AVATARS.map(a => (
-            <div key={a.id} onClick={()=>setSel(a.id)} title={a.name} style={{ width:'100%',aspectRatio:'1',borderRadius:12,background:a.bg,border:`2px solid ${sel===a.id?a.accent:'rgba(255,255,255,0.06)'}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,cursor:'pointer',boxShadow:sel===a.id?`0 0 10px ${a.accent}44`:'none',transition:'all 0.12s' }}>
-              {a.emoji}
+      <div style={{ background:'#111820',borderRadius:'22px 22px 0 0',padding:'16px 14px 32px',border:'1px solid rgba(255,255,255,0.08)',borderBottom:'none',animation:'slideUp 0.28s ease',maxHeight:'82dvh',overflowY:'auto' }}>
+        <div style={{ width:36,height:3,background:'rgba(255,255,255,0.15)',borderRadius:2,margin:'0 auto 14px' }}/>
+        <div style={{ display:'flex',alignItems:'center',gap:10,marginBottom:10 }}>
+          <span style={{ fontSize:24 }}>{av.emoji}</span>
+          <div>
+            <div style={{ fontSize:14,fontWeight:800,color:'#fff',display:'flex',alignItems:'center',gap:6 }}>
+              {av.name}
+              {rc?.label && <span style={{ fontSize:9,padding:'2px 7px',borderRadius:10,background:rc.bg,color:rc.color,fontWeight:700 }}>{rc.label}</span>}
             </div>
+            <div style={{ fontSize:10,color:'rgba(255,255,255,0.3)' }}>{av.desc}</div>
+          </div>
+        </div>
+        {/* Category filter */}
+        <div style={{ display:'flex',gap:4,overflowX:'auto',marginBottom:10 }}>
+          {AV_CATS.map(c => (
+            <button key={c.id} onClick={()=>setCat(c.id)} style={{ flexShrink:0,padding:'3px 9px',borderRadius:20,fontSize:10,fontWeight:700,cursor:'pointer',background:cat===c.id?'rgba(255,255,255,0.1)':'rgba(255,255,255,0.03)',border:`1px solid ${cat===c.id?'rgba(255,255,255,0.2)':'rgba(255,255,255,0.07)'}`,color:cat===c.id?'#fff':'rgba(255,255,255,0.38)' }}>
+              {c.label}
+            </button>
           ))}
         </div>
-        <button onClick={()=>onSelect(sel)} style={{ width:'100%',padding:14,background:'linear-gradient(135deg,#00E5A0,#00C27A)',border:'none',borderRadius:13,color:'#060C09',fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:"'Bebas Neue',sans-serif",letterSpacing:'0.08em' }}>
+        {/* Grid */}
+        <div style={{ display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:6,marginBottom:14,maxHeight:200,overflowY:'auto' }}>
+          {visible.map(a => {
+            const isSel = sel===a.id;
+            const arc = a.rarity ? RARITY_CFG[a.rarity] : null;
+            return (
+              <div key={a.id} onClick={()=>setSel(a.id)} title={a.name} style={{ width:'100%',aspectRatio:'1',borderRadius:11,background:a.bg,border:`2px solid ${isSel?a.accent:'rgba(255,255,255,0.06)'}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:21,cursor:'pointer',boxShadow:isSel?`0 0 12px ${a.accent}55`:a.shine?`0 0 5px ${a.accent}22`:'none',transition:'all 0.12s',position:'relative' }}>
+                {a.emoji}
+                {arc?.label && <div style={{ position:'absolute',bottom:0,right:0,width:8,height:8,borderRadius:'50%',background:arc.color,border:'1px solid rgba(0,0,0,0.6)' }}/>}
+              </div>
+            );
+          })}
+        </div>
+        <button onClick={()=>onSelect(sel)} style={{ width:'100%',padding:13,background:'linear-gradient(135deg,#00E5A0,#00C27A)',border:'none',borderRadius:12,color:'#060C09',fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:"'Bebas Neue',sans-serif",letterSpacing:'0.08em' }}>
           Salvează avatarul
         </button>
       </div>
