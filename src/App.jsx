@@ -1,92 +1,127 @@
 // ─── src/App.jsx ──────────────────────────────────────────────────────────────
-// Main application shell.
-// Auth flow: login → pick nickname → app
-// Admin: accessible via email whitelist (ADMIN_EMAILS) + 5-tap secret tap
+// Main application shell — v3.0
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import CSS from './styles/globalCSS.js';
-import { MATCHES, calcBreakdown, calcPoints, ADMIN_EMAILS } from './data/gameData.js';
+import {
+  MATCHES, buildMatches, calcBreakdown, calcPoints, buildLeaderboard,
+  ADMIN_EMAILS, ADMIN_EMAILS_RUNTIME, QUALIFY_PCT,
+} from './data/gameData.js';
+import { getAvatarById, getDefaultAvatarForNick, AVATARS } from './data/avatars.js';
 import { LoginScreen, NicknameScreen } from './screens/AuthScreens.jsx';
-import MatchesScreen    from './screens/MatchesScreen.jsx';
+import MatchesScreen     from './screens/MatchesScreen.jsx';
 import LeaderboardScreen from './screens/LeaderboardScreen.jsx';
-import AdminScreen      from './screens/AdminScreen.jsx';
-import HowToPlayScreen  from './screens/HowToPlayScreen.jsx';
-import PredictionModal  from './components/PredictionModal.jsx';
-import { FootballAvatar } from './components/UI.jsx';
-import { getPersistedSession, persistSession, saveUserProfile, getUserProfile, signOut } from './services/authService.js';
+import AdminScreen       from './screens/AdminScreen.jsx';
+import HowToPlayScreen   from './screens/HowToPlayScreen.jsx';
+import BracketScreen     from './screens/BracketScreen.jsx';
+import PredictionModal   from './components/PredictionModal.jsx';
+import { FootballAvatar, Spinner } from './components/UI.jsx';
+import {
+  getPersistedSession, persistSession, signOut,
+  saveUserProfile, getUserProfile, onFirebaseAuthChange,
+} from './services/authService.js';
+import { FIREBASE_CONFIGURED } from './services/firebase.js';
 
-export const APP_VERSION = 'v2.0';
+export const APP_VERSION = 'v3.0';
 
 // ─── PERFECT HIT OVERLAY ──────────────────────────────────────────────────────
 function PerfectHitOverlay({ pts, onDone }) {
-  const particles = Array.from({length:12}, (_, i) => ({
-    x: Math.random()*90+5, y: Math.random()*80+5,
-    c: i%3===0?"#FFD700":i%3===1?"#fff":"#00E5A0",
-    s: 4 + Math.random()*6,
-    tx: (Math.random()-0.5)*160,
-    ty: -40 - Math.random()*80,
+  const particles = Array.from({length:14}, (_,i) => ({
+    x:Math.random()*90+5, y:Math.random()*80+5,
+    c:i%3===0?'#FFD700':i%3===1?'#fff':'#00E5A0',
+    s:4+Math.random()*6,
+    tx:(Math.random()-0.5)*160, ty:-40-Math.random()*80,
   }));
-
   return (
-    <div
-      style={{ position:"fixed", inset:0, zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", background:"rgba(0,0,0,0.92)", backdropFilter:"blur(10px)", animation:"fadeIn 0.15s ease" }}
-      onClick={onDone}
-    >
-      {particles.map((p, i) => (
-        <div key={i} style={{ position:"absolute", left:`${p.x}%`, top:`${p.y}%`, width:p.s, height:p.s, borderRadius:"50%", background:p.c, animation:`particlePop 1.4s ${i*0.06}s ease-out forwards`, "--tx":`${p.tx}px`, "--ty":`${p.ty}px`, pointerEvents:"none" }}/>
-      ))}
-      <div style={{ textAlign:"center", animation:"celebPop 0.5s cubic-bezier(0.34,1.56,0.64,1) both", padding:"0 32px" }}>
-        <div style={{ width:88, height:88, borderRadius:"50%", margin:"0 auto 20px", background:"rgba(212,175,55,0.1)", border:"1px solid rgba(212,175,55,0.3)", display:"flex", alignItems:"center", justifyContent:"center", animation:"goldPulse 1.8s ease-out forwards" }}>
-          <div style={{ fontSize:38, lineHeight:1 }}>🎯</div>
+    <div style={{ position:'fixed',inset:0,zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.92)',backdropFilter:'blur(10px)',animation:'fadeIn 0.15s' }} onClick={onDone}>
+      {particles.map((p,i) => <div key={i} style={{ position:'absolute',left:`${p.x}%`,top:`${p.y}%`,width:p.s,height:p.s,borderRadius:'50%',background:p.c,animation:`particlePop 1.4s ${i*0.06}s ease-out forwards`,'--tx':`${p.tx}px`,'--ty':`${p.ty}px`,pointerEvents:'none' }}/>)}
+      <div style={{ textAlign:'center',animation:'celebPop 0.5s cubic-bezier(0.34,1.56,0.64,1) both',padding:'0 32px' }}>
+        <div style={{ width:84,height:84,borderRadius:'50%',margin:'0 auto 16px',background:'rgba(212,175,55,0.1)',border:'1px solid rgba(212,175,55,0.3)',display:'flex',alignItems:'center',justifyContent:'center',animation:'goldPulse 1.8s ease-out forwards' }}>
+          <div style={{ fontSize:36 }}>🎯</div>
         </div>
-        <div style={{ fontSize:10, color:"rgba(212,175,55,0.5)", letterSpacing:"0.22em", textTransform:"uppercase", marginBottom:8, fontWeight:700 }}>Predicție Perfectă</div>
-        <div style={{ fontSize:54, fontWeight:900, color:"#fff", fontFamily:"'Bebas Neue',sans-serif", letterSpacing:"0.04em", lineHeight:1, marginBottom:8 }}>+{pts} PTS</div>
-        <div style={{ fontSize:13, color:"rgba(255,255,255,0.3)", marginBottom:24 }}>Scor · posesie · cornere — toate exacte</div>
-        <div style={{ fontSize:10, color:"rgba(255,255,255,0.15)" }}>atinge pentru a închide</div>
+        <div style={{ fontSize:9,color:'rgba(212,175,55,0.5)',letterSpacing:'0.22em',textTransform:'uppercase',marginBottom:6,fontWeight:700 }}>Predicție Perfectă</div>
+        <div style={{ fontSize:52,fontWeight:900,color:'#fff',fontFamily:"'Bebas Neue',sans-serif",letterSpacing:'0.04em',lineHeight:1,marginBottom:6 }}>+{pts} PTS</div>
+        <div style={{ fontSize:12,color:'rgba(255,255,255,0.3)',marginBottom:20 }}>Scor · posesie · cornere — toate exacte</div>
+        <div style={{ fontSize:10,color:'rgba(255,255,255,0.15)' }}>atinge pentru a închide</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── AVATAR CHANGE MODAL ──────────────────────────────────────────────────────
+function AvatarChangeModal({ currentId, onSelect, onClose }) {
+  const [sel, setSel] = useState(currentId);
+  const av = AVATARS.find(a => a.id === sel) || AVATARS[0];
+  return (
+    <div style={{ position:'fixed',inset:0,zIndex:90,background:'rgba(0,0,0,0.85)',backdropFilter:'blur(8px)',display:'flex',flexDirection:'column',justifyContent:'flex-end',animation:'fadeIn 0.15s' }} onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{ background:'#111820',borderRadius:'22px 22px 0 0',padding:'18px 16px 36px',border:'1px solid rgba(255,255,255,0.08)',borderBottom:'none',animation:'slideUp 0.28s ease',maxHeight:'80dvh',overflowY:'auto' }}>
+        <div style={{ width:36,height:3,background:'rgba(255,255,255,0.15)',borderRadius:2,margin:'0 auto 16px' }}/>
+        <div style={{ fontSize:14,fontWeight:800,color:'#fff',marginBottom:4 }}>Schimbă avatarul</div>
+        <div style={{ fontSize:11,color:'rgba(255,255,255,0.3)',marginBottom:14 }}>{av.name} — {av.desc}</div>
+        <div style={{ display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:7,marginBottom:16 }}>
+          {AVATARS.map(a => (
+            <div key={a.id} onClick={()=>setSel(a.id)} title={a.name} style={{ width:'100%',aspectRatio:'1',borderRadius:12,background:a.bg,border:`2px solid ${sel===a.id?a.accent:'rgba(255,255,255,0.06)'}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,cursor:'pointer',boxShadow:sel===a.id?`0 0 10px ${a.accent}44`:'none',transition:'all 0.12s' }}>
+              {a.emoji}
+            </div>
+          ))}
+        </div>
+        <button onClick={()=>onSelect(sel)} style={{ width:'100%',padding:14,background:'linear-gradient(135deg,#00E5A0,#00C27A)',border:'none',borderRadius:13,color:'#060C09',fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:"'Bebas Neue',sans-serif",letterSpacing:'0.08em' }}>
+          Salvează avatarul
+        </button>
       </div>
     </div>
   );
 }
 
 // ─── PROFILE DRAWER ───────────────────────────────────────────────────────────
-function ProfileDrawer({ user, onClose, onLogout, onAdmin }) {
-  const isAdmin = ADMIN_EMAILS.includes(user?.email);
+function ProfileDrawer({ user, totalPts, myRank, streak, onClose, onLogout, onAdmin, onAvatarChange }) {
+  const adminEmails = [...ADMIN_EMAILS, ...ADMIN_EMAILS_RUNTIME];
+  const isAdmin = adminEmails.includes(user?.email) || user?.isAdmin;
+  const av = getAvatarById(user?.avatarId) || getDefaultAvatarForNick(user?.nickname||'?');
+
   return (
-    <div
-      style={{ position:"fixed", inset:0, zIndex:80, background:"rgba(0,0,0,0.7)", backdropFilter:"blur(6px)", animation:"fadeIn 0.15s" }}
-      onClick={e => e.target === e.currentTarget && onClose()}
-    >
-      <div style={{ position:"absolute", top:0, right:0, width:260, height:"100%", background:"#0E1520", borderLeft:"1px solid rgba(255,255,255,0.06)", padding:"60px 20px 40px", display:"flex", flexDirection:"column", animation:"slideIn 0.2s ease" }}>
-        {/* Avatar */}
-        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginBottom:28 }}>
-          <FootballAvatar nickname={user?.nickname || "?"} size={64}/>
-          <div style={{ fontSize:15, fontWeight:700, color:"#fff", marginTop:12 }}>{user?.nickname}</div>
-          <div style={{ fontSize:11, color:"rgba(255,255,255,0.3)" }}>{user?.email}</div>
+    <div style={{ position:'fixed',inset:0,zIndex:80,background:'rgba(0,0,0,0.65)',backdropFilter:'blur(5px)',animation:'fadeIn 0.15s' }} onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{ position:'absolute',top:0,right:0,width:264,height:'100%',background:'#0E1520',borderLeft:'1px solid rgba(255,255,255,0.06)',padding:'56px 18px 36px',display:'flex',flexDirection:'column',animation:'slideIn 0.2s ease' }}>
+
+        {/* Avatar + name */}
+        <div style={{ display:'flex',flexDirection:'column',alignItems:'center',marginBottom:20 }}>
+          <div onClick={onAvatarChange} style={{ cursor:'pointer',position:'relative' }}>
+            <FootballAvatar nickname={user?.nickname||'?'} avatarId={user?.avatarId} size={68}/>
+            <div style={{ position:'absolute',bottom:0,right:0,width:20,height:20,borderRadius:'50%',background:'rgba(10,14,20,0.9)',border:'1px solid rgba(255,255,255,0.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11 }}>✏️</div>
+          </div>
+          <div style={{ fontSize:15,fontWeight:700,color:'#fff',marginTop:10 }}>{user?.nickname}</div>
+          <div style={{ fontSize:10,color:'rgba(255,255,255,0.28)' }}>{user?.email}</div>
+          <div style={{ fontSize:10,color:'rgba(255,255,255,0.2)',marginTop:3 }}>{av.name}</div>
         </div>
+
+        {/* Stats */}
+        <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginBottom:20 }}>
+          {[{l:'Locul',v:myRank?`#${myRank}`:'—',c:'#FFD700'},{l:'Streak',v:streak?`🔥${streak}`:'—',c:'#FF9800'},{l:'Puncte',v:totalPts,c:'#00E5A0'}].map((s,i)=>(
+            <div key={i} style={{ background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:10,padding:'10px 6px',textAlign:'center' }}>
+              <div style={{ fontSize:15,fontWeight:800,color:s.c,fontFamily:"'DM Mono',monospace" }}>{s.v}</div>
+              <div style={{ fontSize:9,color:'rgba(255,255,255,0.22)',marginTop:2,letterSpacing:'0.05em' }}>{s.l}</div>
+            </div>
+          ))}
+        </div>
+
+        {!FIREBASE_CONFIGURED && (
+          <div style={{ padding:'7px 10px',background:'rgba(245,158,11,0.07)',border:'1px solid rgba(245,158,11,0.15)',borderRadius:8,fontSize:10,color:'rgba(245,158,11,0.6)',marginBottom:16,lineHeight:1.4 }}>
+            ⚠️ Demo mode — configurează Firebase pentru auth real
+          </div>
+        )}
 
         <div style={{ flex:1 }}/>
 
-        {/* Admin access */}
         {isAdmin && (
-          <button
-            onClick={onAdmin}
-            style={{ width:"100%", padding:"12px 16px", background:"rgba(239,68,68,0.08)", border:"1px solid rgba(239,68,68,0.2)", borderRadius:12, color:"#EF4444", fontSize:13, fontWeight:700, cursor:"pointer", marginBottom:8, textAlign:"left" }}
-          >
+          <button onClick={onAdmin} style={{ width:'100%',padding:'11px 14px',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',borderRadius:11,color:'#EF4444',fontSize:12,fontWeight:700,cursor:'pointer',marginBottom:8,textAlign:'left' }}>
             ⚙️ Panou Admin
           </button>
         )}
-
-        <button
-          onClick={onLogout}
-          style={{ width:"100%", padding:"12px 16px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:12, color:"rgba(255,255,255,0.5)", fontSize:13, fontWeight:600, cursor:"pointer", textAlign:"left" }}
-        >
+        <button onClick={onLogout} style={{ width:'100%',padding:'11px 14px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:11,color:'rgba(255,255,255,0.45)',fontSize:12,fontWeight:600,cursor:'pointer',textAlign:'left' }}>
           Deconectează-te
         </button>
-
-        <div style={{ fontSize:9, color:"rgba(255,255,255,0.1)", textAlign:"center", marginTop:16 }}>
-          World Cup Arena {APP_VERSION}
-        </div>
+        <div style={{ fontSize:9,color:'rgba(255,255,255,0.08)',textAlign:'center',marginTop:14 }}>World Cup Arena {APP_VERSION}</div>
       </div>
     </div>
   );
@@ -94,65 +129,111 @@ function ProfileDrawer({ user, onClose, onLogout, onAdmin }) {
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App() {
-  // Auth state
-  const [stage, setStage]         = useState('init');   // init | login | pick-nick | app
+  const [stage,      setStage]      = useState('init');
   const [googleUser, setGoogleUser] = useState(null);
-  const [user, setUser]           = useState(null);
-
-  // Navigation
-  const [tab, setTab]             = useState('matches');
-  const [adminMode, setAdminMode] = useState(false);
-  const [adminTaps, setAdminTaps] = useState(0);
-  const [showProfile, setShowProfile] = useState(false);
-
-  // Predictions
-  const [predictions, setPredictions]       = useState({});
+  const [user,       setUser]       = useState(null);
+  const [tab,        setTab]        = useState('matches');
+  const [adminMode,  setAdminMode]  = useState(false);
+  const [showProfile,setShowProfile]= useState(false);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [predictions,setPredictions]= useState({});
   const [predictingMatch, setPredictingMatch] = useState(null);
+  const [perfectHit, setPerfectHit] = useState(null);
+  const [finishedResults, setFinishedResults] = useState({});
 
-  // Overlays
-  const [perfectHit, setPerfectHit]         = useState(null);
-
-  // ── Restore session ──
+  // ── Restore session ──────────────────────────────────────────────────────
   useEffect(() => {
-    const session = getPersistedSession();
-    if (session?.uid && session?.nickname) {
-      setUser(session);
-      // Load saved predictions
-      const raw = localStorage.getItem(`preds_${session.uid}`);
-      if (raw) try { setPredictions(JSON.parse(raw)); } catch {}
-      setStage('app');
-    } else {
-      setStage('login');
-    }
+    // Try Firebase auth state first (handles returning users automatically)
+    const unsub = onFirebaseAuthChange(async (fbUser) => {
+      if (fbUser) {
+        const profile = await getUserProfile(fbUser.uid);
+        if (profile?.nickname) {
+          const fullUser = { uid:fbUser.uid, email:fbUser.email, name:fbUser.displayName, photoURL:fbUser.photoURL, provider:'google', ...profile };
+          setUser(fullUser);
+          persistSession(fullUser);
+          const raw = localStorage.getItem(`preds_${fbUser.uid}`);
+          if (raw) try { setPredictions(JSON.parse(raw)); } catch {}
+          setStage('app');
+          return;
+        }
+      }
+      // Fallback: localStorage session
+      const session = getPersistedSession();
+      if (session?.uid && session?.nickname) {
+        setUser(session);
+        const raw = localStorage.getItem(`preds_${session.uid}`);
+        if (raw) try { setPredictions(JSON.parse(raw)); } catch {}
+        setStage('app');
+      } else {
+        setStage('login');
+      }
+    });
+    return unsub;
   }, []);
 
+  // ── Computed state ────────────────────────────────────────────────────────
+  const liveMatches = buildMatches(finishedResults);
+
   const totalPts = Object.entries(predictions).reduce((sum, [id, p]) => {
-    const m = MATCHES.find(x => x.id === Number(id));
+    const m = liveMatches.find(x => x.id === Number(id));
     return sum + (m?.isFinished ? calcPoints(p, m) || 0 : 0);
   }, 0);
 
-  // ── Save prediction ──
+  // My rank
+  const demoFriends = {
+    'RaduGoalz':  {13:{scoreA:2,scoreB:0,possession:60,corners:7}},
+    'AndreiFC':   {13:{scoreA:1,scoreB:1,possession:55,corners:9}},
+    'MihaiUltra': {13:{scoreA:2,scoreB:1,possession:58,corners:8}},
+    'AlexTactic': {13:{scoreA:0,scoreB:1,possession:45,corners:6}},
+  };
+  const myPreds    = Object.fromEntries(Object.entries(predictions).map(([id,p])=>[Number(id),p]));
+  const allPreds   = { ...demoFriends, [user?.nickname||'Me']: myPreds };
+  const leaderboard = buildLeaderboard(allPreds, user?.nickname||'Me', liveMatches.filter(m=>m.isFinished));
+  const myEntry    = leaderboard.find(p => p.nickname === user?.nickname);
+  const myRank     = myEntry?.rank;
+  const streak     = myEntry?.exactScores || 0;
+
+  // ── Handlers ─────────────────────────────────────────────────────────────
   const handleSavePrediction = (id, pred) => {
     const next = { ...predictions, [id]: pred };
     setPredictions(next);
     if (user?.uid) localStorage.setItem(`preds_${user.uid}`, JSON.stringify(next));
-    const m = MATCHES.find(m => m.id === Number(id));
+    const m = liveMatches.find(m => m.id === Number(id));
     if (m?.isFinished) {
       const b = calcBreakdown(pred, m);
       if (b?.isPerfect) setPerfectHit({ pts:b.total });
     }
   };
 
-  // ── Admin match update (mock — in production: update FINISHED_RESULTS + rebuild) ──
-  const handleMatchUpdate = (update) => {
-    // In production: mutate Supabase and re-fetch matches
-    console.log("[ADMIN] Match update:", update);
-  };
+  const handleMatchUpdate = useCallback((update) => {
+    setFinishedResults(prev => {
+      const next = { ...prev };
+      if (update.liveStatus === 'ft') {
+        next[update.matchId] = {
+          realScoreA:     update.realScoreA,
+          realScoreB:     update.realScoreB,
+          realPossession: update.realPossession,
+          realCorners:    update.realCorners,
+          liveMinute:     update.liveMinute,
+          liveStatus:     'ft',
+        };
+      } else {
+        next[update.matchId] = {
+          ...(next[update.matchId] || {}),
+          liveScoreA:  update.liveScoreA,
+          liveScoreB:  update.liveScoreB,
+          liveMinute:  update.liveMinute,
+          liveStatus:  update.liveStatus,
+          realScoreA:  null,
+          realScoreB:  null,
+        };
+      }
+      return next;
+    });
+  }, []);
 
-  // ── Auth handlers ──
   const handleLogin = (googleData) => {
     setGoogleUser(googleData);
-    // Check if user already has a profile (returning user)
     getUserProfile(googleData.uid).then(profile => {
       if (profile?.nickname) {
         const fullUser = { ...googleData, ...profile };
@@ -167,8 +248,8 @@ export default function App() {
     });
   };
 
-  const handleNickname = async (nick) => {
-    const profile = { nickname:nick };
+  const handleNickname = async (nick, avatarId) => {
+    const profile = { nickname:nick, avatarId };
     await saveUserProfile(googleUser.uid, profile);
     const fullUser = { ...googleUser, ...profile };
     setUser(fullUser);
@@ -178,26 +259,33 @@ export default function App() {
 
   const handleLogout = () => {
     signOut();
-    setUser(null);
-    setGoogleUser(null);
-    setPredictions({});
-    setAdminMode(false);
-    setShowProfile(false);
+    setUser(null); setGoogleUser(null); setPredictions({});
+    setAdminMode(false); setShowProfile(false);
     setStage('login');
   };
 
-  // ── Tabs ──
+  const handleAvatarChange = async (avatarId) => {
+    if (!user?.uid) return;
+    const updated = { ...user, avatarId };
+    await saveUserProfile(user.uid, { avatarId });
+    setUser(updated);
+    persistSession(updated);
+    setShowAvatarPicker(false);
+  };
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────
   const TABS = [
-    { id:'matches',     label:'Meciuri',   icon:'⚽' },
-    { id:'leaderboard', label:'Clasament',  icon:'🏆' },
-    { id:'rules',       label:'Cum joci',   icon:'📋' },
+    { id:'matches',     label:'Meciuri',  icon:'⚽' },
+    { id:'leaderboard', label:'Clasament', icon:'🏆' },
+    { id:'bracket',     label:'Tablou',   icon:'🗂️' },
+    { id:'rules',       label:'Reguli',   icon:'📋' },
   ];
 
-  // ── Render ──
+  // ── Render ────────────────────────────────────────────────────────────────
   if (stage === 'init') return (
     <><style>{CSS}</style>
-    <div style={{ minHeight:"100dvh", background:"#0A0E14", display:"flex", alignItems:"center", justifyContent:"center" }}>
-      <div style={{ width:36, height:36, border:"3px solid rgba(255,255,255,0.08)", borderTopColor:"#00E5A0", borderRadius:"50%", animation:"spin 0.8s linear infinite" }}/>
+    <div style={{ minHeight:'100dvh',background:'#0A0E14',display:'flex',alignItems:'center',justifyContent:'center' }}>
+      <Spinner size={36} color="#00E5A0"/>
     </div></>
   );
 
@@ -217,128 +305,77 @@ export default function App() {
 
   return (
     <><style>{CSS}</style>
-    <div style={{
-      fontFamily:"'Space Grotesk','Syne',sans-serif",
-      background:"#0A0E14",
-      minHeight:"100dvh", color:"#fff",
-      maxWidth:430, margin:"0 auto",
-      display:"flex", flexDirection:"column",
-      position:"relative",
-    }}>
+    <div style={{ fontFamily:"'Space Grotesk','Syne',sans-serif",background:'#0A0E14',minHeight:'100dvh',color:'#fff',maxWidth:430,margin:'0 auto',display:'flex',flexDirection:'column',position:'relative' }}>
 
-      {/* ── Sticky Header ── */}
-      <div style={{
-        position:"sticky", top:0, zIndex:50,
-        background:"rgba(10,14,20,0.97)",
-        backdropFilter:"blur(20px)",
-        borderBottom:"1px solid rgba(255,255,255,0.06)",
-        padding:"12px 16px 11px",
-        display:"flex", justifyContent:"space-between", alignItems:"center",
-      }}>
+      {/* ── Header ── */}
+      <div style={{ position:'sticky',top:0,zIndex:50,background:'rgba(10,14,20,0.97)',backdropFilter:'blur(20px)',borderBottom:'1px solid rgba(255,255,255,0.06)',padding:'10px 14px 9px',display:'flex',justifyContent:'space-between',alignItems:'center' }}>
         <div>
-          <div style={{ fontSize:8, color:"rgba(212,175,55,0.5)", letterSpacing:"0.22em", textTransform:"uppercase", fontWeight:700, marginBottom:1 }}>FIFA World Cup 2026™</div>
-          <div style={{ fontSize:18, fontWeight:800, color:"#fff", lineHeight:1.1, letterSpacing:"-0.02em" }}>
-            World Cup Arena
-          </div>
+          <div style={{ fontSize:8,color:'rgba(212,175,55,0.45)',letterSpacing:'0.22em',textTransform:'uppercase',fontWeight:700,marginBottom:1 }}>FIFA World Cup 2026™</div>
+          <div style={{ fontSize:17,fontWeight:800,color:'#fff',lineHeight:1.1,letterSpacing:'-0.02em' }}>World Cup Arena</div>
         </div>
-        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          {totalPts > 0 && (
-            <div style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:6, padding:"4px 10px", fontSize:12, fontWeight:700, color:"rgba(255,255,255,0.8)", fontFamily:"'DM Mono',monospace" }}>
-              {totalPts} pts
+        {/* Compact stats strip */}
+        <div style={{ display:'flex',alignItems:'center',gap:8 }}>
+          {(myRank || totalPts > 0) && (
+            <div style={{ display:'flex',alignItems:'center',gap:7,background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.09)',borderRadius:20,padding:'4px 10px' }}>
+              {myRank && <span style={{ fontSize:11,fontWeight:700,color:'#FFD700' }}>🏆 #{myRank}</span>}
+              {streak > 0 && <span style={{ fontSize:11,fontWeight:700,color:'#FF9800' }}>🔥{streak}</span>}
+              {totalPts > 0 && <span style={{ fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.7)',fontFamily:"'DM Mono',monospace" }}>⚡{totalPts}</span>}
             </div>
           )}
-          {/* Avatar + tap-for-admin */}
-          <div
-            onClick={() => {
-              const t = adminTaps + 1;
-              setAdminTaps(t);
-              if (t >= 5) { setAdminMode(true); setAdminTaps(0); }
-              else setShowProfile(true);
-            }}
-            style={{ cursor:"pointer", display:"flex", alignItems:"center" }}
-          >
-            <div style={{ border:adminMode?"2px solid rgba(239,68,68,0.6)":"2px solid rgba(255,255,255,0.08)", borderRadius:"50%" }}>
-              <FootballAvatar nickname={user?.nickname || "?"} size={32}/>
-            </div>
+          <div onClick={()=>setShowProfile(true)} style={{ cursor:'pointer', border:`2px solid ${adminMode?'rgba(239,68,68,0.5)':'rgba(255,255,255,0.1)'}`, borderRadius:'50%' }}>
+            <FootballAvatar nickname={user?.nickname||'?'} avatarId={user?.avatarId} size={30}/>
           </div>
         </div>
       </div>
 
       {/* ── Admin banner ── */}
       {adminMode && (
-        <div style={{ background:"rgba(239,68,68,0.07)", borderBottom:"1px solid rgba(239,68,68,0.15)", padding:"8px 16px", display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:12, color:"rgba(239,68,68,0.8)" }}>
+        <div style={{ background:'rgba(239,68,68,0.07)',borderBottom:'1px solid rgba(239,68,68,0.14)',padding:'7px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:12,color:'rgba(239,68,68,0.8)' }}>
           <span>⚙️ Mod Admin activ</span>
-          <span style={{ cursor:"pointer", opacity:0.6, fontSize:14 }} onClick={() => setAdminMode(false)}>× Ieși</span>
+          <span style={{ cursor:'pointer',opacity:0.6 }} onClick={()=>setAdminMode(false)}>× Ieși</span>
         </div>
       )}
 
-      {/* ── Main Content ── */}
-      <div style={{ flex:1, overflowY:"auto", paddingBottom:86 }}>
+      {/* ── Content ── */}
+      <div style={{ flex:1,overflowY:'auto',paddingBottom:72 }}>
         {adminMode
-          ? <AdminScreen currentUser={user} onMatchUpdate={handleMatchUpdate}/>
-          : tab === 'matches'
-          ? <MatchesScreen predictions={predictions} onPredict={setPredictingMatch}/>
-          : tab === 'leaderboard'
+          ? <AdminScreen currentUser={user} finishedResults={finishedResults} onMatchUpdate={handleMatchUpdate}/>
+          : tab==='matches'
+          ? <MatchesScreen predictions={predictions} onPredict={setPredictingMatch} finishedResults={finishedResults}/>
+          : tab==='leaderboard'
           ? <LeaderboardScreen currentUser={user?.nickname} predictions={predictions}/>
+          : tab==='bracket'
+          ? <BracketScreen/>
           : <HowToPlayScreen/>
         }
       </div>
 
-      {/* ── Bottom Tab Bar ── */}
+      {/* ── Bottom Tab Bar — slimmer ── */}
       {!adminMode && (
-        <div style={{
-          position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)",
-          width:"100%", maxWidth:430,
-          background:"rgba(10,14,20,0.98)",
-          backdropFilter:"blur(24px)",
-          borderTop:"1px solid rgba(255,255,255,0.06)",
-          padding:"10px 10px 24px",
-          display:"flex", justifyContent:"space-around", gap:4,
-        }}>
+        <div style={{ position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:430,background:'rgba(10,14,20,0.97)',backdropFilter:'blur(24px)',borderTop:'1px solid rgba(255,255,255,0.06)',padding:'7px 8px 20px',display:'flex',justifyContent:'space-around',gap:2 }}>
           {TABS.map(t => {
             const active = tab === t.id;
             return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                style={{
-                  flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:3,
-                  background: active ? "rgba(255,255,255,0.07)" : "transparent",
-                  border: active ? "1px solid rgba(255,255,255,0.1)" : "1px solid transparent",
-                  borderRadius:12, cursor:"pointer",
-                  color: active ? "#fff" : "rgba(255,255,255,0.3)",
-                  transition:"all 0.15s", padding:"7px 4px",
-                }}
-              >
-                <span style={{ fontSize:20, lineHeight:1 }}>{t.icon}</span>
-                <span style={{ fontSize:9, fontWeight:active?700:400, letterSpacing:"0.06em", textTransform:"uppercase" }}>{t.label}</span>
+              <button key={t.id} onClick={()=>setTab(t.id)} style={{ flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:2,background:'transparent',border:'none',cursor:'pointer',color:active?'#fff':'rgba(255,255,255,0.3)',transition:'all 0.15s',padding:'5px 2px',position:'relative' }}>
+                {active && <div style={{ position:'absolute',top:-7,left:'50%',transform:'translateX(-50%)',width:20,height:2,borderRadius:1,background:'#00E5A0' }}/>}
+                <span style={{ fontSize:18,lineHeight:1 }}>{t.icon}</span>
+                <span style={{ fontSize:8,fontWeight:active?700:400,letterSpacing:'0.06em',textTransform:'uppercase' }}>{t.label}</span>
               </button>
             );
           })}
         </div>
       )}
 
-      {/* ── Prediction Modal ── */}
+      {/* ── Modals ── */}
       {predictingMatch && (
-        <PredictionModal
-          match={predictingMatch}
-          existing={predictions[predictingMatch.id]}
-          onSave={handleSavePrediction}
-          onClose={() => setPredictingMatch(null)}
-        />
+        <PredictionModal match={predictingMatch} existing={predictions[predictingMatch.id]} onSave={handleSavePrediction} onClose={()=>setPredictingMatch(null)}/>
       )}
-
-      {/* ── Perfect Hit Overlay ── */}
-      {perfectHit && <PerfectHitOverlay pts={perfectHit.pts} onDone={() => setPerfectHit(null)}/>}
-
-      {/* ── Profile Drawer ── */}
+      {perfectHit && <PerfectHitOverlay pts={perfectHit.pts} onDone={()=>setPerfectHit(null)}/>}
       {showProfile && (
-        <ProfileDrawer
-          user={user}
-          onClose={() => setShowProfile(false)}
-          onLogout={handleLogout}
-          onAdmin={() => { setAdminMode(true); setShowProfile(false); }}
-        />
+        <ProfileDrawer user={user} totalPts={totalPts} myRank={myRank} streak={streak} onClose={()=>setShowProfile(false)} onLogout={handleLogout} onAdmin={()=>{setAdminMode(true);setShowProfile(false);}} onAvatarChange={()=>{setShowProfile(false);setShowAvatarPicker(true);}}/>
+      )}
+      {showAvatarPicker && (
+        <AvatarChangeModal currentId={user?.avatarId} onSelect={handleAvatarChange} onClose={()=>setShowAvatarPicker(false)}/>
       )}
 
     </div></>
