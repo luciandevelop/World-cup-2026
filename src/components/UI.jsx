@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState } from 'react';
-import { getAvatarConfig } from '../data/gameData.js';
+import { getDefaultAvatarForNick, getAvatarById } from '../data/avatars.js';
 
 // ─── GOOGLE LOGO ──────────────────────────────────────────────────────────────
 export function GoogleLogo({ size = 20 }) {
@@ -27,61 +27,19 @@ export function AppleLogo({ size = 20 }) {
 }
 
 // ─── FOOTBALL AVATAR ──────────────────────────────────────────────────────────
-// FUT card style cartoon avatar derived deterministically from nickname
-export function FootballAvatar({ nickname, size = 40, style: extraStyle = {} }) {
-  const cfg = getAvatarConfig(nickname || "?");
-  const initial = (nickname || "?")[0].toUpperCase();
-
+// Emoji-based avatar. Uses avatarId if provided, else derives from nickname.
+export function FootballAvatar({ nickname, avatarId, size = 40, style: extraStyle = {} }) {
+  const av = avatarId ? getAvatarById(avatarId) : getDefaultAvatarForNick(nickname || '?');
+  const fontSize = Math.round(size * 0.52);
   return (
     <div style={{
-      width: size, height: size, borderRadius: "50%",
-      background: cfg.bg,
-      border: `2px solid ${cfg.accent}44`,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      position: "relative", overflow: "hidden",
-      flexShrink: 0,
+      width:size, height:size, borderRadius:'50%',
+      background:av.bg, border:`2px solid ${av.accent}44`,
+      display:'flex', alignItems:'center', justifyContent:'center',
+      fontSize, flexShrink:0, position:'relative', overflow:'hidden',
       ...extraStyle,
     }}>
-      {/* Hair shape */}
-      <div style={{
-        position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)",
-        width: "80%", height: "40%",
-        background: cfg.hair,
-        borderRadius: "0 0 50% 50%",
-      }}/>
-      {/* Face */}
-      <div style={{
-        position: "absolute",
-        width: "62%", height: "56%",
-        background: cfg.skin,
-        borderRadius: "50% 50% 45% 45%",
-        bottom: "14%",
-        left: "50%", transform: "translateX(-50%)",
-        display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "flex-end",
-        paddingBottom: "8%",
-      }}>
-        {/* Eyes */}
-        <div style={{ position: "absolute", top: "28%", width: "80%", display: "flex", justifyContent: "space-around" }}>
-          <div style={{ width: "16%", aspectRatio:"1", borderRadius: "50%", background: "#1a1a2e" }}/>
-          <div style={{ width: "16%", aspectRatio:"1", borderRadius: "50%", background: "#1a1a2e" }}/>
-        </div>
-        {/* Smile */}
-        <div style={{
-          width: "50%", height: "20%",
-          border: "2px solid rgba(0,0,0,0.25)",
-          borderTop: "none",
-          borderRadius: "0 0 50% 50%",
-          marginBottom: "5%",
-        }}/>
-      </div>
-      {/* Accent dot bottom right */}
-      <div style={{
-        position:"absolute", bottom: 2, right: 2,
-        width: size * 0.22, height: size * 0.22,
-        borderRadius: "50%",
-        background: cfg.accent,
-      }}/>
+      <span style={{ lineHeight:1 }}>{av.emoji}</span>
     </div>
   );
 }
