@@ -76,7 +76,7 @@ export const AVATARS = [
   // ── ⭐ Superstar Jerseys — EPIC ────────────────────────────────────────────
   // rarity: 'epic'
   { id:'mbappe_10',  emoji:'⚡', name:'MBAPPÉ #10',     desc:'France · PSG / Real Madrid · Viteza pură', bg:'#0a0a2d', accent:'#4A9EFF', ring:'linear-gradient(135deg,#4A9EFF,#EF4444)', rarity:'epic',   shine:true },
-  { id:'vinicius_7', emoji:'🌪️', name:'VINICIUS #7',   desc:'Brazil · Real Madrid · Ballon d'Or 2024',  bg:'#0a2d0a', accent:'#FFD700', ring:'linear-gradient(135deg,#FFD700,#00E5A0)', rarity:'epic',   shine:true },
+  { id:'vinicius_7', emoji:'🌪️', name:'VINICIUS #7',   desc:'Brazil · Real Madrid · Ballon d\'Or 2024',  bg:'#0a2d0a', accent:'#FFD700', ring:'linear-gradient(135deg,#FFD700,#00E5A0)', rarity:'epic',   shine:true },
   { id:'messi_10',   emoji:'🐐', name:'MESSI #10',      desc:'Argentina · Inter Miami · The GOAT',        bg:'#0a1a2d', accent:'#4A9EFF', ring:'linear-gradient(135deg,#4A9EFF,#FFD700)', rarity:'epic',   shine:true },
   { id:'yamal_19',   emoji:'💫', name:'YAMAL #19',      desc:'Spain · Barcelona · Lamine la nouă generație',bg:'#2d0a0a', accent:'#FFD700', ring:'linear-gradient(135deg,#EF4444,#FFD700)', rarity:'epic',  shine:true },
   { id:'haaland_9',  emoji:'💣', name:'HAALAND #9',     desc:'Norway · Man City · Mașina de goluri',      bg:'#0a0a2d', accent:'#4A9EFF', ring:'linear-gradient(135deg,#4A9EFF,#00E5A0)', rarity:'epic',   shine:true },
@@ -110,7 +110,7 @@ export const AVATARS = [
 
   // ── ⭐ More Superstars — EPIC ──────────────────────────────────────────────
   { id:'pedri_8',    emoji:'🎪', name:'PEDRI #8',      desc:'Spain · Barcelona · El Maestro',         bg:'#2d0a0a', accent:'#FFD700', ring:'linear-gradient(135deg,#EF4444,#FFD700)', rarity:'epic', shine:true },
-  { id:'rodri_16',   emoji:'🏔', name:'RODRI #16',     desc:'Spain · Man City · Ballon d'Or 2023',    bg:'#2d0a0a', accent:'#4A9EFF', ring:'linear-gradient(135deg,#EF4444,#4A9EFF)', rarity:'epic', shine:true },
+  { id:'rodri_16',   emoji:'🏔', name:'RODRI #16',     desc:'Spain · Man City · Ballon d\'Or 2023',    bg:'#2d0a0a', accent:'#4A9EFF', ring:'linear-gradient(135deg,#EF4444,#4A9EFF)', rarity:'epic', shine:true },
   { id:'salah_11',   emoji:'🌙', name:'SALAH #11',     desc:'Egypt · Liverpool · King of Anfield',    bg:'#2d0a0a', accent:'#EF4444', ring:'linear-gradient(135deg,#EF4444,#FFD700)', rarity:'epic', shine:true },
   { id:'neymar_10',  emoji:'🎯', name:'NEYMAR #10',    desc:'Brazil · Santos de Volta · O Ney',       bg:'#0a2d0a', accent:'#FFD700', ring:'linear-gradient(135deg,#FFD700,#00E5A0)', rarity:'epic', shine:true },
   { id:'osimhen_9',  emoji:'💥', name:'OSIMHEN #9',    desc:'Nigeria · Napoli/Galatasaray · Boom',    bg:'#0a2d0a', accent:'#00E5A0', ring:'linear-gradient(135deg,#00E5A0,#FFD700)', rarity:'epic', shine:true },
