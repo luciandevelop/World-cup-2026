@@ -7,21 +7,28 @@ import {
 } from '../data/gameData.js';
 import { FootballAvatar } from '../components/UI.jsx';
 
-export default function LeaderboardScreen({ currentUser, predictions }) {
-  const demoFriends = {
+export default function LeaderboardScreen({ currentUser, predictions, allPredictions, allUsers }) {
+  // When allPredictions is available (Firestore or multi-tab localStorage), use real data.
+  // Otherwise fall back to demo friends so the screen never looks empty.
+  const hasMPData = allPredictions && Object.keys(allPredictions).length > 1;
+
+  const demoFallback = hasMPData ? {} : {
     "RaduGoalz":  { 13: MOCK_PREDICTIONS_FINISHED[0] },
     "AndreiFC":   { 13: MOCK_PREDICTIONS_FINISHED[1] },
     "MihaiUltra": { 13: MOCK_PREDICTIONS_FINISHED[2] },
     "AlexTactic": { 13: MOCK_PREDICTIONS_FINISHED[3] },
-    "CostinPro":  { 13: MOCK_PREDICTIONS_FINISHED[4] },
-    "IonelFC":    { 13: MOCK_PREDICTIONS_FINISHED[5] },
   };
 
   const myPreds = Object.fromEntries(
     Object.entries(predictions).map(([id, p]) => [Number(id), p])
   );
 
-  const allPlayerPreds = { ...demoFriends, [currentUser]: myPreds };
+  // Merge: real multi-user data + current user always present
+  const allPlayerPreds = {
+    ...demoFallback,
+    ...(allPredictions || {}),
+    [currentUser]: myPreds,
+  };
   const sorted = buildLeaderboard(allPlayerPreds, currentUser);
 
   const total         = sorted.length;

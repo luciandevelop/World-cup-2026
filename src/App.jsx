@@ -12,7 +12,7 @@ import { getAvatarById, getDefaultAvatarForNick, AVATARS } from './data/avatars.
 import { LoginScreen, NicknameScreen } from './screens/AuthScreens.jsx';
 import MatchesScreen     from './screens/MatchesScreen.jsx';
 import LeaderboardScreen from './screens/LeaderboardScreen.jsx';
-import AdminScreen       from './screens/AdminScreen.jsx';
+import AdminScreen, { loadAdminResults } from './screens/AdminScreen.jsx';
 import HowToPlayScreen   from './screens/HowToPlayScreen.jsx';
 import BracketScreen     from './screens/BracketScreen.jsx';
 import PredictionModal   from './components/PredictionModal.jsx';
@@ -21,9 +21,15 @@ import {
   getPersistedSession, persistSession, signOut,
   saveUserProfile, getUserProfile, onFirebaseAuthChange,
 } from './services/authService.js';
+import {
+  savePrediction, loadUserPredictions,
+  loadAllPredictions, loadMatchResults,
+  subscribeToMatchResults, subscribeToPredictions, subscribeToUsers,
+  REALTIME_MODE,
+} from './services/firestoreService.js';
 import { FIREBASE_CONFIGURED } from './services/firebase.js';
 
-export const APP_VERSION = 'v3.0';
+export const APP_VERSION = 'v4.0';
 
 // ─── PERFECT HIT OVERLAY ──────────────────────────────────────────────────────
 function PerfectHitOverlay({ pts, onDone }) {
@@ -183,20 +189,32 @@ export default function App() {
   const [predictions,setPredictions]= useState({});
   const [predictingMatch, setPredictingMatch] = useState(null);
   const [perfectHit, setPerfectHit] = useState(null);
-  const [finishedResults, setFinishedResults] = useState({});
+  const [finishedResults,  setFinishedResults]  = useState(() => loadAdminResults()); // persist across reloads
+  const [allPredictions,   setAllPredictions]   = useState({}); // { uid: { matchId: pred } } — all users
+  const [allUsers,         setAllUsers]         = useState({}); // { uid: { nickname, avatarId, ... } }
 
-  // ── Restore session ──────────────────────────────────────────────────────
+  // ── Restore session + set up realtime listeners ──────────────────────────
   useEffect(() => {
-    // Try Firebase auth state first (handles returning users automatically)
-    const unsub = onFirebaseAuthChange(async (fbUser) => {
+    // Realtime: match results (Firestore or localStorage poll)
+    const unsubResults = subscribeToMatchResults(results => setFinishedResults(results));
+    // Realtime: all users' predictions
+    const unsubPreds   = subscribeToPredictions(preds => setAllPredictions(preds));
+    // Realtime: user profiles (for leaderboard nicknames/avatars)
+    const unsubUsers   = subscribeToUsers(users => setAllUsers(users));
+
+    // Load initial all-users predictions
+    loadAllPredictions().then(setAllPredictions);
+
+    // Auth state
+    const unsubAuth = onFirebaseAuthChange(async (fbUser) => {
       if (fbUser) {
         const profile = await getUserProfile(fbUser.uid);
         if (profile?.nickname) {
           const fullUser = { uid:fbUser.uid, email:fbUser.email, name:fbUser.displayName, photoURL:fbUser.photoURL, provider:'google', ...profile };
           setUser(fullUser);
           persistSession(fullUser);
-          const raw = localStorage.getItem(`preds_${fbUser.uid}`);
-          if (raw) try { setPredictions(JSON.parse(raw)); } catch {}
+          const preds = await loadUserPredictions(fbUser.uid);
+          setPredictions(preds);
           setStage('app');
           return;
         }
@@ -205,14 +223,15 @@ export default function App() {
       const session = getPersistedSession();
       if (session?.uid && session?.nickname) {
         setUser(session);
-        const raw = localStorage.getItem(`preds_${session.uid}`);
-        if (raw) try { setPredictions(JSON.parse(raw)); } catch {}
+        const preds = await loadUserPredictions(session.uid);
+        setPredictions(preds);
         setStage('app');
       } else {
         setStage('login');
       }
     });
-    return unsub;
+
+    return () => { unsubResults(); unsubPreds(); unsubUsers(); unsubAuth(); };
   }, []);
 
   // ── Computed state ────────────────────────────────────────────────────────
@@ -223,25 +242,30 @@ export default function App() {
     return sum + (m?.isFinished ? calcPoints(p, m) || 0 : 0);
   }, 0);
 
-  // My rank
-  const demoFriends = {
-    'RaduGoalz':  {13:{scoreA:2,scoreB:0,possession:60,corners:7}},
-    'AndreiFC':   {13:{scoreA:1,scoreB:1,possession:55,corners:9}},
-    'MihaiUltra': {13:{scoreA:2,scoreB:1,possession:58,corners:8}},
-    'AlexTactic': {13:{scoreA:0,scoreB:1,possession:45,corners:6}},
-  };
-  const myPreds    = Object.fromEntries(Object.entries(predictions).map(([id,p])=>[Number(id),p]));
-  const allPreds   = { ...demoFriends, [user?.nickname||'Me']: myPreds };
-  const leaderboard = buildLeaderboard(allPreds, user?.nickname||'Me', liveMatches.filter(m=>m.isFinished));
-  const myEntry    = leaderboard.find(p => p.nickname === user?.nickname);
-  const myRank     = myEntry?.rank;
-  const streak     = myEntry?.exactScores || 0;
+  // ── Leaderboard from real multi-user data ────────────────────────────────
+  // allPredictions: { uid: { matchId: pred } } — from all registered users
+  // allUsers:       { uid: { nickname, avatarId, ... } }
+  // Map uid → nickname for buildLeaderboard
+  const predsByNick = Object.entries(allPredictions).reduce((acc, [uid, preds]) => {
+    const nick = allUsers[uid]?.nickname || (uid === user?.uid ? user?.nickname : null);
+    if (nick) acc[nick] = Object.fromEntries(Object.entries(preds).map(([id,p])=>[Number(id),p]));
+    return acc;
+  }, {});
+  // Always include current user even if allPredictions hasn't caught up yet
+  if (user?.nickname) {
+    predsByNick[user.nickname] = Object.fromEntries(Object.entries(predictions).map(([id,p])=>[Number(id),p]));
+  }
+  const leaderboard = buildLeaderboard(predsByNick, user?.nickname||'Me', liveMatches.filter(m=>m.isFinished));
+  const myEntry     = leaderboard.find(p => p.nickname === user?.nickname);
+  const myRank      = myEntry?.rank;
+  const streak      = myEntry?.exactScores || 0;
 
   // ── Handlers ─────────────────────────────────────────────────────────────
-  const handleSavePrediction = (id, pred) => {
+  const handleSavePrediction = async (id, pred) => {
     const next = { ...predictions, [id]: pred };
     setPredictions(next);
-    if (user?.uid) localStorage.setItem(`preds_${user.uid}`, JSON.stringify(next));
+    // Save to Firestore (or localStorage) — syncs to all users via realtime listener
+    if (user?.uid) await savePrediction(user.uid, id, pred);
     const m = liveMatches.find(m => m.id === Number(id));
     if (m?.isFinished) {
       const b = calcBreakdown(pred, m);
@@ -249,31 +273,15 @@ export default function App() {
     }
   };
 
-  const handleMatchUpdate = useCallback((update) => {
-    setFinishedResults(prev => {
-      const next = { ...prev };
-      if (update.liveStatus === 'ft') {
-        next[update.matchId] = {
-          realScoreA:     update.realScoreA,
-          realScoreB:     update.realScoreB,
-          realPossession: update.realPossession,
-          realCorners:    update.realCorners,
-          liveMinute:     update.liveMinute,
-          liveStatus:     'ft',
-        };
-      } else {
-        next[update.matchId] = {
-          ...(next[update.matchId] || {}),
-          liveScoreA:  update.liveScoreA,
-          liveScoreB:  update.liveScoreB,
-          liveMinute:  update.liveMinute,
-          liveStatus:  update.liveStatus,
-          realScoreA:  null,
-          realScoreB:  null,
-        };
-      }
-      return next;
-    });
+  const handleMatchUpdate = useCallback(async (update) => {
+    // AdminScreen already saved to Firestore/localStorage via firestoreService.
+    // subscribeToMatchResults listener will auto-update finishedResults.
+    // For localStorage mode: manually reload results.
+    if (!REALTIME_MODE) {
+      const results = await loadMatchResults();
+      setFinishedResults(results);
+    }
+    // In Firestore mode: onSnapshot fires automatically, no action needed here.
   }, []);
 
   const handleLogin = (googleData) => {
@@ -387,7 +395,7 @@ export default function App() {
           : tab==='matches'
           ? <MatchesScreen predictions={predictions} onPredict={setPredictingMatch} finishedResults={finishedResults}/>
           : tab==='leaderboard'
-          ? <LeaderboardScreen currentUser={user?.nickname} predictions={predictions}/>
+          ? <LeaderboardScreen currentUser={user?.nickname} predictions={predictions} allPredictions={predsByNick} allUsers={allUsers}/>
           : tab==='bracket'
           ? <BracketScreen/>
           : <HowToPlayScreen/>

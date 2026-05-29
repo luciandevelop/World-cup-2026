@@ -331,89 +331,191 @@ export function buildGroupStandings(groupLetter, finishedResults = FINISHED_RESU
   );
 }
 
-// ─── KNOCKOUT BRACKET SEEDING ─────────────────────────────────────────────────
-// WC 2026 Round of 32 pairings (1A vs 2B pattern)
-// Returns array of { id, home, away } — null slots when group not done
-// ─── REAL FIFA WC 2026 ROUND OF 32 PAIRINGS ─────────────────────────────────
-// Official format: 32 teams qualify (12×1st, 12×2nd, 8 best 3rd-place).
-// Pairings follow FIFA's published bracket structure for WC 2026.
-// Left side of bracket (M33–M40), Right side (M41–M48).
-// Source: FIFA.com official bracket release.
-export const R32_PAIRINGS = [
-  // ── Left half of bracket ──────────────────────────────────────────────────
-  // M33: 1A vs best-3rd (from B/C/D/E/F)
-  { id:'m33', label:'M33', pos1:{group:'A',rank:1}, pos2:{group:'3rd',slot:'BCDEF',rank:1},  homeLabel:'1° Gr.A', awayLabel:'3° melior(B-F)' },
-  // M34: 1C vs 3rd (from D/E/F)
-  { id:'m34', label:'M34', pos1:{group:'C',rank:1}, pos2:{group:'3rd',slot:'DEF',rank:1},    homeLabel:'1° Gr.C', awayLabel:'3° melior(D-F)' },
-  // M35: 1E vs 3rd (from A/B/C/D)
-  { id:'m35', label:'M35', pos1:{group:'E',rank:1}, pos2:{group:'3rd',slot:'ABCD',rank:1},   homeLabel:'1° Gr.E', awayLabel:'3° melior(A-D)' },
-  // M36: 1G vs 3rd (from A/B/C/H)
-  { id:'m36', label:'M36', pos1:{group:'G',rank:1}, pos2:{group:'3rd',slot:'ABCH',rank:1},   homeLabel:'1° Gr.G', awayLabel:'3° melior(A-C,H)' },
-  // M37: 2A vs 2B
-  { id:'m37', label:'M37', pos1:{group:'A',rank:2}, pos2:{group:'B',rank:2},                 homeLabel:'2° Gr.A', awayLabel:'2° Gr.B' },
-  // M38: 2C vs 2D
-  { id:'m38', label:'M38', pos1:{group:'C',rank:2}, pos2:{group:'D',rank:2},                 homeLabel:'2° Gr.C', awayLabel:'2° Gr.D' },
-  // M39: 2E vs 2F
-  { id:'m39', label:'M39', pos1:{group:'E',rank:2}, pos2:{group:'F',rank:2},                 homeLabel:'2° Gr.E', awayLabel:'2° Gr.F' },
-  // M40: 2G vs 2H
-  { id:'m40', label:'M40', pos1:{group:'G',rank:2}, pos2:{group:'H',rank:2},                 homeLabel:'2° Gr.G', awayLabel:'2° Gr.H' },
+// ─── GROUP STANDINGS ──────────────────────────────────────────────────────────
+// Already defined above as buildGroupStandings
 
-  // ── Right half of bracket ─────────────────────────────────────────────────
-  // M41: 1B vs best-3rd (from G/H/I/J/K/L)
-  { id:'m41', label:'M41', pos1:{group:'B',rank:1}, pos2:{group:'3rd',slot:'GHIJKL',rank:1}, homeLabel:'1° Gr.B', awayLabel:'3° melior(G-L)' },
-  // M42: 1D vs 3rd (from I/J/K/L)
-  { id:'m42', label:'M42', pos1:{group:'D',rank:1}, pos2:{group:'3rd',slot:'IJKL',rank:1},   homeLabel:'1° Gr.D', awayLabel:'3° melior(I-L)' },
-  // M43: 1F vs 3rd (from G/H/I/J)
-  { id:'m43', label:'M43', pos1:{group:'F',rank:1}, pos2:{group:'3rd',slot:'GHIJ',rank:1},   homeLabel:'1° Gr.F', awayLabel:'3° melior(G-J)' },
-  // M44: 1H vs 3rd (from K/L/... remaining)
-  { id:'m44', label:'M44', pos1:{group:'H',rank:1}, pos2:{group:'3rd',slot:'KL',rank:1},     homeLabel:'1° Gr.H', awayLabel:'3° melior(K,L)' },
-  // M45: 2I vs 2J
-  { id:'m45', label:'M45', pos1:{group:'I',rank:2}, pos2:{group:'J',rank:2},                 homeLabel:'2° Gr.I', awayLabel:'2° Gr.J' },
-  // M46: 2K vs 2L
-  { id:'m46', label:'M46', pos1:{group:'K',rank:2}, pos2:{group:'L',rank:2},                 homeLabel:'2° Gr.K', awayLabel:'2° Gr.L' },
-  // M47: 1I vs 1J
-  { id:'m47', label:'M47', pos1:{group:'I',rank:1}, pos2:{group:'J',rank:1},                 homeLabel:'1° Gr.I', awayLabel:'1° Gr.J' },
-  // M48: 1K vs 1L
-  { id:'m48', label:'M48', pos1:{group:'K',rank:1}, pos2:{group:'L',rank:1},                 homeLabel:'1° Gr.K', awayLabel:'1° Gr.L' },
+// ─── FIFA WC 2026 KNOCKOUT QUALIFICATION ENGINE ───────────────────────────────
+//
+// FORMAT:
+//   12 groups (A–L), 4 teams each, 3 matches each.
+//   Qualification:
+//     • 12 × 1st place  → automatic (24 spots)
+//     • 12 × 2nd place  → automatic (24 spots, total 24)
+//     Wait — 12 groups × 2 = 24 auto-qualifiers.
+//     • Best 8 of 12 third-place finishers → 8 spots
+//     TOTAL: 24 + 8 = 32 teams in Round of 32.
+//
+// THIRD-PLACE RANKING criteria (FIFA standard):
+//   1. Points
+//   2. Goal difference
+//   3. Goals scored
+//   4. Wins
+//   5. Disciplinary (not tracked here — use alphabetical as tiebreaker)
+//
+// ROUND OF 32 PAIRING MAP:
+//   The exact FIFA 2026 pairing assignment for best-3rd slots depends on
+//   which groups the qualifying third-place teams come from. FIFA has not
+//   yet published the official 2026 conditional pairing table (it will be
+//   released closer to the tournament, similar to EURO 2024 format).
+//
+//   The pairing map below is structured and configurable:
+//   - Fixed pairings: all 1st vs 2nd matchups are fixed by FIFA bracket
+//   - Third-place slots: 8 group-winner slots each have a "slot pool"
+//     defining which groups' third-placers can fill that position
+//   - Assignment: best thirds are placed into slots by pool priority
+//
+//   ⚠️  UPDATE THIS TABLE when FIFA publishes the official 2026 bracket.
+//       The slot pools below follow FIFA 32-team bracket convention.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─── R32 STRUCTURE ────────────────────────────────────────────────────────────
+// 16 matches in Round of 32.
+// Left bracket half: M33–M40 (matches 33-40 of the tournament)
+// Right bracket half: M41–M48
+
+// Fixed pairings — group winners vs runners-up (these are known and fixed):
+const FIXED_PAIRINGS = [
+  // LEFT HALF ─────────────────────────────────────────────────────────────────
+  { id:'m37', homeGroup:'A', homeRank:2, awayGroup:'B', awayRank:2, side:'left'  }, // 2A vs 2B
+  { id:'m38', homeGroup:'C', homeRank:2, awayGroup:'D', awayRank:2, side:'left'  }, // 2C vs 2D
+  { id:'m39', homeGroup:'E', homeRank:2, awayGroup:'F', awayRank:2, side:'left'  }, // 2E vs 2F
+  { id:'m40', homeGroup:'G', homeRank:2, awayGroup:'H', awayRank:2, side:'left'  }, // 2G vs 2H
+  // RIGHT HALF ────────────────────────────────────────────────────────────────
+  { id:'m45', homeGroup:'I', homeRank:2, awayGroup:'J', awayRank:2, side:'right' }, // 2I vs 2J
+  { id:'m46', homeGroup:'K', homeRank:2, awayGroup:'L', awayRank:2, side:'right' }, // 2K vs 2L
+  { id:'m47', homeGroup:'I', homeRank:1, awayGroup:'J', awayRank:1, side:'right' }, // 1I vs 1J
+  { id:'m48', homeGroup:'K', homeRank:1, awayGroup:'L', awayRank:1, side:'right' }, // 1K vs 1L
 ];
 
-// ─── BUILD KNOCKOUT SLOTS ─────────────────────────────────────────────────────
-// Returns 16 R32 slots (populated where group is done, placeholder otherwise).
-// 3rd-place resolution simplified: returns null until groups finish.
-export function buildKnockoutSlots(finishedResults = FINISHED_RESULTS) {
+// Third-place slot pairings — group winners vs best third-place teams.
+// Each slot defines: which group winner hosts, and which "pool" of third-placers
+// can fill that slot. Pool = set of groups whose 3rd-place team is eligible here.
+//
+// ⚠️  CONFIGURABLE: Update slot pools below when FIFA releases the official
+//     conditional pairing table for WC 2026 best third-place assignments.
+//
+// Current assignment follows a structured provisional bracket convention:
+const THIRD_PLACE_SLOTS = [
+  // LEFT HALF
+  { id:'m33', winnerGroup:'A', winnerRank:1, pool:'BCDEF',  side:'left'  }, // 1A vs 3(B/C/D/E/F)
+  { id:'m34', winnerGroup:'C', winnerRank:1, pool:'DEF',    side:'left'  }, // 1C vs 3(D/E/F)
+  { id:'m35', winnerGroup:'E', winnerRank:1, pool:'ABCD',   side:'left'  }, // 1E vs 3(A/B/C/D)
+  { id:'m36', winnerGroup:'G', winnerRank:1, pool:'ABCH',   side:'left'  }, // 1G vs 3(A/B/C/H)
+  // RIGHT HALF
+  { id:'m41', winnerGroup:'B', winnerRank:1, pool:'GHIJKL', side:'right' }, // 1B vs 3(G-L)
+  { id:'m42', winnerGroup:'D', winnerRank:1, pool:'IJKL',   side:'right' }, // 1D vs 3(I/J/K/L)
+  { id:'m43', winnerGroup:'F', winnerRank:1, pool:'GHIJ',   side:'right' }, // 1F vs 3(G/H/I/J)
+  { id:'m44', winnerGroup:'H', winnerRank:1, pool:'KL',     side:'right' }, // 1H vs 3(K/L)
+];
+
+// ─── BUILD THE QUALIFYING FIELD ───────────────────────────────────────────────
+// Returns full qualification data: winners, runners-up, qualified thirds.
+export function buildQualifiedTeams(finishedResults = FINISHED_RESULTS) {
   const ALL_G = ['A','B','C','D','E','F','G','H','I','J','K','L'];
   const fm = buildMatches(finishedResults);
-  const groupDone = (g) => fm.filter(m => m.group === g).every(m => m.isFinished);
+  const groupDone = g => fm.filter(m => m.group === g).every(m => m.isFinished);
+
   const standings = {};
   ALL_G.forEach(g => {
     if (groupDone(g)) standings[g] = buildGroupStandings(g, finishedResults);
   });
 
-  // Collect all 3rd-place teams, sorted by pts → gd → gf
-  const thirds = ALL_G
-    .map(g => { const t = standings[g]; return t ? { ...t[2], group:g } : null; })
-    .filter(Boolean)
-    .sort((a,b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
-  const bestThird = thirds[0] || null; // placeholder — full 3rd logic needs all groups done
+  const groupsCompleted = ALL_G.filter(g => !!standings[g]);
 
-  return R32_PAIRINGS.map(pair => {
-    const resolvePos = (pos) => {
-      if (pos.group === '3rd') {
-        // Only show if all groups done (simplified — return best 3rd as placeholder)
-        return bestThird ? { team:bestThird.team, flag:bestThird.flag } : null;
-      }
-      const table = standings[pos.group];
-      if (!table) return null;
-      const entry = table[pos.rank - 1];
-      return entry ? { team:entry.team, flag:entry.flag } : null;
-    };
-    return {
-      id:        pair.id,
-      label:     pair.label,
-      home:      resolvePos(pair.pos1),
-      away:      resolvePos(pair.pos2),
-      homeLabel: pair.homeLabel,
-      awayLabel: pair.awayLabel,
-    };
+  // Collect all third-place teams from completed groups, ranked correctly
+  const allThirds = groupsCompleted
+    .map(g => {
+      const table = standings[g];
+      if (!table || table.length < 3) return null;
+      return { ...table[2], fromGroup: g };
+    })
+    .filter(Boolean)
+    .sort((a, b) =>
+      b.pts - a.pts ||
+      b.gd  - a.gd  ||
+      b.gf  - a.gf  ||
+      b.w   - a.w   ||
+      a.fromGroup.localeCompare(b.fromGroup)
+    );
+
+  // Best 8 third-place teams qualify
+  const qualifiedThirds = allThirds.slice(0, 8);
+
+  return { standings, groupsCompleted, allThirds, qualifiedThirds };
+}
+
+// ─── ASSIGN THIRDS TO SLOTS ───────────────────────────────────────────────────
+// Distributes the 8 qualified thirds into their designated bracket slots.
+// Pool matching: each slot accepts thirds from specific group pools.
+// If all 12 groups are done, assign exactly — otherwise leave slot empty.
+function assignThirdsToSlots(qualifiedThirds) {
+  // qualifiedThirds is already sorted best-first.
+  // For each slot, find the highest-ranked eligible third that hasn't been assigned yet.
+  const assigned = {};     // slotId → third team
+  const usedGroups = new Set();
+
+  THIRD_PLACE_SLOTS.forEach(slot => {
+    const eligible = qualifiedThirds.filter(
+      t => slot.pool.includes(t.fromGroup) && !usedGroups.has(t.fromGroup)
+    );
+    if (eligible.length > 0) {
+      const pick = eligible[0]; // best available
+      assigned[slot.id] = { team: pick.team, flag: pick.flag, fromGroup: pick.fromGroup };
+      usedGroups.add(pick.fromGroup);
+    }
   });
+
+  return assigned;
+}
+
+// ─── BUILD KNOCKOUT SLOTS ─────────────────────────────────────────────────────
+// Returns array of 16 R32 match objects for the bracket to render.
+// Each match: { id, home, away, homeLabel, awayLabel, side }
+// home/away are null when the group isn't finished yet.
+export function buildKnockoutSlots(finishedResults = FINISHED_RESULTS) {
+  const { standings, qualifiedThirds } = buildQualifiedTeams(finishedResults);
+
+  // Only assign thirds when all 12 groups are done (needed to know best 8)
+  const ALL_G = ['A','B','C','D','E','F','G','H','I','J','K','L'];
+  const allGroupsDone = ALL_G.every(g => !!standings[g]);
+  const thirdAssignments = allGroupsDone ? assignThirdsToSlots(qualifiedThirds) : {};
+
+  const getTeam = (group, rank) => {
+    const table = standings[group];
+    if (!table) return null;
+    const e = table[rank - 1];
+    return e ? { team: e.team, flag: e.flag } : null;
+  };
+
+  // Build fixed pairings (winners vs runners-up, or runner-up vs runner-up)
+  const fixedSlots = FIXED_PAIRINGS.map(p => ({
+    id:        p.id,
+    label:     p.id.toUpperCase(),
+    home:      getTeam(p.homeGroup, p.homeRank),
+    away:      getTeam(p.awayGroup, p.awayRank),
+    homeLabel: `${p.homeRank}° Gr.${p.homeGroup}`,
+    awayLabel: `${p.awayRank}° Gr.${p.awayGroup}`,
+    side:      p.side,
+  }));
+
+  // Build third-place slots
+  const thirdSlots = THIRD_PLACE_SLOTS.map(p => ({
+    id:        p.id,
+    label:     p.id.toUpperCase(),
+    home:      getTeam(p.winnerGroup, p.winnerRank),
+    away:      thirdAssignments[p.id] || null,
+    homeLabel: `${p.winnerRank}° Gr.${p.winnerGroup}`,
+    awayLabel: `3° pool ${p.pool}`,
+    side:      p.side,
+  }));
+
+  // Merge and sort by match ID (m33→m48) for correct bracket order
+  const all = [...fixedSlots, ...thirdSlots];
+  all.sort((a, b) => {
+    const na = parseInt(a.id.replace('m',''));
+    const nb = parseInt(b.id.replace('m',''));
+    return na - nb;
+  });
+
+  return all; // 16 matches in order m33..m48
 }

@@ -1,6 +1,6 @@
 // ─── src/services/authService.js ──────────────────────────────────────────────
-// Uses REAL Firebase Auth when VITE_FIREBASE_* env vars are set.
-// Falls back to localStorage mock when running without Firebase (demo mode).
+// Auth service — email OTP (primary) + Google (secondary).
+// Profile reads/writes route through firestoreService (Firestore ↔ localStorage).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
@@ -9,33 +9,28 @@ import {
   firebaseSignOut,
   onFirebaseAuthChange,
 } from './firebase.js';
+import { sendEmailCode, verifyEmailCode } from './emailAuth.js';
+import {
+  saveUserProfile   as fssSaveProfile,
+  getUserProfile    as fssGetProfile,
+  checkNicknameAvailable as fssCheckNick,
+} from './firestoreService.js';
 
-const SESSION_KEY    = 'wc2026_session';
-const PROFILE_PREFIX = 'wc2026_profile_';
+export { sendEmailCode, verifyEmailCode, onFirebaseAuthChange };
+export { FIREBASE_CONFIGURED };
 
-export { onFirebaseAuthChange };
+const SESSION_KEY = 'wc2026_session';
 
 // ─── GOOGLE SIGN-IN ───────────────────────────────────────────────────────────
 export async function signInWithGoogle() {
-  if (FIREBASE_CONFIGURED) {
-    return firebaseSignInWithGoogle();
-  }
-  // Demo fallback — simulates real flow
-  return new Promise(resolve => {
-    setTimeout(() => resolve({
-      uid:      'demo_' + Math.random().toString(36).slice(2, 8),
-      email:    'demo@worldcup2026.app',
-      name:     'Demo User',
-      photoURL: null,
-      provider: 'google',
-    }), 900);
-  });
+  if (FIREBASE_CONFIGURED) return firebaseSignInWithGoogle();
+  return new Promise(resolve => setTimeout(() => resolve({
+    uid:'demo_' + Math.random().toString(36).slice(2,8),
+    email:'demo@worldcup2026.app', name:'Demo User', photoURL:null, provider:'google',
+  }), 900));
 }
 
-// ─── APPLE (coming soon) ──────────────────────────────────────────────────────
-export async function signInWithApple() {
-  throw new Error('coming_soon');
-}
+export async function signInWithApple() { throw new Error('coming_soon'); }
 
 // ─── SIGN-OUT ─────────────────────────────────────────────────────────────────
 export async function signOut() {
@@ -51,23 +46,19 @@ export function persistSession(user) {
   localStorage.setItem(SESSION_KEY, JSON.stringify(user));
 }
 
-// ─── NICKNAME ─────────────────────────────────────────────────────────────────
-export async function checkNicknameAvailable(nick, takenList) {
-  return new Promise(resolve =>
-    setTimeout(() => resolve(!takenList.map(n => n.toLowerCase()).includes(nick.toLowerCase())), 400)
-  );
-}
-
-// ─── PROFILE (localStorage — swap for Firestore in production) ────────────────
+// ─── PROFILE (routes to Firestore or localStorage via firestoreService) ───────
 export async function saveUserProfile(uid, profile) {
-  const existing = await getUserProfile(uid) || {};
-  const merged   = { ...existing, ...profile, updatedAt: Date.now() };
-  localStorage.setItem(PROFILE_PREFIX + uid, JSON.stringify(merged));
-  return merged;
+  return fssSaveProfile(uid, profile);
 }
 export async function getUserProfile(uid) {
-  try { return JSON.parse(localStorage.getItem(PROFILE_PREFIX + uid)); } catch { return null; }
+  return fssGetProfile(uid);
 }
 export async function updateUserAvatar(uid, avatarId) {
-  return saveUserProfile(uid, { avatarId });
+  return fssSaveProfile(uid, { avatarId });
+}
+
+// ─── NICKNAME CHECK ───────────────────────────────────────────────────────────
+// Uses Firestore query when configured, local nickname list otherwise.
+export async function checkNicknameAvailable(nick, _takenList) {
+  return fssCheckNick(nick);
 }

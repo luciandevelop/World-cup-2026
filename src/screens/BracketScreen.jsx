@@ -1,34 +1,23 @@
 // ─── src/screens/BracketScreen.jsx ───────────────────────────────────────────
 // FIFA World Cup 2026 — real knockout bracket.
-// 32 teams → 16 → QF → SF → Final → Champion.
-// Mobile-first: vertical list by round, each round scrollable.
+// R32 (16 matches) → R16 (8) → QF (4) → SF (2) → Final (1) → Champion.
+// List view: mobile-first, one round at a time with round tabs.
+// Bracket view: horizontal scroll, correct left→center→(no right repeat) layout.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useMemo, useState } from 'react';
-import { buildKnockoutSlots, MATCHES } from '../data/gameData.js';
-
-// ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const ROUNDS = [
-  { id:'r32', label:'Optimi de Finală',   short:'R32',    count:16 },
-  { id:'r16', label:'16-imi de Finală',   short:'16-imi', count:8  },
-  { id:'qf',  label:'Sferturi de Finală', short:'SF',     count:4  },
-  { id:'sf',  label:'Semifinale',         short:'Semi',   count:2  },
-  { id:'f',   label:'Finala Mare',        short:'Final',  count:1  },
-];
+import { buildKnockoutSlots, buildQualifiedTeams, MATCHES } from '../data/gameData.js';
 
 // ─── TEAM CELL ────────────────────────────────────────────────────────────────
-function TeamCell({ team, flag, label, isWinner, isTop, color }) {
-  const filled = !!team;
+function TeamCell({ team, flag, label, isWinner, isTop }) {
   return (
     <div style={{
       display:'flex', alignItems:'center', gap:8,
-      padding:'8px 11px',
+      padding:'8px 11px', minHeight:36,
       borderBottom: isTop ? '1px solid rgba(255,255,255,0.06)' : 'none',
       background: isWinner ? 'rgba(0,229,160,0.06)' : 'transparent',
-      transition:'background 0.2s',
-      minHeight:36,
     }}>
-      {filled ? (
+      {team ? (
         <>
           <span style={{ fontSize:20, lineHeight:1, flexShrink:0 }}>{flag}</span>
           <span style={{
@@ -36,7 +25,7 @@ function TeamCell({ team, flag, label, isWinner, isTop, color }) {
             color: isWinner ? '#00E5A0' : '#fff',
             flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
           }}>{team}</span>
-          {isWinner && <span style={{ fontSize:10, color:'#00E5A0', fontWeight:800, flexShrink:0 }}>✓</span>}
+          {isWinner && <span style={{ fontSize:10, color:'#00E5A0', flexShrink:0 }}>✓</span>}
         </>
       ) : (
         <>
@@ -51,25 +40,17 @@ function TeamCell({ team, flag, label, isWinner, isTop, color }) {
 // ─── MATCH CARD ───────────────────────────────────────────────────────────────
 function MatchCard({ match, isFinal, isSmall }) {
   const { home, away, homeLabel, awayLabel, label, winner } = match;
-  const borderColor = isFinal
-    ? 'rgba(212,175,55,0.35)'
-    : home || away
-    ? 'rgba(255,255,255,0.1)'
-    : 'rgba(255,255,255,0.05)';
-  const bg = isFinal
-    ? 'linear-gradient(135deg,rgba(212,175,55,0.07),rgba(212,175,55,0.03))'
-    : 'rgba(255,255,255,0.025)';
-  const minW = isSmall ? 140 : isFinal ? 170 : 158;
+  const bc = isFinal ? 'rgba(212,175,55,0.35)' : (home||away) ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)';
+  const bg = isFinal ? 'linear-gradient(135deg,rgba(212,175,55,0.07),rgba(212,175,55,0.03))' : 'rgba(255,255,255,0.025)';
 
   return (
     <div style={{
-      background: bg, border:`1px solid ${borderColor}`,
-      borderRadius:12, overflow:'hidden',
-      minWidth: minW, width:'100%',
+      background:bg, border:`1px solid ${bc}`, borderRadius:12, overflow:'hidden',
+      minWidth: isSmall ? 138 : isFinal ? 172 : 156, width:'100%',
       boxShadow: isFinal ? '0 4px 24px rgba(212,175,55,0.08)' : 'none',
     }}>
       {label && (
-        <div style={{ padding:'3px 10px', background:'rgba(255,255,255,0.03)', borderBottom:'1px solid rgba(255,255,255,0.05)', fontSize:9, color:'rgba(255,255,255,0.2)', fontWeight:700, letterSpacing:'0.08em' }}>
+        <div style={{ padding:'3px 10px', background:'rgba(255,255,255,0.03)', borderBottom:'1px solid rgba(255,255,255,0.05)', fontSize:9, color:isFinal?'rgba(212,175,55,0.6)':'rgba(255,255,255,0.2)', fontWeight:700, letterSpacing:'0.08em' }}>
           {label}
         </div>
       )}
@@ -79,317 +60,349 @@ function MatchCard({ match, isFinal, isSmall }) {
   );
 }
 
-// ─── ROUND HEADER ─────────────────────────────────────────────────────────────
-function RoundHeader({ round, isActive, isFinal }) {
-  return (
-    <div style={{
-      display:'flex', alignItems:'center', gap:10,
-      padding:'4px 0', marginBottom:10,
-    }}>
-      <div style={{
-        height:1, flex:1,
-        background: isFinal ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.06)',
-      }}/>
-      <div style={{
-        fontSize:10, fontWeight:800,
-        color: isFinal ? 'rgba(212,175,55,0.8)' : isActive ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.25)',
-        letterSpacing:'0.14em', textTransform:'uppercase',
-        padding:'3px 10px',
-        background: isFinal ? 'rgba(212,175,55,0.07)' : 'rgba(255,255,255,0.03)',
-        border:`1px solid ${isFinal ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.06)'}`,
-        borderRadius:20, whiteSpace:'nowrap',
-      }}>
-        {isFinal ? '🏆 ' : ''}{round.label}
-      </div>
-      <div style={{
-        height:1, flex:1,
-        background: isFinal ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.06)',
-      }}/>
-    </div>
-  );
-}
-
 // ─── CHAMPION CARD ────────────────────────────────────────────────────────────
 function ChampionCard({ team, flag }) {
   if (!team) return null;
   return (
     <div style={{
-      margin:'16px 0', padding:'20px 16px',
-      background:'linear-gradient(135deg,rgba(212,175,55,0.12),rgba(212,175,55,0.04))',
-      border:'1px solid rgba(212,175,55,0.3)',
-      borderRadius:18, textAlign:'center',
+      margin:'16px 0', padding:'24px 16px',
+      background:'linear-gradient(135deg,rgba(212,175,55,0.14),rgba(212,175,55,0.04))',
+      border:'1px solid rgba(212,175,55,0.35)', borderRadius:18, textAlign:'center',
       animation:'goldPulse 2s ease-in-out infinite',
     }}>
-      <div style={{ fontSize:12, color:'rgba(212,175,55,0.5)', letterSpacing:'0.22em', textTransform:'uppercase', fontWeight:700, marginBottom:10 }}>
+      <div style={{ fontSize:11, color:'rgba(212,175,55,0.55)', letterSpacing:'0.22em', textTransform:'uppercase', fontWeight:700, marginBottom:12 }}>
         🏆 CAMPIOANA MONDIALĂ 2026 🏆
       </div>
-      <span style={{ fontSize:48 }}>{flag}</span>
-      <div style={{ fontSize:24, fontWeight:900, color:'#FFD700', fontFamily:"'Bebas Neue',sans-serif", letterSpacing:'0.06em', marginTop:6 }}>
+      <span style={{ fontSize:52 }}>{flag}</span>
+      <div style={{ fontSize:26, fontWeight:900, color:'#FFD700', fontFamily:"'Bebas Neue',sans-serif", letterSpacing:'0.06em', marginTop:8 }}>
         {team}
       </div>
     </div>
   );
 }
 
+// ─── THIRDS PANEL ─────────────────────────────────────────────────────────────
+// Shows which 3rd-place teams have qualified and their ranking
+function ThirdsPanel({ allThirds, qualifiedThirds }) {
+  const [open, setOpen] = useState(false);
+  if (!allThirds || allThirds.length === 0) return null;
+
+  return (
+    <div style={{ marginBottom:12 }}>
+      <div
+        onClick={() => setOpen(o => !o)}
+        style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 12px', background:'rgba(255,215,0,0.04)', border:'1px solid rgba(255,215,0,0.1)', borderRadius: open?'10px 10px 0 0':10, cursor:'pointer', userSelect:'none' }}
+      >
+        <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+          <span style={{ fontSize:13 }}>🥉</span>
+          <span style={{ fontSize:11, fontWeight:700, color:'rgba(255,215,0,0.7)' }}>
+            Locuri 3 calificate — {qualifiedThirds?.length||0}/8
+          </span>
+        </div>
+        <span style={{ fontSize:12, color:'rgba(255,255,255,0.3)', transform:open?'rotate(180deg)':'none', transition:'transform 0.2s', display:'inline-block' }}>▾</span>
+      </div>
+      {open && (
+        <div style={{ background:'rgba(255,215,0,0.02)', border:'1px solid rgba(255,215,0,0.08)', borderTop:'none', borderRadius:'0 0 10px 10px', overflow:'hidden', animation:'revealFlip 0.18s ease' }}>
+          {allThirds.slice(0, 12).map((t, i) => {
+            const isQ = i < 8;
+            return (
+              <div key={t.fromGroup} style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 12px', borderBottom: i < allThirds.length-1 ? '1px solid rgba(255,255,255,0.04)' : 'none', background: isQ ? 'rgba(255,215,0,0.03)' : 'transparent', opacity: isQ ? 1 : 0.4 }}>
+                <span style={{ fontSize:10, fontWeight:800, color: isQ?'#FFD700':'rgba(255,255,255,0.3)', width:16, textAlign:'center' }}>{i+1}</span>
+                <span style={{ fontSize:16 }}>{t.flag}</span>
+                <span style={{ fontSize:12, color:'#fff', fontWeight:600, flex:1 }}>{t.team}</span>
+                <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)', fontFamily:"'DM Mono',monospace" }}>Gr.{t.fromGroup}</span>
+                <div style={{ display:'flex', gap:4, fontFamily:"'DM Mono',monospace" }}>
+                  <span style={{ fontSize:10, fontWeight:700, color: isQ?'#FFD700':'rgba(255,255,255,0.3)' }}>{t.pts}p</span>
+                  <span style={{ fontSize:9, color:'rgba(255,255,255,0.2)' }}>{t.gd>0?'+':''}{t.gd}</span>
+                </div>
+                {isQ && <span style={{ fontSize:8, color:'#FFD700', background:'rgba(255,215,0,0.1)', border:'1px solid rgba(255,215,0,0.2)', padding:'1px 5px', borderRadius:3, fontWeight:700 }}>✓ Q</span>}
+              </div>
+            );
+          })}
+          <div style={{ padding:'6px 12px', fontSize:9, color:'rgba(255,255,255,0.15)', background:'rgba(0,0,0,0.15)' }}>
+            Calificați: top 8 din 12 echipe de pe locul 3 · sortate pts → dif.goluri → goluri
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── QUALIFICATION BANNER ─────────────────────────────────────────────────────
 function QualificationBanner() {
-  const lines = [
-    { text:'Dacă ai ajuns aici, ai supraviețuit grupelor.', icon:'⚔️', color:'rgba(0,229,160,0.8)' },
-    { text:'Acum nu mai există meciuri de antrenament.', icon:'🔥', color:'rgba(255,152,0,0.8)' },
-    { text:'Top 70% se califică. Restul dispar.', icon:'💀', color:'rgba(239,68,68,0.8)' },
+  const bullets = [
+    { icon:'⚔️', text:'Dacă ești aici, ai supraviețuit grupelor.', accent:'rgba(0,229,160,0.9)'  },
+    { icon:'🔥', text:'Acum nu mai există meciuri de antrenament.', accent:'rgba(255,152,0,0.9)'  },
+    { icon:'⚡', text:'Punctele se înjumătățesc. Presiunea se dublează.', accent:'rgba(212,175,55,0.9)' },
+    { icon:'💀', text:'Top 70% merge mai departe. Restul dispar.', accent:'rgba(239,68,68,0.85)' },
   ];
 
   return (
     <div style={{
-      margin:'0 0 16px',
-      background:'linear-gradient(135deg,rgba(15,45,26,0.8),rgba(10,14,20,0.9))',
+      margin:'0 0 14px',
+      background:'linear-gradient(135deg,rgba(12,28,18,0.95),rgba(8,12,14,0.98))',
       border:'1px solid rgba(0,229,160,0.12)',
-      borderRadius:14, overflow:'hidden',
-      position:'relative',
+      borderRadius:14, overflow:'hidden', position:'relative',
     }}>
-      {/* Subtle top stripe */}
-      <div style={{ height:2, background:'linear-gradient(90deg,transparent,rgba(0,229,160,0.4),rgba(212,175,55,0.4),transparent)' }}/>
-
-      <div style={{ padding:'14px 16px 16px' }}>
-        <div style={{ fontSize:9, letterSpacing:'0.22em', color:'rgba(212,175,55,0.5)', textTransform:'uppercase', fontWeight:700, marginBottom:12 }}>
-          FAZA ELIMINATORIE
+      {/* Cinematic top bar */}
+      <div style={{ height:2, background:'linear-gradient(90deg,transparent 0%,rgba(0,229,160,0.6) 30%,rgba(212,175,55,0.6) 70%,transparent 100%)' }}/>
+      <div style={{ padding:'13px 15px 15px' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:11 }}>
+          <div style={{ width:18, height:18, borderRadius:'50%', background:'rgba(212,175,55,0.12)', border:'1px solid rgba(212,175,55,0.3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10 }}>🏆</div>
+          <span style={{ fontSize:9, letterSpacing:'0.2em', color:'rgba(212,175,55,0.6)', textTransform:'uppercase', fontWeight:800 }}>FAZA ELIMINATORIE</span>
         </div>
-
-        {lines.map((l, i) => (
+        {bullets.map((b, i) => (
           <div key={i} style={{
-            display:'flex', alignItems:'flex-start', gap:10,
-            padding:'8px 0',
-            borderBottom: i < lines.length-1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-            animation:`staggerIn 0.3s ${i*0.1}s ease both`,
+            display:'flex', alignItems:'flex-start', gap:9, padding:'7px 0',
+            borderBottom: i < bullets.length-1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+            animation:`staggerIn 0.3s ${i*0.08}s ease both`,
           }}>
-            <span style={{ fontSize:16, flexShrink:0, lineHeight:1.4 }}>{l.icon}</span>
-            <span style={{ fontSize:13, fontWeight:600, color:l.color, lineHeight:1.5 }}>{l.text}</span>
+            <span style={{ fontSize:14, flexShrink:0, lineHeight:1.5 }}>{b.icon}</span>
+            <span style={{ fontSize:12, fontWeight:600, color:b.accent, lineHeight:1.55 }}>{b.text}</span>
           </div>
         ))}
-
-        <div style={{
-          marginTop:12, padding:'8px 11px',
-          background:'rgba(212,175,55,0.06)', border:'1px solid rgba(212,175,55,0.12)',
-          borderRadius:8, display:'flex', alignItems:'center', gap:8,
-        }}>
-          <span style={{ fontSize:14 }}>⚡</span>
-          <span style={{ fontSize:11, color:'rgba(212,175,55,0.6)', lineHeight:1.4 }}>
-            Predicțiile pentru meciurile eliminatorii se deschid<br/>
-            <strong style={{ color:'rgba(212,175,55,0.85)' }}>cu 48h înainte de fiecare meci</strong>
-          </span>
-        </div>
       </div>
     </div>
   );
 }
 
 // ─── PROGRESS BAR ─────────────────────────────────────────────────────────────
-function GroupProgress({ finished, total }) {
-  const pct = Math.round((finished / total) * 100);
+function GroupProgress({ finished, total, groupsCompleted, qualifiedThirds }) {
+  const pct  = Math.round((finished / total) * 100);
   const done = finished === total;
+  const thirdsCount = qualifiedThirds?.length || 0;
+  const allDone = groupsCompleted?.length === 12;
+
   return (
-    <div style={{ marginBottom:16 }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+    <div style={{ marginBottom:14 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
         <span style={{ fontSize:11, color:'rgba(255,255,255,0.4)', fontWeight:600 }}>
-          {done ? '✅ Grupe complete' : 'Faza grupelor'}
+          {allDone ? '✅ Grupe complete — tabloul e activ' : 'Faza grupelor în desfășurare'}
         </span>
-        <span style={{ fontSize:11, color:'rgba(255,255,255,0.3)', fontFamily:"'DM Mono',monospace" }}>
-          {finished}/{total} meciuri
+        <span style={{ fontSize:10, color:'rgba(255,255,255,0.25)', fontFamily:"'DM Mono',monospace" }}>
+          {groupsCompleted?.length||0}/12 grupe
         </span>
       </div>
-      <div style={{ height:4, background:'rgba(255,255,255,0.05)', borderRadius:2, overflow:'hidden' }}>
-        <div style={{
-          height:'100%', width:`${pct}%`,
-          background: done ? 'linear-gradient(90deg,#FFD700,#F59E0B)' : 'linear-gradient(90deg,#00E5A0,#00C27A)',
-          borderRadius:2, transition:'width 0.6s ease',
-        }}/>
+      <div style={{ height:3, background:'rgba(255,255,255,0.05)', borderRadius:2, overflow:'hidden', marginBottom:8 }}>
+        <div style={{ height:'100%', width:`${(groupsCompleted?.length||0)/12*100}%`, background: allDone ? 'linear-gradient(90deg,#FFD700,#F59E0B)' : 'linear-gradient(90deg,#00E5A0,#00C27A)', borderRadius:2, transition:'width 0.6s ease' }}/>
       </div>
-      {!done && (
-        <div style={{ marginTop:8, fontSize:11, color:'rgba(255,215,0,0.5)', display:'flex', alignItems:'center', gap:6 }}>
-          <span>🔒</span>
-          <span>Tabloul se completează automat după grupe</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── BRACKET VIEW (horizontal scroll) ────────────────────────────────────────
-function BracketView({ r32 }) {
-  // Empty placeholder rounds
-  const mkEmpty = (count, fromLabel, toLabel) =>
-    Array.from({length:count}, (_,i) => ({
-      id:`${fromLabel}_${i}`, home:null, away:null,
-      homeLabel:`Câșt. ${toLabel}`, awayLabel:`Câșt. ${toLabel}`,
-    }));
-
-  const r16 = mkEmpty(8, 'r16', 'Optimi');
-  const qf  = mkEmpty(4, 'qf',  '16-imi');
-  const sf  = mkEmpty(2, 'sf',  'Sferturi');
-  const fin = mkEmpty(1, 'f',   'Semifinală');
-
-  // Split bracket: left 8, right 8
-  const left  = r32.slice(0, 8);
-  const right = r32.slice(8, 16);
-
-  const Col = ({ rounds, isSmall, title }) => (
-    <div style={{ display:'flex', flexDirection:'column', gap:8, alignItems:'stretch', flex:'0 0 auto' }}>
-      {title && (
-        <div style={{ fontSize:9, fontWeight:800, letterSpacing:'0.14em', textTransform:'uppercase', color:'rgba(255,255,255,0.25)', textAlign:'center', padding:'3px 8px', background:'rgba(255,255,255,0.03)', borderRadius:20, whiteSpace:'nowrap' }}>
-          {title}
-        </div>
-      )}
-      {rounds.map((m, i) => <MatchCard key={m.id||i} match={m} isSmall={isSmall}/>)}
-    </div>
-  );
-
-  return (
-    <div style={{ overflowX:'auto', WebkitOverflowScrolling:'touch', paddingBottom:8 }}>
-      <div style={{ display:'flex', gap:12, alignItems:'center', minWidth:'max-content', padding:'0 2px' }}>
-        {/* Left R32 */}
-        <Col rounds={left.slice(0,4)} isSmall title="Optimi A"/>
-        <Col rounds={left.slice(4,8)} isSmall title="Optimi B"/>
-        {/* Connector */}
-        <div style={{ width:1, alignSelf:'stretch', background:'rgba(255,255,255,0.06)', flexShrink:0, margin:'16px 0' }}/>
-        {/* Left R16 */}
-        <Col rounds={r16.slice(0,4)} isSmall={false} title="16-imi A"/>
-        {/* QF left */}
-        <Col rounds={qf.slice(0,2)} title="Sferturi A"/>
-        {/* Connector */}
-        <div style={{ width:1, alignSelf:'stretch', background:'rgba(255,255,255,0.06)', flexShrink:0, margin:'16px 0' }}/>
-        {/* SF + Final center */}
-        <div style={{ display:'flex', flexDirection:'column', gap:12, flex:'0 0 auto', alignItems:'center' }}>
-          <div style={{ fontSize:9, fontWeight:800, letterSpacing:'0.14em', textTransform:'uppercase', color:'rgba(212,175,55,0.6)', textAlign:'center', padding:'3px 10px', background:'rgba(212,175,55,0.06)', borderRadius:20, border:'1px solid rgba(212,175,55,0.15)', whiteSpace:'nowrap' }}>
-            ⚡ Centru
+      {/* Qualification counts */}
+      <div style={{ display:'flex', gap:6 }}>
+        {[
+          { label:'Locuri 1',  value:groupsCompleted?.length||0, max:12, color:'#00E5A0' },
+          { label:'Locuri 2',  value:groupsCompleted?.length||0, max:12, color:'#4A9EFF' },
+          { label:'3° calificați', value:thirdsCount, max:8, color:'#FFD700' },
+        ].map((s,i) => (
+          <div key={i} style={{ flex:1, padding:'6px 8px', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)', borderRadius:8, textAlign:'center' }}>
+            <div style={{ fontSize:12, fontWeight:800, color:s.color, fontFamily:"'DM Mono',monospace" }}>{s.value}<span style={{ fontSize:9, color:'rgba(255,255,255,0.2)' }}>/{s.max}</span></div>
+            <div style={{ fontSize:8, color:'rgba(255,255,255,0.2)', marginTop:1, letterSpacing:'0.04em' }}>{s.label}</div>
           </div>
-          <MatchCard match={sf[0]} isSmall={false}/>
-          <MatchCard match={{...fin[0], label:'🏆 FINALA'}} isFinal/>
-          <MatchCard match={sf[1]} isSmall={false}/>
-        </div>
-        {/* Connector */}
-        <div style={{ width:1, alignSelf:'stretch', background:'rgba(255,255,255,0.06)', flexShrink:0, margin:'16px 0' }}/>
-        {/* QF right */}
-        <Col rounds={qf.slice(2,4)} title="Sferturi B"/>
-        {/* Right R16 */}
-        <Col rounds={r16.slice(4,8)} isSmall={false} title="16-imi B"/>
-        {/* Connector */}
-        <div style={{ width:1, alignSelf:'stretch', background:'rgba(255,255,255,0.06)', flexShrink:0, margin:'16px 0' }}/>
-        {/* Right R32 */}
-        <Col rounds={right.slice(0,4)} isSmall title="Optimi C"/>
-        <Col rounds={right.slice(4,8)} isSmall title="Optimi D"/>
+        ))}
       </div>
+      {!allDone && (
+        <div style={{ marginTop:7, fontSize:10, color:'rgba(255,215,0,0.45)', display:'flex', alignItems:'center', gap:5 }}>
+          <span>🔒</span><span>Tabloul se completează automat după finalizarea tuturor grupelor</span>
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── ROUND LIST VIEW (mobile-friendly vertical) ───────────────────────────────
-function RoundListView({ r32 }) {
-  const [activeRound, setActiveRound] = useState('r32');
+// ─── EMPTY SLOTS HELPER ───────────────────────────────────────────────────────
+const mkEmpty = (count, key, lbl) =>
+  Array.from({length:count}, (_,i) => ({
+    id:`${key}_${i}`, home:null, away:null,
+    homeLabel:`Câșt. ${lbl}`, awayLabel:`Câșt. ${lbl}`,
+  }));
 
-  const mkEmpty = (count, key, lbl) =>
-    Array.from({length:count}, (_,i) => ({ id:`${key}_${i}`, home:null, away:null, homeLabel:`Câșt. ${lbl}`, awayLabel:`Câșt. ${lbl}` }));
+// ─── ROUND LIST VIEW — mobile primary ────────────────────────────────────────
+function RoundListView({ r32, champion }) {
+  const [active, setActive] = useState('r32');
 
-  const rounds = {
-    r32: { matches:r32,                   label:'Optimi de Finală'   },
-    r16: { matches:mkEmpty(8,'r16','R32'), label:'16-imi de Finală'   },
-    qf:  { matches:mkEmpty(4,'qf','R16'),  label:'Sferturi de Finală' },
-    sf:  { matches:mkEmpty(2,'sf','SF'),   label:'Semifinale'         },
-    f:   { matches:mkEmpty(1,'f','Semi'),  label:'Finala'             },
+  const ROUND_DATA = {
+    r32: { matches:r32,                    label:'Optimi de Finală',   isFinal:false },
+    r16: { matches:mkEmpty(8,'r16','R32'), label:'16-imi de Finală',   isFinal:false },
+    qf:  { matches:mkEmpty(4,'qf','R16'),  label:'Sferturi de Finală', isFinal:false },
+    sf:  { matches:mkEmpty(2,'sf','SF'),   label:'Semifinale',         isFinal:false },
+    f:   { matches:mkEmpty(1,'f','Semi'),  label:'🏆 Finala',          isFinal:true  },
   };
 
-  const tabs = [
-    { id:'r32', short:'32' },
-    { id:'r16', short:'16' },
-    { id:'qf',  short:'SF' },
-    { id:'sf',  short:'Semi'},
-    { id:'f',   short:'🏆'  },
+  const TABS = [
+    { id:'r32', label:'Optimi'  },
+    { id:'r16', label:'16-imi'  },
+    { id:'qf',  label:'Sferturi'},
+    { id:'sf',  label:'Semi'    },
+    { id:'f',   label:'🏆 Final'},
   ];
 
-  const current = rounds[activeRound];
-  const isFinalRound = activeRound === 'f';
+  const cur     = ROUND_DATA[active];
+  const curIdx  = TABS.findIndex(t => t.id === active);
 
   return (
     <div>
-      {/* Round selector tabs */}
-      <div style={{ display:'flex', gap:4, marginBottom:14, overflowX:'auto' }}>
-        {tabs.map((t, i) => {
-          const active = activeRound === t.id;
-          const hasData = t.id === 'r32' && r32.some(m => m.home || m.away);
+      {/* Round tabs */}
+      <div style={{ display:'flex', gap:3, marginBottom:14, overflowX:'auto' }}>
+        {TABS.map((t, i) => {
+          const isActive = active === t.id;
+          const isLast   = t.id === 'f';
           return (
-            <button
-              key={t.id}
-              onClick={() => setActiveRound(t.id)}
-              style={{
-                flex:1, padding:'8px 4px', border:'none', cursor:'pointer',
-                borderRadius:10, transition:'all 0.15s',
-                background: active
-                  ? (t.id === 'f' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.1)')
-                  : 'rgba(255,255,255,0.03)',
-                borderBottom:`2px solid ${active ? (t.id==='f'?'#FFD700':'#00E5A0') : 'transparent'}`,
-                color: active ? '#fff' : 'rgba(255,255,255,0.3)',
-                fontSize:11, fontWeight: active ? 800 : 500,
-                position:'relative', whiteSpace:'nowrap',
-              }}
-            >
-              {t.short}
-              {i < tabs.length-1 && (
-                <span style={{ position:'absolute', right:-2, top:'50%', transform:'translateY(-50%)', fontSize:9, color:'rgba(255,255,255,0.1)' }}>›</span>
-              )}
+            <button key={t.id} onClick={() => setActive(t.id)} style={{
+              flex:1, padding:'7px 3px', border:'none', cursor:'pointer',
+              borderRadius:9, transition:'all 0.15s', whiteSpace:'nowrap',
+              background: isActive ? (isLast?'rgba(212,175,55,0.18)':'rgba(255,255,255,0.1)') : 'rgba(255,255,255,0.03)',
+              borderBottom:`2px solid ${isActive ? (isLast?'#FFD700':'#00E5A0') : 'transparent'}`,
+              color: isActive ? (isLast?'#FFD700':'#fff') : 'rgba(255,255,255,0.3)',
+              fontSize:10, fontWeight: isActive ? 800 : 500,
+            }}>
+              {t.label}
             </button>
           );
         })}
       </div>
 
-      {/* Round label */}
-      <div style={{ fontSize:13, fontWeight:700, color: isFinalRound ? '#FFD700' : 'rgba(255,255,255,0.6)', marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
-        {isFinalRound && <span>🏆</span>}
-        {current.label}
-        <span style={{ fontSize:10, color:'rgba(255,255,255,0.2)', fontWeight:400 }}>({current.matches.length} meciuri)</span>
-      </div>
+      {/* Final tab — special full-width layout */}
+      {active === 'f' ? (
+        <div>
+          {champion ? (
+            <ChampionCard team={champion.team} flag={champion.flag}/>
+          ) : (
+            <div>
+              <div style={{ marginBottom:12, padding:'12px 14px', background:'rgba(212,175,55,0.05)', border:'1px solid rgba(212,175,55,0.12)', borderRadius:12 }}>
+                <div style={{ fontSize:11, color:'rgba(212,175,55,0.6)', marginBottom:4, fontWeight:700 }}>🏆 MAREA FINALĂ</div>
+                <div style={{ fontSize:12, color:'rgba(255,255,255,0.35)' }}>
+                  Cei doi finaliști se vor decide după semifinale.
+                </div>
+              </div>
+              {/* Single full-width final card */}
+              <MatchCard match={{...cur.matches[0], label:'🏆 FINALA — 19 Iulie 2026'}} isFinal/>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div>
+          {/* Round label */}
+          <div style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.55)', marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
+            {cur.label}
+            <span style={{ fontSize:10, color:'rgba(255,255,255,0.2)', fontWeight:400 }}>— {cur.matches.length} meciuri</span>
+          </div>
+          {/* 2-col grid for all non-final rounds */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+            {cur.matches.map((m, i) => (
+              <MatchCard key={m.id||i} match={m} isFinal={false}/>
+            ))}
+          </div>
+        </div>
+      )}
 
-      {/* Match grid */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-        {current.matches.map((m, i) => (
-          <MatchCard
-            key={m.id||i}
-            match={m}
-            isFinal={activeRound === 'f'}
-          />
-        ))}
-      </div>
-
-      {/* Navigation hint */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:12 }}>
-        {tabs.findIndex(t=>t.id===activeRound) > 0 ? (
-          <button onClick={()=>{const idx=tabs.findIndex(t=>t.id===activeRound);setActiveRound(tabs[idx-1].id);}} style={{ background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:8, color:'rgba(255,255,255,0.4)', fontSize:11, padding:'5px 10px', cursor:'pointer' }}>
-            ← {tabs[tabs.findIndex(t=>t.id===activeRound)-1]?.short}
+      {/* Prev / Next navigation */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:14 }}>
+        {curIdx > 0 ? (
+          <button onClick={() => setActive(TABS[curIdx-1].id)} style={{ background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:8, color:'rgba(255,255,255,0.45)', fontSize:11, padding:'6px 12px', cursor:'pointer' }}>
+            ← {TABS[curIdx-1].label}
           </button>
         ) : <div/>}
-        {tabs.findIndex(t=>t.id===activeRound) < tabs.length-1 ? (
-          <button onClick={()=>{const idx=tabs.findIndex(t=>t.id===activeRound);setActiveRound(tabs[idx+1].id);}} style={{ background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:8, color:'rgba(255,255,255,0.4)', fontSize:11, padding:'5px 10px', cursor:'pointer' }}>
-            {tabs[tabs.findIndex(t=>t.id===activeRound)+1]?.short} →
+        {curIdx < TABS.length-1 ? (
+          <button onClick={() => setActive(TABS[curIdx+1].id)} style={{ background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:8, color:'rgba(255,255,255,0.45)', fontSize:11, padding:'6px 12px', cursor:'pointer' }}>
+            {TABS[curIdx+1].label} →
           </button>
-        ) : <div/>}
+        ) : (
+          // Terminal state — no forward button, show a closing note
+          <div style={{ fontSize:10, color:'rgba(212,175,55,0.4)', fontStyle:'italic' }}>
+            {champion ? '🏆 Turneul s-a încheiat' : 'Turneul se termină aici'}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// ─── MAIN BRACKET SCREEN ──────────────────────────────────────────────────────
+// ─── BRACKET VIEW — horizontal, left-to-right, correct structure ──────────────
+// Layout: R32-left → R16-left → QF-left → SF → FINAL → SF → QF-right → R16-right → R32-right
+// The Final is the rightmost "peak" — there is no continuation after it.
+function BracketView({ r32, champion }) {
+  const r16 = mkEmpty(8,'r16','Optimi');
+  const qf  = mkEmpty(4,'qf','16-imi');
+  const sf  = mkEmpty(2,'sf','Sferturi');
+  const fin = mkEmpty(1,'f','Semifinală');
+
+  const left  = r32.slice(0,8);
+  const right = r32.slice(8,16);
+
+  // Vertical connector line between columns
+  const Connector = () => (
+    <div style={{ width:1, alignSelf:'stretch', background:'rgba(255,255,255,0.07)', flexShrink:0, margin:'24px 0' }}/>
+  );
+
+  const Col = ({ rounds, title, small }) => (
+    <div style={{ display:'flex', flexDirection:'column', gap:7, alignItems:'stretch', flex:'0 0 auto' }}>
+      {title && (
+        <div style={{ fontSize:8, fontWeight:800, letterSpacing:'0.14em', textTransform:'uppercase', color:'rgba(255,255,255,0.22)', textAlign:'center', padding:'3px 7px', background:'rgba(255,255,255,0.03)', borderRadius:20, whiteSpace:'nowrap', marginBottom:2 }}>
+          {title}
+        </div>
+      )}
+      {rounds.map((m,i) => <MatchCard key={m.id||i} match={m} isSmall={small}/>)}
+    </div>
+  );
+
+  return (
+    <div style={{ overflowX:'auto', WebkitOverflowScrolling:'touch', paddingBottom:12 }}>
+      <div style={{ display:'flex', gap:10, alignItems:'center', minWidth:'max-content', padding:'4px 2px 4px' }}>
+
+        {/* ── LEFT HALF ─────────────────────────────────── */}
+        <Col rounds={left.slice(0,4)} small title="Optimi A"/>
+        <Col rounds={left.slice(4,8)} small title="Optimi B"/>
+        <Connector/>
+        <Col rounds={r16.slice(0,4)} title="16-imi A"/>
+        <Col rounds={qf.slice(0,2)}  title="Sferturi A"/>
+        <Connector/>
+
+        {/* ── CENTER: SF + FINAL + SF ────────────────────── */}
+        <div style={{ display:'flex', flexDirection:'column', gap:10, flex:'0 0 auto', alignItems:'center', justifyContent:'center' }}>
+          <div style={{ fontSize:8, fontWeight:800, letterSpacing:'0.14em', textTransform:'uppercase', color:'rgba(212,175,55,0.65)', textAlign:'center', padding:'3px 10px', background:'rgba(212,175,55,0.06)', borderRadius:20, border:'1px solid rgba(212,175,55,0.15)', whiteSpace:'nowrap', marginBottom:2 }}>
+            Centru
+          </div>
+          <MatchCard match={sf[0]}/>
+          {/* FINAL — the end point */}
+          {champion ? (
+            <div style={{ padding:'10px 14px', background:'linear-gradient(135deg,rgba(212,175,55,0.14),rgba(212,175,55,0.04))', border:'1px solid rgba(212,175,55,0.4)', borderRadius:14, textAlign:'center', minWidth:160 }}>
+              <div style={{ fontSize:9, color:'rgba(212,175,55,0.6)', letterSpacing:'0.15em', textTransform:'uppercase', fontWeight:700, marginBottom:6 }}>🏆 Campioană</div>
+              <span style={{ fontSize:32 }}>{champion.flag}</span>
+              <div style={{ fontSize:14, fontWeight:900, color:'#FFD700', fontFamily:"'Bebas Neue',sans-serif", marginTop:4 }}>{champion.team}</div>
+            </div>
+          ) : (
+            <MatchCard match={{...fin[0], label:'🏆 FINALA'}} isFinal/>
+          )}
+          <MatchCard match={sf[1]}/>
+        </div>
+
+        <Connector/>
+        {/* ── RIGHT HALF ────────────────────────────────── */}
+        <Col rounds={qf.slice(2,4)}  title="Sferturi B"/>
+        <Col rounds={r16.slice(4,8)} title="16-imi B"/>
+        <Connector/>
+        <Col rounds={right.slice(0,4)} small title="Optimi C"/>
+        <Col rounds={right.slice(4,8)} small title="Optimi D"/>
+        {/* ── END — no columns after this ──────────────── */}
+
+      </div>
+    </div>
+  );
+}
+
+// ─── MAIN SCREEN ──────────────────────────────────────────────────────────────
 export default function BracketScreen() {
   const r32 = useMemo(() => buildKnockoutSlots(), []);
-  const [view, setView] = useState('list'); // 'list' | 'bracket'
+  const { groupsCompleted, qualifiedThirds, allThirds } = useMemo(() => buildQualifiedTeams(), []);
+  const [view, setView] = useState('list');
 
   const totalMatches    = MATCHES.length;
   const finishedMatches = MATCHES.filter(m => m.isFinished).length;
-  const allGroupsDone   = finishedMatches === totalMatches;
-
-  const champion = null; // TODO: wire when tournament progresses
+  const champion        = null; // wire when tournament ends: { team, flag }
 
   return (
-    <div style={{ paddingBottom:20 }}>
+    <div style={{ paddingBottom:24 }}>
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div style={{ padding:'14px 14px 12px', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
         <div style={{ fontSize:9, color:'rgba(212,175,55,0.55)', letterSpacing:'0.22em', textTransform:'uppercase', fontWeight:700, marginBottom:4 }}>
           FIFA World Cup 2026™
@@ -399,44 +412,47 @@ export default function BracketScreen() {
             <div style={{ fontSize:20, fontWeight:900, color:'#fff', letterSpacing:'-0.02em', fontFamily:"'Bebas Neue',sans-serif" }}>
               TABLOUL ELIMINATORIU
             </div>
-            <div style={{ fontSize:11, color:'rgba(255,255,255,0.3)', marginTop:1 }}>
-              32 → 16 → 8 → 4 → 2 → 🏆
+            <div style={{ fontSize:11, color:'rgba(255,255,255,0.28)', marginTop:2 }}>
+              R32 → R16 → SF → Semi → 🏆
             </div>
           </div>
           {/* View toggle */}
-          <div style={{ display:'flex', gap:4, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:8, padding:3 }}>
-            {[{id:'list',icon:'≡'},{id:'bracket',icon:'⊞'}].map(v => (
-              <button key={v.id} onClick={()=>setView(v.id)} style={{ width:28,height:24,borderRadius:6,border:'none',cursor:'pointer',fontSize:13,background:view===v.id?'rgba(255,255,255,0.1)':'transparent',color:view===v.id?'#fff':'rgba(255,255,255,0.3)',transition:'all 0.15s' }}>{v.icon}</button>
+          <div style={{ display:'flex', gap:3, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:8, padding:3, flexShrink:0 }}>
+            {[{id:'list',icon:'≡',label:'Listă'},{id:'bracket',icon:'⊞',label:'Tablou'}].map(v => (
+              <button key={v.id} onClick={() => setView(v.id)} title={v.label} style={{
+                width:30, height:26, borderRadius:6, border:'none', cursor:'pointer',
+                fontSize:14, background:view===v.id?'rgba(255,255,255,0.1)':'transparent',
+                color:view===v.id?'#fff':'rgba(255,255,255,0.3)', transition:'all 0.15s',
+              }}>{v.icon}</button>
             ))}
           </div>
         </div>
       </div>
 
-      {/* ── Content ── */}
+      {/* Content */}
       <div style={{ padding:'12px 14px 0' }}>
-        <GroupProgress finished={finishedMatches} total={totalMatches}/>
+        <GroupProgress finished={finishedMatches} total={totalMatches} groupsCompleted={groupsCompleted} qualifiedThirds={qualifiedThirds}/>
+        <ThirdsPanel allThirds={allThirds} qualifiedThirds={qualifiedThirds}/>
         <QualificationBanner/>
 
-        {/* Champion (shown when tournament ends) */}
-        <ChampionCard team={champion?.team} flag={champion?.flag}/>
-
-        {view === 'list'
-          ? <RoundListView r32={r32}/>
-          : (
-            <div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.3)', marginBottom:10 }}>
-                ← Scroll orizontal pentru tabloul complet
-              </div>
-              <BracketView r32={r32}/>
+        {view === 'list' ? (
+          <RoundListView r32={r32} champion={champion}/>
+        ) : (
+          <div>
+            <div style={{ fontSize:11, color:'rgba(255,255,255,0.28)', marginBottom:10, display:'flex', alignItems:'center', gap:5 }}>
+              <span style={{ fontSize:14 }}>←</span>
+              Scroll stânga-dreapta pentru tabloul complet
             </div>
-          )
-        }
+            <BracketView r32={r32} champion={champion}/>
+          </div>
+        )}
 
         {/* Format note */}
         <div style={{ marginTop:16, padding:'10px 12px', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)', borderRadius:10 }}>
-          <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.3)', marginBottom:6 }}>FORMAT WC 2026</div>
+          <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.28)', marginBottom:5 }}>FORMAT WC 2026</div>
           <div style={{ fontSize:11, color:'rgba(255,255,255,0.2)', lineHeight:1.7 }}>
-            32 echipe calificate: <strong style={{ color:'rgba(255,255,255,0.35)' }}>12 × locul 1</strong> + <strong style={{ color:'rgba(255,255,255,0.35)' }}>12 × locul 2</strong> + <strong style={{ color:'rgba(255,255,255,0.35)' }}>8 × cele mai bune locuri 3</strong> din 12 grupe.
+            <strong style={{ color:'rgba(255,255,255,0.35)' }}>12 × locul 1</strong> + <strong style={{ color:'rgba(255,255,255,0.35)' }}>12 × locul 2</strong> + <strong style={{ color:'rgba(255,255,255,0.35)' }}>8 × cele mai bune locuri 3</strong> = 32 echipe calificate.
+            Meciuri directe eliminatorii până la finală.
           </div>
         </div>
       </div>
