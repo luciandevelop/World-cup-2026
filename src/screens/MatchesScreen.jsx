@@ -675,6 +675,7 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults 
   const visibleGroups = groupFilter === "toate" ? ALL_GROUPS : [groupFilter];
 
   return (
+    <>
     <div>
       {/* Sticky group filter tabs */}
       <div style={{ position:"sticky", top:0, zIndex:30, background:"rgba(10,14,20,0.95)", backdropFilter:"blur(12px)", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
@@ -788,5 +789,6 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults 
         onPredict={onPredict}
       />
     )}
+    </>
   );
 }
