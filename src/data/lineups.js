@@ -19,9 +19,12 @@
 const SRC = {
   sourceName: "Bulinews",
   sourceUrl:  "https://bulinews.com/predicted-lineups-for-all-48-teams-the-2026-world-cup",
-  lastUpdated: "2025-12-01",
+  lastUpdated: "2026-05-28",
   isOfficial: false,
 };
+// Source verified live: May 30 2026. Bulinews article last updated May 28 8:50 CET.
+// Teams confirmed: all 48 from official FIFA draw (Dec 5, 2025, Kennedy Center, Washington DC).
+// Formation data sourced from Bulinews per-match predicted lineup pages.
 
 export const TEAM_LINEUPS = {
 
