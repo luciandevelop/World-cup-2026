@@ -189,9 +189,9 @@ function GroupProgress({ finished, total, groupsCompleted, qualifiedThirds }) {
       {/* Qualification counts */}
       <div style={{ display:'flex', gap:6 }}>
         {[
-          { label:'Locuri 1',  value:groupsCompleted?.length||0, max:12, color:'#00E5A0' },
-          { label:'Locuri 2',  value:groupsCompleted?.length||0, max:12, color:'#4A9EFF' },
-          { label:'3° calificați', value:thirdsCount, max:8, color:'#FFD700' },
+          { label:'Castigatoare grupe', value:groupsCompleted?.length||0, max:12, color:'#00E5A0' },
+          { label:'Locuri secunde',      value:groupsCompleted?.length||0, max:12, color:'#4A9EFF' },
+          { label:'Cele mai bune locuri 3', value:thirdsCount,             max:8,  color:'#FFD700' },
         ].map((s,i) => (
           <div key={i} style={{ flex:1, padding:'6px 8px', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)', borderRadius:8, textAlign:'center' }}>
             <div style={{ fontSize:12, fontWeight:800, color:s.color, fontFamily:"'DM Mono',monospace" }}>{s.value}<span style={{ fontSize:9, color:'rgba(255,255,255,0.2)' }}>/{s.max}</span></div>

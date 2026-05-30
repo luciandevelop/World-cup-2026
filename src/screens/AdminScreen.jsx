@@ -8,7 +8,7 @@ import { useState, useMemo } from 'react';
 import { ScoreInput, StepInput, PossessionInput } from '../components/UI.jsx';
 import {
   MATCHES, ADMIN_EMAILS, ADMIN_EMAILS_RUNTIME,
-  formatKickoffRO, buildGroupStandings,
+  formatKickoffRO, buildGroupStandings, buildQualifiedTeams, buildMatches,
 } from '../data/gameData.js';
 import { ALL_GROUPS } from '../data/matches.js';
 import { saveMatchResult, REALTIME_MODE } from '../services/firestoreService.js';
@@ -31,6 +31,68 @@ const STATUS_OPTIONS = [
   { value:'locked',    label:'🔒 Blocat',  color:'#6B7280' },
 ];
 
+
+// ─── ADMIN HELP SECTION ──────────────────────────────────────────────────────
+function AdminHelp({ open, onToggle }) {
+  if (!open) return (
+    <button onClick={onToggle} style={{ width:"100%", padding:"8px 12px", background:"rgba(74,158,255,0.06)", border:"1px solid rgba(74,158,255,0.15)", borderRadius:10, color:"rgba(74,158,255,0.7)", fontSize:11, fontWeight:700, cursor:"pointer", textAlign:"left", marginBottom:10 }}>
+      ? Ghid testare admin
+    </button>
+  );
+
+  const Section = ({ title, children }) => (
+    <div style={{ marginBottom:12 }}>
+      <div style={{ fontSize:10, fontWeight:800, color:"rgba(255,255,255,0.55)", textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:6 }}>{title}</div>
+      {children}
+    </div>
+  );
+  const Step = ({ n, text }) => (
+    <div style={{ display:"flex", gap:8, marginBottom:4 }}>
+      <div style={{ width:18, height:18, borderRadius:"50%", background:"rgba(255,255,255,0.08)", fontSize:9, fontWeight:700, color:"rgba(255,255,255,0.4)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>{n}</div>
+      <div style={{ fontSize:11, color:"rgba(255,255,255,0.45)", lineHeight:1.5 }}>{text}</div>
+    </div>
+  );
+
+  return (
+    <div style={{ background:"rgba(74,158,255,0.04)", border:"1px solid rgba(74,158,255,0.15)", borderRadius:12, padding:"12px 14px", marginBottom:12, animation:"fadeUp 0.18s ease" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+        <div style={{ fontSize:11, fontWeight:800, color:"rgba(74,158,255,0.8)" }}>Ghid testare admin</div>
+        <button onClick={onToggle} style={{ background:"none", border:"none", color:"rgba(255,255,255,0.3)", fontSize:16, cursor:"pointer", padding:2 }}>x</button>
+      </div>
+
+      <Section title="A) Acces admin">
+        <Step n="1" text="Adauga email-ul tau in src/data/gameData.js la ADMIN_EMAILS, sau seteaza VITE_ADMIN_EMAILS in Vercel." />
+        <Step n="2" text="Logheaza-te cu acel email. Apasa avatarul (dreapta sus) -> Panou Admin." />
+        <Step n="3" text="Butonul admin apare DOAR daca emailul este in lista." />
+      </Section>
+
+      <Section title="B) Testare clasamente">
+        <Step n="1" text="Selecteaza un meci din lista. Ex: Gr.A -> Mexic vs Africa de Sud." />
+        <Step n="2" text="Seteaza scorul (ex: 2-0) si Status: Final (FT)." />
+        <Step n="3" text="Apasa Salveaza rezultat. Clasamentul Gr.A se actualizeaza imediat." />
+        <Step n="4" text="Repeta pentru mai multe meciuri din acelasi grup." />
+        <Step n="5" text="Apasa Recalculeaza clasamente pentru a vedea calificatii." />
+        <Step n="6" text="Sectiunea Tabloul Calificarilor arata castigatorii, locurile 2 si cele mai bune locuri 3." />
+      </Section>
+
+      <Section title="C) Testare echipe oficiale">
+        <Step n="1" text="Selecteaza un meci -> Adauga / actualizeaza echipe." />
+        <Step n="2" text="Completeaza formatia si XI titular (un jucator pe rand: 1. Portar)." />
+        <Step n="3" text="Bifeaza Echipa OFICIALA (FIFA Match Centre)." />
+        <Step n="4" text="Salveaza. Deschide meciul din tab Meciuri -> tab Echipe." />
+        <Step n="5" text="Echipa oficiala inlocuieste prognoza cu 45 min inainte de start." />
+        <Step n="6" text="Inainte de 45 min se afiseaza echipa Bulinews (prognozata)." />
+      </Section>
+
+      <Section title="D) Reset date test">
+        <Step n="1" text="Apasa Reset rezultate test pentru a sterge toate scorurile salvate." />
+        <Step n="2" text="Pentru linii oficiale: DevTools -> localStorage.removeItem('wc2026_lineups')" />
+        <Step n="3" text="Reset complet: DevTools -> Object.keys(localStorage).filter(k=>k.startsWith('wc2026_')).forEach(k=>localStorage.removeItem(k)); location.reload()" />
+      </Section>
+    </div>
+  );
+}
+
 export default function AdminScreen({ currentUser, finishedResults, onMatchUpdate }) {
   const [sel,     setSel]    = useState(null);
   const [sA,      setSA]     = useState(0);
@@ -44,6 +106,13 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
   const [statusF, setStatusF]= useState('all');
   const [search,  setSearch] = useState('');
   const [history, setHistory]= useState([]); // last 5 saves
+  const [showLineupPanel, setShowLineupPanel] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [lineupFormation, setLineupFormation] = useState('4-3-3');
+  const [lineupHome, setLineupHome] = useState('');
+  const [lineupAway, setLineupAway] = useState('');
+  const [lineupOfficial, setLineupOfficial] = useState(false);
+  const [lineupSaved, setLineupSaved] = useState(false);
 
   const adminEmails = [...ADMIN_EMAILS, ...ADMIN_EMAILS_RUNTIME];
   const isAdmin = adminEmails.includes(currentUser?.email) || currentUser?.isAdmin === true;
@@ -146,6 +215,8 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
           </div>
         </div>
       </div>
+
+      <AdminHelp open={showHelp} onToggle={() => setShowHelp(p => !p)}/>
 
       {/* Stats */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:5, marginBottom:10 }}>
@@ -287,6 +358,138 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
         </div>
       )}
 
+      {/* Lineup panel */}
+      {sel && (
+        <div style={{ marginTop:10 }}>
+          <button
+            onClick={() => setShowLineupPanel(p => !p)}
+            style={{ width:'100%', padding:'9px 12px', background:'rgba(74,158,255,0.07)', border:'1px solid rgba(74,158,255,0.18)', borderRadius:10, color:'#4A9EFF', fontSize:11, fontWeight:700, cursor:'pointer', textAlign:'left' }}
+          >
+            {showLineupPanel ? 'x Inchide' : '+ Adauga / actualizeaza echipe'}
+          </button>
+          {showLineupPanel && (
+            <div style={{ marginTop:8, padding:'12px 14px', background:'rgba(74,158,255,0.04)', border:'1px solid rgba(74,158,255,0.12)', borderRadius:10, animation:'fadeUp 0.18s ease' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'rgba(74,158,255,0.7)', marginBottom:10, textTransform:'uppercase', letterSpacing:'0.08em' }}>
+                Echipe meci
+              </div>
+
+              {/* Formation */}
+              <div style={{ marginBottom:8 }}>
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', marginBottom:4 }}>Formatia (ambele echipe)</div>
+                <input
+                  value={lineupFormation}
+                  onChange={e => setLineupFormation(e.target.value.trim())}
+                  placeholder="ex: 4-3-3"
+                  style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                />
+              </div>
+
+              {/* Home XI */}
+              <div style={{ marginBottom:8 }}>
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', marginBottom:4 }}>{sel.flagA} {sel.teamA} — XI titular (unul pe linie)</div>
+                <textarea
+                  value={lineupHome}
+                  onChange={e => setLineupHome(e.target.value)}
+                  placeholder={"1. Portarul
+2. Fundas dreapta
+3. Fundas central
+..."}
+                  rows={6}
+                  style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:12, fontFamily:'monospace', outline:'none', boxSizing:'border-box', resize:'vertical' }}
+                />
+              </div>
+
+              {/* Away XI */}
+              <div style={{ marginBottom:8 }}>
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', marginBottom:4 }}>{sel.flagB} {sel.teamB} — XI titular (unul pe linie)</div>
+                <textarea
+                  value={lineupAway}
+                  onChange={e => setLineupAway(e.target.value)}
+                  placeholder={"1. Portarul
+2. Fundas dreapta
+..."}
+                  rows={6}
+                  style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:12, fontFamily:'monospace', outline:'none', boxSizing:'border-box', resize:'vertical' }}
+                />
+              </div>
+
+              {/* Official flag */}
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+                <input
+                  type="checkbox"
+                  id="officialCheck"
+                  checked={lineupOfficial}
+                  onChange={e => setLineupOfficial(e.target.checked)}
+                  style={{ width:16, height:16, cursor:'pointer' }}
+                />
+                <label htmlFor="officialCheck" style={{ fontSize:11, color:lineupOfficial ? '#00E5A0' : 'rgba(255,255,255,0.4)', cursor:'pointer', fontWeight:lineupOfficial ? 700 : 400 }}>
+                  {lineupOfficial ? 'Echipa OFICIALA (FIFA Match Centre)' : 'Echipa prognozata / Bulinews'}
+                </label>
+              </div>
+
+              <button
+                onClick={() => {
+                  const parseXI = (text) => text.split('
+').filter(l => l.trim()).slice(0,11).map((l, i) => {
+                    const m = l.match(/^(\d+)[.\s]+(.+)$/);
+                    return m ? { number:parseInt(m[1]), name:m[2].trim(), position:['GK','RB','CB','CB','LB','CDM','CM','CM','RW','ST','LW'][i] || 'CM' }
+                             : { number:i+1, name:l.trim(), position:['GK','RB','CB','CB','LB','CDM','CM','CM','RW','ST','LW'][i] || 'CM' };
+                  });
+                  const lu = {
+                    matchId:    sel.id,
+                    formation:  lineupFormation,
+                    home:       parseXI(lineupHome),
+                    away:       parseXI(lineupAway),
+                    isOfficial: lineupOfficial,
+                    sourceName: lineupOfficial ? 'FIFA Match Centre' : 'Manual / Bulinews',
+                    updatedAt:  Date.now(),
+                  };
+                  // Save lineup to localStorage under lineups key
+                  const stored = JSON.parse(localStorage.getItem('wc2026_lineups') || '{}');
+                  stored[sel.id] = lu;
+                  localStorage.setItem('wc2026_lineups', JSON.stringify(stored));
+                  onMatchUpdate?.({ _action:'lineup', matchId:sel.id, lineup:lu });
+                  setLineupSaved(true);
+                  setTimeout(() => setLineupSaved(false), 2500);
+                }}
+                style={{ width:'100%', padding:10, background:lineupSaved ? 'rgba(0,229,160,0.1)' : 'rgba(74,158,255,0.1)', border:`1px solid ${lineupSaved ? 'rgba(0,229,160,0.3)' : 'rgba(74,158,255,0.25)'}`, borderRadius:9, color:lineupSaved ? '#00E5A0' : '#4A9EFF', fontSize:12, fontWeight:700, cursor:'pointer' }}
+              >
+                {lineupSaved ? 'Salvat!' : 'Salveaza echipele'}
+              </button>
+              {lineupOfficial && (
+                <div style={{ marginTop:6, fontSize:9, color:'rgba(0,229,160,0.4)' }}>
+                  Echipa oficiala va inlocui prognoza cu 45 min inainte de start.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Recalculate / Reset panel */}
+      <div style={{ display:'flex', gap:8, marginTop:10 }}>
+        <button
+          onClick={() => { onMatchUpdate?.({ _action:'recalc' }); setSaved(false); }}
+          style={{ flex:1, padding:'10px 8px', background:'rgba(0,229,160,0.08)', border:'1px solid rgba(0,229,160,0.2)', borderRadius:10, color:'#00E5A0', fontSize:11, fontWeight:700, cursor:'pointer' }}
+        >
+          Recalculeaza clasamente
+        </button>
+        <button
+          onClick={() => {
+            if (!window.confirm('Resetezi toate rezultatele test?')) return;
+            localStorage.removeItem('wc2026_admin_results');
+            onMatchUpdate?.({ _action:'reset' });
+            setSel(null); setHistory([]);
+          }}
+          style={{ flex:1, padding:'10px 8px', background:'rgba(239,68,68,0.07)', border:'1px solid rgba(239,68,68,0.18)', borderRadius:10, color:'#EF4444', fontSize:11, fontWeight:700, cursor:'pointer' }}
+        >
+          Reset rezultate test
+        </button>
+      </div>
+
+      {/* Qualification overview */}
+      <QualificationPanel finishedResults={finishedResults}/>
+
       {/* Save history */}
       {history.length > 0 && (
         <div style={{ marginTop:12 }}>
@@ -299,6 +502,55 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+
+// ─── QUALIFICATION PANEL ─────────────────────────────────────────────────────
+// Shows which teams have qualified based on current finishedResults.
+function QualificationPanel({ finishedResults }) {
+  const { standings, qualifiedThirds, groupsCompleted } = buildQualifiedTeams(finishedResults || {});
+  const ALL_G = ['A','B','C','D','E','F','G','H','I','J','K','L'];
+
+  const winners    = ALL_G.map(g => ({ g, team:standings[g]?.[0] })).filter(x => x.team);
+  const runnersUp  = ALL_G.map(g => ({ g, team:standings[g]?.[1] })).filter(x => x.team);
+
+  const section = (title, teams, color) => (
+    <div style={{ marginBottom:10 }}>
+      <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', textTransform:'uppercase', letterSpacing:'0.1em', fontWeight:700, marginBottom:6 }}>
+        {title} ({teams.length})
+      </div>
+      <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+        {teams.map((x, i) => (
+          <div key={i} style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 7px', background:'rgba(255,255,255,0.04)', border:`1px solid ${color}22`, borderRadius:6 }}>
+            <span style={{ fontSize:12 }}>{x.team?.flag || x.flag}</span>
+            <span style={{ fontSize:10, color:'#fff', fontWeight:600 }}>{x.team?.team || x.team}</span>
+            {x.g && <span style={{ fontSize:9, color:'rgba(255,255,255,0.25)' }}>Gr.{x.g}</span>}
+            {x.pts !== undefined && (
+              <span style={{ fontSize:9, color:color, fontFamily:"'DM Mono',monospace", marginLeft:2 }}>
+                {x.pts}p {x.gd > 0 ? '+' : ''}{x.gd}gd
+              </span>
+            )}
+          </div>
+        ))}
+        {teams.length === 0 && (
+          <span style={{ fontSize:10, color:'rgba(255,255,255,0.15)', fontStyle:'italic' }}>
+            Nu sunt date inca
+          </span>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:12, padding:'12px 14px', marginTop:10 }}>
+      <div style={{ fontSize:10, fontWeight:800, color:'rgba(255,255,255,0.5)', marginBottom:10, letterSpacing:'0.08em', textTransform:'uppercase' }}>
+        Tabloul Calificarilor
+      </div>
+      {section('Castigatori grupe (Locul 1)', winners, '#00E5A0')}
+      {section('Locul 2', runnersUp, '#4A9EFF')}
+      {section('Cele mai bune locuri 3 calificate', qualifiedThirds.map(t => ({ team:t.team, flag:t.flag, g:t.fromGroup, pts:t.pts, gd:t.gd })), '#FFD700')}
     </div>
   );
 }

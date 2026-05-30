@@ -71,11 +71,12 @@ export function formatDateRO(iso) {
 }
 
 export function formatKickoffRO(iso) {
-  // Returns: "Joi, 11 Iun • 22:00 RO"
+  // Returns: "joi, 11 iun. • 22:00 RO"
+  // Always uses Europe/Bucharest regardless of viewer's local timezone.
   const d = new Date(iso);
   const date = d.toLocaleDateString("ro-RO", { timeZone:"Europe/Bucharest", weekday:"short", day:"numeric", month:"short" });
   const time = d.toLocaleTimeString("ro-RO", { timeZone:"Europe/Bucharest", hour:"2-digit", minute:"2-digit" });
-  return `${date} • ${time}`;
+  return date + " \u2022 " + time + " RO";
 }
 
 // ─── LOCK STATE ───────────────────────────────────────────────────────────────

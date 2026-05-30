@@ -1,5 +1,5 @@
 // ─── src/App.jsx ──────────────────────────────────────────────────────────────
-// Main application shell — v3.0
+// Main application shell — v8 Firestore
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback } from 'react';
@@ -29,7 +29,7 @@ import {
 } from './services/firestoreService.js';
 import { FIREBASE_CONFIGURED } from './services/firebase.js';
 
-export const APP_VERSION = 'v4.0';
+export const APP_VERSION = 'v8';
 
 // ─── PERFECT HIT OVERLAY ──────────────────────────────────────────────────────
 function PerfectHitOverlay({ pts, onDone }) {
@@ -64,12 +64,12 @@ const RARITY_CFG = {
 };
 
 const AV_CATS = [
-  { id:'all',       label:'Toate' },
-  { id:'nations',   label:'🌍 Naționale',   filter: a => a.id.startsWith('flag_') },
-  { id:'jerseys',   label:'👕 Echipamente', filter: a => a.id.startsWith('kit_') },
-  { id:'stars',     label:'⭐ Stele',       filter: a => a.rarity==='epic' },
-  { id:'legendary', label:'🔮 Legendar',    filter: a => a.rarity==='legendary' },
-  { id:'person',    label:'😄 Personaje',   filter: a => !a.rarity || (a.rarity==='common' && !a.id.startsWith('flag_') && !a.id.startsWith('kit_')) },
+  { id:'all',      label:'Toate' },
+  { id:'nations',  label:'Natiuni',   filter: a => a.id.startsWith('flag_') },
+  { id:'jerseys',  label:'Tricouri',  filter: a => a.id.startsWith('kit_') },
+  { id:'players',  label:'Jucatori',  filter: a => a.rarity==='epic' },
+  { id:'trophies', label:'Trofee',    filter: a => a.rarity==='legendary' || ['clean_sheet','var_hunter','penalty_k','assist_king','top_scorer'].includes(a.id) },
+  { id:'fantasy',  label:'Personaje', filter: a => a.rarity==='common' && !a.id.startsWith('flag_') && !a.id.startsWith('kit_') },
 ];
 
 // ─── AVATAR CHANGE MODAL ──────────────────────────────────────────────────────
@@ -274,14 +274,19 @@ export default function App() {
   };
 
   const handleMatchUpdate = useCallback(async (update) => {
-    // AdminScreen already saved to Firestore/localStorage via firestoreService.
-    // subscribeToMatchResults listener will auto-update finishedResults.
-    // For localStorage mode: manually reload results.
+    if (update?._action === 'reset') {
+      setFinishedResults({});
+      return;
+    }
+    if (update?._action === 'lineup') {
+      // Lineup saved to localStorage by AdminScreen — trigger re-render
+      setFinishedResults(prev => ({ ...prev }));
+      return;
+    }
     if (!REALTIME_MODE) {
       const results = await loadMatchResults();
       setFinishedResults(results);
     }
-    // In Firestore mode: onSnapshot fires automatically, no action needed here.
   }, []);
 
   const handleLogin = (googleData) => {
@@ -363,7 +368,10 @@ export default function App() {
       <div style={{ position:'sticky',top:0,zIndex:50,background:'rgba(10,14,20,0.97)',backdropFilter:'blur(20px)',borderBottom:'1px solid rgba(255,255,255,0.06)',padding:'10px 14px 9px',display:'flex',justifyContent:'space-between',alignItems:'center' }}>
         <div>
           <div style={{ fontSize:8,color:'rgba(212,175,55,0.45)',letterSpacing:'0.22em',textTransform:'uppercase',fontWeight:700,marginBottom:1 }}>FIFA World Cup 2026™</div>
-          <div style={{ fontSize:17,fontWeight:800,color:'#fff',lineHeight:1.1,letterSpacing:'-0.02em' }}>World Cup Arena</div>
+          <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+            <div style={{ fontSize:17,fontWeight:800,color:'#fff',lineHeight:1.1,letterSpacing:'-0.02em' }}>World Cup Arena</div>
+            <div style={{ fontSize:8,fontWeight:800,color:'rgba(0,229,160,0.7)',background:'rgba(0,229,160,0.08)',border:'1px solid rgba(0,229,160,0.2)',padding:'2px 6px',borderRadius:5,letterSpacing:'0.06em',flexShrink:0 }}>v8 Firestore</div>
+          </div>
         </div>
         {/* Compact stats strip */}
         <div style={{ display:'flex',alignItems:'center',gap:8 }}>

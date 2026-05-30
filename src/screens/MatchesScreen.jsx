@@ -12,6 +12,7 @@ import {
 import { ALL_GROUPS } from '../data/matches.js';
 import { StatusPill, SectionDivider } from '../components/UI.jsx';
 import GroupStandings from '../components/GroupStandings.jsx';
+import { getTeamLineup, resolveLineup, OFFICIAL_CUTOFF_MS } from '../data/lineups.js';
 
 // ─── GROUP TEAMS (derived) ────────────────────────────────────────────────────
 const GROUP_TEAMS = ALL_GROUPS.reduce((acc, g) => {
@@ -123,7 +124,7 @@ function FriendPredictions({ match }) {
 }
 
 // ─── MATCH CARD ───────────────────────────────────────────────────────────────
-function MatchCard({ match, prediction, onPredict }) {
+function MatchCard({ match, prediction, onPredict, onDetail }) {
   const lockInfo   = matchLockState(match);
   const isEditable = lockInfo.state === "open";
   const pts        = prediction && match.isFinished ? calcPoints(prediction, match) : null;
@@ -141,7 +142,11 @@ function MatchCard({ match, prediction, onPredict }) {
   return (
     <div style={{ marginBottom:8 }}>
       <div
-        onClick={() => isEditable ? onPredict(match) : (match.isFinished || match.isLive) && setExpanded(e => !e)}
+        onClick={() => {
+          if (isEditable) onPredict(match);
+          else if (onDetail) onDetail(match);
+          else if (match.isFinished || match.isLive) setExpanded(e => !e);
+        }}
         style={{
           background: hasPred ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
           border: cardBorder,
@@ -304,8 +309,306 @@ function LiveFeed() {
 }
 
 // ─── MATCHES SCREEN ───────────────────────────────────────────────────────────
+// ─── PITCH FORMATION GRAPHIC ──────────────────────────────────────────────────
+// Renders players positioned on a football pitch by role.
+// positions: GK at bottom, then DEF row, MID row, FWD row (home = bottom half).
+// ─── FORMATION PARSER ────────────────────────────────────────────────────────
+// Splits a formation string like "4-2-3-1" into row counts [4,2,3,1]
+// and maps each player to a row based on their index in the XI (GK always row 0).
+function parseFormationRows(formationStr, players) {
+  if (!players || players.length === 0) return [];
+  // Parse e.g. "4-3-3" => [4,3,3], "4-2-3-1" => [4,2,3,1]
+  const parts = (formationStr || '4-3-3').split('-').map(Number).filter(n => n > 0);
+  // rows[0] = GK (always 1), rows[1..] = outfield rows
+  const rowCounts = [1, ...parts];
+  const rows = [];
+  let idx = 0;
+  for (const count of rowCounts) {
+    rows.push(players.slice(idx, idx + count));
+    idx += count;
+  }
+  // Any overflow goes to last row
+  if (idx < players.length) {
+    rows[rows.length - 1] = [...(rows[rows.length - 1] || []), ...players.slice(idx)];
+  }
+  return rows; // first row = GK, last row = attackers
+}
+
+function PitchFormation({ players, formation, teamName, flag, flipped }) {
+  const allPlayers = players || [];
+  const rows = parseFormationRows(formation, allPlayers);
+  // flipped = away team; render attacker row first so both teams face each other
+  const displayRows = flipped ? [...rows].reverse() : rows;
+
+  const PlayerDot = ({ p }) => (
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2, flex:'0 0 auto' }}>
+      <div style={{
+        width:26, height:26, borderRadius:'50%',
+        background:'rgba(255,255,255,0.14)', border:'1px solid rgba(255,255,255,0.28)',
+        display:'flex', alignItems:'center', justifyContent:'center',
+        fontSize:9, fontWeight:800, color:'#fff',
+      }}>
+        {p.number}
+      </div>
+      <div style={{
+        fontSize:8, color:'rgba(255,255,255,0.7)', textAlign:'center',
+        maxWidth:42, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+        lineHeight:1.2,
+      }}>
+        {(p.name || '').split(' ').pop()}
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ flex:1 }}>
+      <div style={{ textAlign:'center', marginBottom:5 }}>
+        <span style={{ fontSize:13 }}>{flag}</span>
+        <span style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.7)', marginLeft:5 }}>{teamName}</span>
+        <span style={{ fontSize:9, color:'rgba(255,255,255,0.28)', marginLeft:5 }}>{formation}</span>
+      </div>
+      {displayRows.length === 0 ? (
+        <div style={{ fontSize:10, color:'rgba(255,255,255,0.2)', textAlign:'center', padding:'12px 0', fontStyle:'italic' }}>
+          Echipa probabila nu este disponibila inca pentru aceasta nationala.
+        </div>
+      ) : (
+        <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+          {displayRows.map((row, ri) => (
+            row.length > 0 && (
+              <div key={ri} style={{ display:'flex', justifyContent:'space-evenly', alignItems:'flex-start', minHeight:44 }}>
+                {row.map((p, pi) => <PlayerDot key={pi} p={p}/>)}
+              </div>
+            )
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── MATCH DETAIL MODAL ──────────────────────────────────────────────────────
+function MatchDetailModal({ match, prediction, onClose, onPredict }) {
+  const lockInfo  = matchLockState(match);
+  const kickoffRO = formatKickoffRO(match.time);
+  const [tab, setTabDetail] = useState('info');
+
+  // Resolve lineups (predicted vs official, timing-aware)
+  const officialOverride = match.officialLineup || null;
+  const lineupA = resolveLineup(match.teamA, match.time, officialOverride?.home);
+  const lineupB = resolveLineup(match.teamB, match.time, officialOverride?.away);
+  const hasLineup = !!(lineupA || lineupB);
+
+  // Source badge
+  const isOfficial  = lineupA?.isOfficial || lineupB?.isOfficial;
+  const officialMissing = lineupA?.officialMissing || lineupB?.officialMissing;
+  const sourceName  = isOfficial ? "FIFA Match Centre" : (lineupA?.sourceName || "Bulinews");
+  const sourceUrl   = lineupA?.sourceUrl || null;
+
+  const DETAIL_TABS = [
+    { id:'info',    label:'Info' },
+    { id:'lineups', label:'Echipe' },
+    { id:'pred',    label:'Predictie' },
+  ];
+
+  return (
+    <div
+      style={{ position:'fixed', inset:0, zIndex:100, background:'rgba(0,0,0,0.88)', backdropFilter:'blur(10px)', display:'flex', flexDirection:'column', justifyContent:'flex-end', animation:'fadeIn 0.15s' }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <div style={{ background:'linear-gradient(180deg,#111820,#0A0E14)', borderRadius:'22px 22px 0 0', padding:'18px 18px 40px', border:'1px solid rgba(255,255,255,0.08)', borderBottom:'none', animation:'slideUp 0.28s cubic-bezier(0.34,1.1,0.64,1)', maxHeight:'90dvh', overflowY:'auto' }}>
+        <div style={{ width:36, height:3, background:'rgba(255,255,255,0.15)', borderRadius:2, margin:'0 auto 14px' }}/>
+
+        {/* Header */}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14 }}>
+          <div>
+            <div style={{ fontSize:9, color:'rgba(0,229,160,0.65)', letterSpacing:'0.14em', textTransform:'uppercase', fontWeight:700, marginBottom:3 }}>
+              Grupa {match.group}
+            </div>
+            <div style={{ fontSize:16, fontWeight:800, color:'#fff' }}>
+              {match.flagA} {match.teamA} vs {match.teamB} {match.flagB}
+            </div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', marginTop:3 }}>{kickoffRO}</div>
+          </div>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.35)', fontSize:22, cursor:'pointer', padding:4, lineHeight:1 }}>x</button>
+        </div>
+
+        {/* Inner tabs */}
+        <div style={{ display:'flex', gap:4, marginBottom:14, background:'rgba(255,255,255,0.04)', borderRadius:10, padding:3 }}>
+          {DETAIL_TABS.map(t => (
+            <button key={t.id} onClick={() => setTabDetail(t.id)} style={{
+              flex:1, padding:'7px 4px', borderRadius:8, border:'none', cursor:'pointer',
+              background:tab===t.id ? 'rgba(255,255,255,0.1)' : 'transparent',
+              color:tab===t.id ? '#fff' : 'rgba(255,255,255,0.38)',
+              fontSize:12, fontWeight:tab===t.id ? 700 : 500, transition:'all 0.15s',
+            }}>{t.label}</button>
+          ))}
+        </div>
+
+        {/* ── TAB: INFO ── */}
+        {tab === 'info' && (
+          <div style={{ background:'rgba(255,255,255,0.03)', borderRadius:12, padding:'12px 14px', border:'1px solid rgba(255,255,255,0.06)' }}>
+            {[
+              { label:'Ora (Romania)', value:kickoffRO },
+              { label:'Stadion',       value:match.venue },
+              { label:'Grupa',         value:'Grupa ' + match.group },
+              { label:'Status',        value:lockInfo.label },
+            ].map((row, i) => (
+              <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:i < 3 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                <span style={{ fontSize:11, color:'rgba(255,255,255,0.3)' }}>{row.label}</span>
+                <span style={{ fontSize:11, color:'#fff', fontWeight:600 }}>{row.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── TAB: LINEUPS ── */}
+        {tab === 'lineups' && (
+          <div>
+            {/* Source badge */}
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                {isOfficial ? (
+                  <span style={{ fontSize:9, fontWeight:800, color:'#00E5A0', background:'rgba(0,229,160,0.1)', border:'1px solid rgba(0,229,160,0.25)', padding:'2px 8px', borderRadius:4, letterSpacing:'0.06em' }}>
+                    OFICIAL
+                  </span>
+                ) : (
+                  <span style={{ fontSize:9, fontWeight:600, color:'rgba(255,215,0,0.55)', background:'rgba(255,215,0,0.06)', border:'1px solid rgba(255,215,0,0.15)', padding:'2px 8px', borderRadius:4 }}>
+                    PROGNOZAT
+                  </span>
+                )}
+                <span style={{ fontSize:9, color:'rgba(255,255,255,0.2)' }}>Sursa: {sourceName}</span>
+              </div>
+              {!isOfficial && sourceUrl && (
+                <a href={sourceUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize:9, color:'rgba(255,215,0,0.4)', textDecoration:'none' }}>
+                  bulinews.com
+                </a>
+              )}
+            </div>
+
+            {/* Official missing warning */}
+            {officialMissing && (
+              <div style={{ marginBottom:10, padding:'8px 12px', background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.2)', borderRadius:8, fontSize:11, color:'rgba(245,158,11,0.7)' }}>
+                Echipa oficiala nu a fost publicata inca. Se afiseaza echipa prognozata.
+              </div>
+            )}
+
+            {hasLineup ? (
+              <div>
+                {/* Pitch container */}
+                <div style={{
+                  background:'linear-gradient(180deg,#1a3a1a 0%,#1e4a1e 45%,#1a3a1a 45%,#1e4a1e 100%)',
+                  borderRadius:12, padding:'14px 10px', border:'1px solid rgba(255,255,255,0.07)',
+                  position:'relative', overflow:'hidden',
+                }}>
+                  {/* Pitch lines */}
+                  <div style={{ position:'absolute', inset:0, pointerEvents:'none' }}>
+                    {/* Center line */}
+                    <div style={{ position:'absolute', top:'50%', left:'5%', right:'5%', height:1, background:'rgba(255,255,255,0.12)' }}/>
+                    {/* Center circle */}
+                    <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', width:60, height:60, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.1)' }}/>
+                    {/* Penalty areas */}
+                    <div style={{ position:'absolute', top:'4%', left:'20%', right:'20%', height:'14%', border:'1px solid rgba(255,255,255,0.08)', borderBottom:'none' }}/>
+                    <div style={{ position:'absolute', bottom:'4%', left:'20%', right:'20%', height:'14%', border:'1px solid rgba(255,255,255,0.08)', borderTop:'none' }}/>
+                  </div>
+
+                  {/* Two teams side by side on pitch */}
+                  <div style={{ display:'flex', gap:8, position:'relative', zIndex:1 }}>
+                    <PitchFormation
+                      players={lineupA?.startingXI}
+                      formation={lineupA?.formation || '?'}
+                      teamName={match.teamA}
+                      flag={match.flagA}
+                      flipped={false}
+                    />
+                    <div style={{ width:1, background:'rgba(255,255,255,0.1)', alignSelf:'stretch' }}/>
+                    <PitchFormation
+                      players={lineupB?.startingXI}
+                      formation={lineupB?.formation || '?'}
+                      teamName={match.teamB}
+                      flag={match.flagB}
+                      flipped={true}
+                    />
+                  </div>
+                </div>
+
+                {/* Substitutes */}
+                {(lineupA?.substitutes?.length > 0 || lineupB?.substitutes?.length > 0) && (
+                  <div style={{ marginTop:10, display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    {[
+                      { side:match.teamA, flag:match.flagA, subs:lineupA?.substitutes },
+                      { side:match.teamB, flag:match.flagB, subs:lineupB?.substitutes },
+                    ].map((t, ti) => t.subs?.length > 0 && (
+                      <div key={ti} style={{ background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)', borderRadius:9, padding:'8px 10px' }}>
+                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', fontWeight:700, marginBottom:5, textTransform:'uppercase', letterSpacing:'0.06em' }}>
+                          {t.flag} Rezerve
+                        </div>
+                        {t.subs.slice(0,5).map((s, si) => (
+                          <div key={si} style={{ fontSize:10, color:'rgba(255,255,255,0.4)', padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
+                            {typeof s === 'string' ? s : (s.name || s)}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ padding:'20px 14px', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)', borderRadius:12, textAlign:'center' }}>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,0.2)', fontStyle:'italic', lineHeight:1.7 }}>
+                  Echipele probabile vor aparea cand exista surse credibile.<br/>
+                  <span style={{ fontSize:9 }}>Surse: Bulinews / FotMob / stiri oficiale echipa</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── TAB: PREDICTIE ── */}
+        {tab === 'pred' && (
+          <div>
+            {prediction ? (
+              <div style={{ background:'rgba(0,229,160,0.04)', borderRadius:12, padding:'12px 14px', border:'1px solid rgba(0,229,160,0.12)' }}>
+                <div style={{ fontSize:9, color:'rgba(0,229,160,0.5)', textTransform:'uppercase', letterSpacing:'0.1em', fontWeight:700, marginBottom:8 }}>Predictia ta</div>
+                <div style={{ fontSize:18, fontWeight:800, color:'#fff', textAlign:'center', marginBottom:8 }}>
+                  {match.flagA} {prediction.scoreA} - {prediction.scoreB} {match.flagB}
+                </div>
+                <div style={{ display:'flex', justifyContent:'center', gap:16 }}>
+                  <span style={{ fontSize:12, color:'rgba(255,255,255,0.4)' }}>Posesie: {prediction.possession}%</span>
+                  <span style={{ fontSize:12, color:'rgba(255,255,255,0.4)' }}>Cornere: {prediction.corners}</span>
+                </div>
+              </div>
+            ) : (
+              <div style={{ textAlign:'center', padding:'20px' }}>
+                <div style={{ fontSize:12, color:'rgba(255,255,255,0.25)', marginBottom:12 }}>Nu ai facut inca o predictie pentru acest meci.</div>
+              </div>
+            )}
+
+            {lockInfo.state === 'open' && (
+              <button onClick={() => { onClose(); onPredict(match); }} style={{ width:'100%', marginTop:12, padding:14, background: prediction ? 'rgba(255,255,255,0.06)' : 'linear-gradient(135deg,#00E5A0,#00C27A)', border: prediction ? '1px solid rgba(255,255,255,0.1)' : 'none', borderRadius:12, color: prediction ? 'rgba(255,255,255,0.6)' : '#060C09', fontSize:14, fontWeight:700, cursor:'pointer' }}>
+                {prediction ? 'Editeaza predictia' : '+ Adauga predictie'}
+              </button>
+            )}
+            {lockInfo.state !== 'open' && lockInfo.state !== 'finished' && (
+              <div style={{ marginTop:12, padding:'10px 14px', background:'rgba(107,114,128,0.08)', border:'1px solid rgba(107,114,128,0.15)', borderRadius:10, fontSize:12, color:'rgba(255,255,255,0.3)', textAlign:'center' }}>
+                Predictiile s-au inchis cu 30 de minute inainte de start.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function MatchesScreen({ predictions, onPredict, finishedResults }) {
   const [tab, setTab]              = useState("toate"); // "toate" | "mele" | "prieteni"
+  const [detailMatch, setDetailMatch] = useState(null);
+
+  // Load admin-saved official lineups from localStorage
+  // This is re-evaluated on each render (lightweight localStorage read)
+  const adminLineups = (() => {
+    try { return JSON.parse(localStorage.getItem('wc2026_lineups') || '{}'); } catch { return {}; }
+  })();
   const [collapsedGroups, setCollapsedGroups] = useState(new Set());
   const [groupFilter, setGroupFilter] = useState("toate");
 
@@ -361,7 +664,7 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults 
           <div style={{ background:"rgba(255,255,255,0.01)", border:"1px solid rgba(255,255,255,0.06)", borderTop:"none", borderRadius:"0 0 12px 12px", padding:"10px 10px 4px" }}>
             {tab === "toate" && <GroupStandings group={g} finishedResults={finishedResults}/>}
             {matches.map(m => (
-              <MatchCard key={m.id} match={m} prediction={predictions[m.id]} onPredict={onPredict}/>
+              <MatchCard key={m.id} match={m} prediction={predictions[m.id]} onPredict={onPredict} onDetail={setDetailMatch}/>
             ))}
           </div>
         )}
@@ -475,5 +778,15 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults 
 
       </div>
     </div>
+
+    {/* Match detail modal */}
+    {detailMatch && (
+      <MatchDetailModal
+        match={{ ...detailMatch, officialLineup: adminLineups[detailMatch.id] || null }}
+        prediction={predictions[detailMatch.id]}
+        onClose={() => setDetailMatch(null)}
+        onPredict={onPredict}
+      />
+    )}
   );
 }

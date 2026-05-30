@@ -225,11 +225,11 @@ const RARITY_CONFIG = {
 };
 
 const AVATAR_CATEGORIES = [
-  { id:'personality', label:'Personalități',  filter: av => !av.rarity || (av.rarity === 'common' && !av.id.startsWith('flag_') && !av.id.startsWith('kit_')) },
-  { id:'nations',     label:'🌍 Naționale',   filter: av => av.id.startsWith('flag_') },
-  { id:'jerseys',     label:'👕 Echipamente', filter: av => av.id.startsWith('kit_') },
-  { id:'stars',       label:'⭐ Superstele',  filter: av => av.rarity === 'epic' },
-  { id:'legendary',   label:'🔮 Legendar',    filter: av => av.rarity === 'legendary' },
+  { id:'nations',   label:'Natiuni',        filter: av => av.id.startsWith('flag_') },
+  { id:'jerseys',   label:'Tricouri',       filter: av => av.id.startsWith('kit_') },
+  { id:'players',   label:'Jucatori',       filter: av => av.rarity === 'epic' },
+  { id:'trophies',  label:'Trofee',         filter: av => av.rarity === 'legendary' || av.id === 'clean_sheet' || av.id === 'var_hunter' || av.id === 'penalty_k' || av.id === 'assist_king' || av.id === 'top_scorer' },
+  { id:'fantasy',   label:'Personaje',      filter: av => av.rarity === 'common' && !av.id.startsWith('flag_') && !av.id.startsWith('kit_') },
 ];
 
 function AvatarPicker({ selected, onSelect }) {
