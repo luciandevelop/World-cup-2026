@@ -390,10 +390,7 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
                 <textarea
                   value={lineupHome}
                   onChange={e => setLineupHome(e.target.value)}
-                  placeholder={"1. Portarul
-2. Fundas dreapta
-3. Fundas central
-..."}
+                  placeholder={"1. Portarul\n2. Fundas dreapta\n3. Fundas central\n..."}
                   rows={6}
                   style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:12, fontFamily:'monospace', outline:'none', boxSizing:'border-box', resize:'vertical' }}
                 />
@@ -405,9 +402,7 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
                 <textarea
                   value={lineupAway}
                   onChange={e => setLineupAway(e.target.value)}
-                  placeholder={"1. Portarul
-2. Fundas dreapta
-..."}
+                  placeholder={"1. Portarul\n2. Fundas dreapta\n..."}
                   rows={6}
                   style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:12, fontFamily:'monospace', outline:'none', boxSizing:'border-box', resize:'vertical' }}
                 />
@@ -429,8 +424,7 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
 
               <button
                 onClick={() => {
-                  const parseXI = (text) => text.split('
-').filter(l => l.trim()).slice(0,11).map((l, i) => {
+                  const parseXI = (text) => text.split('\n').filter(l => l.trim()).slice(0,11).map((l, i) => {
                     const m = l.match(/^(\d+)[.\s]+(.+)$/);
                     return m ? { number:parseInt(m[1]), name:m[2].trim(), position:['GK','RB','CB','CB','LB','CDM','CM','CM','RW','ST','LW'][i] || 'CM' }
                              : { number:i+1, name:l.trim(), position:['GK','RB','CB','CB','LB','CDM','CM','CM','RW','ST','LW'][i] || 'CM' };
