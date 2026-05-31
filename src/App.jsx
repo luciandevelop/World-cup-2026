@@ -382,6 +382,14 @@ export default function App() {
               {totalPts > 0 && <span style={{ fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.7)',fontFamily:"'DM Mono',monospace" }}>⚡{totalPts}</span>}
             </div>
           )}
+          {[...ADMIN_EMAILS, ...ADMIN_EMAILS_RUNTIME].includes(user?.email) && !adminMode && (
+            <button
+              onClick={() => setAdminMode(true)}
+              style={{ padding:'5px 10px', background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.35)', borderRadius:20, color:'#EF4444', fontSize:11, fontWeight:800, cursor:'pointer', flexShrink:0 }}
+            >
+              ⚙️ Admin
+            </button>
+          )}
           <div onClick={()=>setShowProfile(true)} style={{ cursor:'pointer', border:`2px solid ${adminMode?'rgba(239,68,68,0.5)':'rgba(255,255,255,0.1)'}`, borderRadius:'50%' }}>
             <FootballAvatar nickname={user?.nickname||'?'} avatarId={user?.avatarId} size={30}/>
           </div>
@@ -391,7 +399,7 @@ export default function App() {
       {/* ── Admin banner ── */}
       {adminMode && (
         <div style={{ background:'rgba(239,68,68,0.07)',borderBottom:'1px solid rgba(239,68,68,0.14)',padding:'7px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:12,color:'rgba(239,68,68,0.8)' }}>
-          <span>⚙️ Mod Admin activ</span>
+          <span>⚙️ Admin Test Mode — luciavram87@gmail.com</span>
           <span style={{ cursor:'pointer',opacity:0.6 }} onClick={()=>setAdminMode(false)}>× Ieși</span>
         </div>
       )}
