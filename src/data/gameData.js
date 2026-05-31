@@ -26,19 +26,22 @@ export function buildMatches(finishedResults = FINISHED_RESULTS) {
     const kickoff    = new Date(m.time).getTime();
     const isLocked   = now >= kickoff - LOCK_BEFORE_MS;
     const result     = finishedResults[m.id] ?? null;
-    const isFinished = result !== null;
-    const isLive     = now >= kickoff && !isFinished;
+    // isFinished only when status is explicitly 'ft' — not live, scheduled, or locked
+    const isFinished = result?.liveStatus === 'ft' &&
+                       result?.realScoreA !== null && result?.realScoreA !== undefined &&
+                       result?.realScoreB !== null && result?.realScoreB !== undefined;
+    const isLive     = result?.liveStatus === 'live' || result?.liveStatus === 'ht';
     return {
       ...m,
       isLocked,
       isFinished,
       isLive,
-      realScoreA:     result?.realScoreA     ?? null,
-      realScoreB:     result?.realScoreB     ?? null,
+      realScoreA:     isFinished ? Number(result.realScoreA) : null,
+      realScoreB:     isFinished ? Number(result.realScoreB) : null,
       realPossession: result?.realPossession ?? null,
       realCorners:    result?.realCorners    ?? null,
       liveMinute:     result?.liveMinute     ?? null,
-      liveStatus:     result?.liveStatus     ?? (isLive ? "live" : isFinished ? "finished" : now >= kickoff - LOCK_BEFORE_MS ? "locked" : "open"),
+      liveStatus:     result?.liveStatus     ?? (isLive ? "live" : isFinished ? "ft" : now >= kickoff - LOCK_BEFORE_MS ? "locked" : "open"),
     };
   });
 }
