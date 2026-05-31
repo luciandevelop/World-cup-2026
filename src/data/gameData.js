@@ -16,7 +16,7 @@ export const LOCK_BEFORE_MS = 30 * 60 * 1000; // 30 min before kickoff
 // Only users whose email appears here can access admin mode.
 export const ADMIN_EMAILS = [
   "admin@worldcup2026.app",
-  // Add real admin emails here
+  "luciavram87@gmail.com",   // primary admin
 ];
 
 // ─── MATCHES (computed) ───────────────────────────────────────────────────────
