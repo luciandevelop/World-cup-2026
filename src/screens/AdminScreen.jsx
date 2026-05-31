@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useMemo } from 'react';
-import { ScoreInput, StepInput, PossessionInput } from '../components/UI.jsx';
+import { ScoreInput } from '../components/UI.jsx';
 import {
   MATCHES, ADMIN_EMAILS, ADMIN_EMAILS_RUNTIME,
   formatKickoffRO, buildGroupStandings, buildQualifiedTeams, buildMatches,
@@ -97,8 +97,10 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
   const [sel,     setSel]    = useState(null);
   const [sA,      setSA]     = useState(0);
   const [sB,      setSB]     = useState(0);
-  const [poss,    setPoss]   = useState(50);
-  const [corn,    setCorn]   = useState(8);
+  const [possA,   setPossA]  = useState('');
+  const [possB,   setPossB]  = useState('');
+  const [cornA,   setCornA]  = useState('');
+  const [cornB,   setCornB]  = useState('');
   const [minute,  setMinute] = useState(0);
   const [status,  setStatus] = useState('ft');
   const [saved,   setSaved]  = useState(false);
@@ -133,46 +135,71 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
   const selectMatch = (m) => {
     const fr = finishedResults?.[m.id];
     setSel(m); setSaved(false);
-    setSA(fr?.realScoreA ?? m.realScoreA ?? 0);
-    setSB(fr?.realScoreB ?? m.realScoreB ?? 0);
-    setPoss(fr?.realPossession ?? m.realPossession ?? 50);
-    setCorn(fr?.realCorners ?? m.realCorners ?? 8);
+    setSA(fr?.homeScore ?? fr?.realScoreA ?? 0);
+    setSB(fr?.awayScore ?? fr?.realScoreB ?? 0);
+    setPossA(fr?.homePossession != null ? String(fr.homePossession) : '');
+    setPossB(fr?.awayPossession != null ? String(fr.awayPossession) : '');
+    setCornA(fr?.homeCorners    != null ? String(fr.homeCorners)    : '');
+    setCornB(fr?.awayCorners    != null ? String(fr.awayCorners)    : '');
     setMinute(fr?.liveMinute ?? 0);
     setStatus(fr?.liveStatus ?? (m.isFinished ? 'ft' : m.isLive ? 'live' : 'scheduled'));
   };
 
   const saveResult = async () => {
     if (!sel) return;
-    const isFinished = status === 'ft';
+    const isFT = status === 'ft';
+
+    // Parse optional stats — store null if empty
+    const hPoss = possA !== '' ? Number(possA) : null;
+    const aPoss = possB !== '' ? Number(possB) : null;
+    const hCorn = cornA !== '' ? Math.max(0, parseInt(cornA, 10)) : null;
+    const aCorn = cornB !== '' ? Math.max(0, parseInt(cornB, 10)) : null;
+
+    // Canonical result object — matchId is the unique key
     const update = {
-      matchId:        sel.id,
-      realScoreA:     isFinished ? sA    : null,
-      realScoreB:     isFinished ? sB    : null,
-      realPossession: isFinished ? poss  : null,
-      realCorners:    isFinished ? corn  : null,
-      liveScoreA:     sA,
-      liveScoreB:     sB,
-      liveMinute:     minute,
-      liveStatus:     status,
+      matchId:         sel.id,
+      group:           sel.group,
+      homeTeam:        sel.teamA,
+      awayTeam:        sel.teamB,
+      homeScore:       isFT ? Number(sA) : null,
+      awayScore:       isFT ? Number(sB) : null,
+      // legacy fields — kept for buildMatches compat
+      realScoreA:      isFT ? Number(sA) : null,
+      realScoreB:      isFT ? Number(sB) : null,
+      liveScoreA:      Number(sA),
+      liveScoreB:      Number(sB),
+      liveMinute:      minute,
+      liveStatus:      status,
+      homePossession:  hPoss,
+      awayPossession:  aPoss,
+      homeCorners:     hCorn,
+      awayCorners:     aCorn,
+      updatedAt:       Date.now(),
+      updatedBy:       currentUser?.uid ?? 'admin',
     };
 
-    // Save to Firestore (or localStorage fallback) — shared across all users
+    // Upsert to Firestore (or localStorage) — keyed by matchId, no duplicates
     await saveMatchResult(currentUser?.uid, update);
 
-    // Also update local admin cache so we can reload it immediately
+    // Upsert local cache — always overwrite by matchId
     const current = loadAdminResults();
-    current[sel.id] = update;
+    current[sel.id] = update;   // object key = matchId → automatic dedup
     saveAdminResults(current);
 
-    // Propagate to App state (triggers leaderboard/standings/bracket recalc)
+    // Propagate to App state
     onMatchUpdate?.(update);
 
-    // Log to history
-    const label = `${sel.flagA}${sel.teamA} ${sA}–${sB} ${sel.teamB}${sel.flagB}`;
-    setHistory(h => [{ label, status, id:sel.id, ts:Date.now() }, ...h].slice(0,5));
+    // History: upsert by matchId — replace existing entry for same match
+    const statsLabel = (hPoss != null && aPoss != null) ? ` · Pos: ${hPoss}%-${aPoss}%` : '';
+    const cornLabel  = (hCorn != null && aCorn != null) ? ` · Cornere: ${hCorn}-${aCorn}` : '';
+    const label = `${sel.flagA}${sel.teamA} ${sA}–${sB} ${sel.teamB}${sel.flagB}${statsLabel}${cornLabel}`;
+    setHistory(h => {
+      const without = h.filter(x => x.id !== sel.id);   // remove old entry for same match
+      return [{ label, status, id:sel.id, ts:Date.now() }, ...without].slice(0, 5);
+    });
 
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    setSaved(isFT ? 'ft' : 'noft');
+    setTimeout(() => setSaved(false), 3500);
   };
 
   // Derived match status
@@ -327,27 +354,45 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
             </div>
           </div>
 
-          {/* Possession + Corners (FT only) */}
+          {/* Per-team possession + corners (FT only, optional) */}
           {status === 'ft' && (
-            <>
-              <div style={{ marginBottom:10 }}>
-                <PossessionInput value={poss} onChange={setPoss} teamA={sel.teamA} teamB={sel.teamB} flagA={sel.flagA} flagB={sel.flagB}/>
+            <div style={{ marginBottom:10 }}>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.25)', letterSpacing:'0.08em', textTransform:'uppercase', fontWeight:600, marginBottom:8 }}>Stats opționale</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+                <div>
+                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:4 }}>{sel.flagA} Posesie %</div>
+                  <input type="number" min="0" max="100" value={possA} onChange={e=>setPossA(e.target.value)} placeholder="ex: 55" style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:13, fontFamily:"'DM Mono',monospace", outline:'none', boxSizing:'border-box' }}/>
+                </div>
+                <div>
+                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:4 }}>{sel.flagB} Posesie %</div>
+                  <input type="number" min="0" max="100" value={possB} onChange={e=>setPossB(e.target.value)} placeholder="ex: 45" style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:13, fontFamily:"'DM Mono',monospace", outline:'none', boxSizing:'border-box' }}/>
+                </div>
+                <div>
+                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:4 }}>{sel.flagA} Cornere</div>
+                  <input type="number" min="0" max="30" value={cornA} onChange={e=>setCornA(e.target.value)} placeholder="ex: 6" style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:13, fontFamily:"'DM Mono',monospace", outline:'none', boxSizing:'border-box' }}/>
+                </div>
+                <div>
+                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:4 }}>{sel.flagB} Cornere</div>
+                  <input type="number" min="0" max="30" value={cornB} onChange={e=>setCornB(e.target.value)} placeholder="ex: 3" style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:13, fontFamily:"'DM Mono',monospace", outline:'none', boxSizing:'border-box' }}/>
+                </div>
               </div>
-              <div style={{ display:'flex', justifyContent:'center', marginBottom:10 }}>
-                <StepInput value={corn} onChange={setCorn} min={0} max={25} label="Cornere totale" unit="" color="#FFD700" wide/>
-              </div>
-            </>
+              {possA !== '' && possB !== '' && Math.abs(Number(possA)+Number(possB)-100) > 1 && (
+                <div style={{ fontSize:10, color:'#F59E0B', marginBottom:4 }}>⚠️ Posesia trebuie să totalizeze 100% ({Number(possA)+Number(possB)}%)</div>
+              )}
+            </div>
           )}
 
           {/* Save */}
           <button onClick={saveResult} style={{
             width:'100%', padding:13,
-            background: saved ? 'rgba(0,229,160,0.1)' : 'rgba(239,68,68,0.1)',
-            border:`1px solid ${saved?'rgba(0,229,160,0.28)':'rgba(239,68,68,0.22)'}`,
-            borderRadius:11, color:saved?'#00E5A0':'#EF4444',
+            background: saved==='ft' ? 'rgba(0,229,160,0.1)' : saved==='noft' ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)',
+            border:`1px solid ${saved==='ft'?'rgba(0,229,160,0.28)':saved==='noft'?'rgba(245,158,11,0.28)':'rgba(239,68,68,0.22)'}`,
+            borderRadius:11, color:saved==='ft'?'#00E5A0':saved==='noft'?'#F59E0B':'#EF4444',
             fontSize:13, fontWeight:700, cursor:'pointer', transition:'all 0.18s',
           }}>
-            {saved ? '✓ Salvat! Clasamentul + grupele s-au actualizat.' : 'Salvează rezultat'}
+            {saved==='ft'   ? '✓ Salvat! Clasamentul + grupele s-au actualizat.' :
+             saved==='noft' ? 'Salvat. Nu contează în clasament până la status Final.' :
+             'Salvează rezultat'}
           </button>
 
           {/* Group standings preview */}
