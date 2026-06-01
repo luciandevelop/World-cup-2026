@@ -12,7 +12,7 @@ import { getAvatarById, getDefaultAvatarForNick, AVATARS } from './data/avatars.
 import { LoginScreen, NicknameScreen } from './screens/AuthScreens.jsx';
 import MatchesScreen     from './screens/MatchesScreen.jsx';
 import LeaderboardScreen from './screens/LeaderboardScreen.jsx';
-import AdminScreen, { loadAdminResults } from './screens/AdminScreen.jsx';
+import AdminScreen, { loadAdminResults, loadGroupOverrides } from './screens/AdminScreen.jsx';
 import HowToPlayScreen   from './screens/HowToPlayScreen.jsx';
 import BracketScreen     from './screens/BracketScreen.jsx';
 import PredictionModal   from './components/PredictionModal.jsx';
@@ -190,7 +190,8 @@ export default function App() {
   const [predictingMatch, setPredictingMatch] = useState(null);
   const [perfectHit, setPerfectHit] = useState(null);
   const [finishedResults,  setFinishedResults]  = useState(() => loadAdminResults()); // persist across reloads
-  const [allPredictions,   setAllPredictions]   = useState({}); // { uid: { matchId: pred } } — all users
+  const [allPredictions,   setAllPredictions]   = useState({});
+  const [groupOverrides,   setGroupOverrides]   = useState(() => loadGroupOverrides()); // { uid: { matchId: pred } } — all users
   const [allUsers,         setAllUsers]         = useState({}); // { uid: { nickname, avatarId, ... } }
 
   // ── Restore session + set up realtime listeners ──────────────────────────
@@ -279,10 +280,11 @@ export default function App() {
       return;
     }
     if (update?._action === 'lineup') {
-      // Lineup saved to localStorage by AdminScreen — trigger re-render
       setFinishedResults(prev => ({ ...prev }));
       return;
     }
+    // Reload overrides any time admin saves (they may have changed)
+    setGroupOverrides(loadGroupOverrides());
     if (!REALTIME_MODE) {
       const results = await loadMatchResults();
       setFinishedResults(results);
@@ -409,7 +411,7 @@ export default function App() {
         {adminMode
           ? <AdminScreen currentUser={user} finishedResults={finishedResults} onMatchUpdate={handleMatchUpdate}/>
           : tab==='matches'
-          ? <MatchesScreen predictions={predictions} onPredict={setPredictingMatch} finishedResults={finishedResults}/>
+          ? <MatchesScreen predictions={predictions} onPredict={setPredictingMatch} finishedResults={finishedResults} groupOverrides={groupOverrides}/>
           : tab==='leaderboard'
           ? <LeaderboardScreen currentUser={user?.nickname} predictions={predictions} allPredictions={predsByNick} allUsers={allUsers}/>
           : tab==='bracket'
