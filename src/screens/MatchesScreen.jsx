@@ -600,7 +600,7 @@ function MatchDetailModal({ match, prediction, onClose, onPredict }) {
   );
 }
 
-export default function MatchesScreen({ predictions, onPredict, finishedResults }) {
+export default function MatchesScreen({ predictions, onPredict, finishedResults, groupOverrides }) {
   const [tab, setTab]              = useState("toate"); // "toate" | "mele" | "prieteni"
   const [detailMatch, setDetailMatch] = useState(null);
 
@@ -662,7 +662,7 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults 
         />
         {!collapsed && (
           <div style={{ background:"rgba(255,255,255,0.01)", border:"1px solid rgba(255,255,255,0.06)", borderTop:"none", borderRadius:"0 0 12px 12px", padding:"10px 10px 4px" }}>
-            {tab === "toate" && <GroupStandings group={g} finishedResults={finishedResults}/>}
+            {tab === "toate" && <GroupStandings group={g} finishedResults={finishedResults} overrideOrder={groupOverrides?.[g] || null}/>}
             {matches.map(m => (
               <MatchCard key={m.id} match={m} prediction={predictions[m.id]} onPredict={onPredict} onDetail={setDetailMatch}/>
             ))}

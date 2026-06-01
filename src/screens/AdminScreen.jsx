@@ -14,13 +14,20 @@ import { ALL_GROUPS } from '../data/matches.js';
 import { saveMatchResult, REALTIME_MODE } from '../services/firestoreService.js';
 
 // localStorage key for admin-set results (shared across all users on same device)
-const RESULTS_KEY = 'wc2026_admin_results';
+const RESULTS_KEY   = 'wc2026_admin_results';
+const OVERRIDES_KEY = 'wc2026_group_overrides';
 
 export function loadAdminResults() {
   try { return JSON.parse(localStorage.getItem(RESULTS_KEY)) || {}; } catch { return {}; }
 }
 function saveAdminResults(results) {
   localStorage.setItem(RESULTS_KEY, JSON.stringify(results));
+}
+export function loadGroupOverrides() {
+  try { return JSON.parse(localStorage.getItem(OVERRIDES_KEY)) || {}; } catch { return {}; }
+}
+function saveGroupOverrides(overrides) {
+  localStorage.setItem(OVERRIDES_KEY, JSON.stringify(overrides));
 }
 
 const STATUS_OPTIONS = [
@@ -109,7 +116,9 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
   const [search,  setSearch] = useState('');
   const [history, setHistory]= useState([]); // last 5 saves
   const [showLineupPanel, setShowLineupPanel] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
+  const [showHelp,         setShowHelp]          = useState(false);
+  const [showOverridePanel,setShowOverridePanel] = useState(false);
+  const [groupOverrides,   setGroupOverrides]    = useState(() => loadGroupOverrides());
   const [lineupFormation, setLineupFormation] = useState('4-3-3');
   const [lineupHome, setLineupHome] = useState('');
   const [lineupAway, setLineupAway] = useState('');
