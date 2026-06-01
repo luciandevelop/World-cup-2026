@@ -301,25 +301,54 @@ export const ADMIN_EMAILS_RUNTIME = (() => {
   return [...new Set(['admin@worldcup2026.app', ...extra])];
 })();
 
-// ─── GROUP STANDINGS ──────────────────────────────────────────────────────────
-// Calculate group table from finished matches.
-// Returns array sorted by: points → GD → goals scored → name
+// ─── GROUP STANDINGS + FIFA TIEBREAKERS ──────────────────────────────────────
+// Official FIFA World Cup 2026 ranking criteria (Art. 32 Regulations):
+//   1. Points
+//   2. Head-to-head points among tied teams
+//   3. Head-to-head goal difference among tied teams
+//   4. Head-to-head goals scored among tied teams
+//   5. Overall goal difference
+//   6. Overall goals scored
+//   7. Fair play score (not tracked — skipped)
+//   8. FIFA ranking (not tracked — skipped)
+//   9. Team name alphabetical (final fallback)
+//
+// Supports 2-, 3-, and 4-way ties via recursive mini-table resolution.
+// Returns rows with a `tieBreaker` string describing what separated tied teams.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Build a mini-table for a subset of teams using only matches between them.
+function buildMiniTable(teams, allMatches) {
+  const set = new Set(teams);
+  const map = {};
+  teams.forEach(t => { map[t] = { team:t, pts:0, gd:0, gf:0 }; });
+  allMatches.forEach(m => {
+    if (!set.has(m.teamA) || !set.has(m.teamB) || !m.isFinished) return;
+    const a = map[m.teamA], b = map[m.teamB];
+    const ga = m.realScoreA, gb = m.realScoreB;
+    a.gf += ga; a.gd += ga - gb;
+    b.gf += gb; b.gd += gb - ga;
+    if (ga > gb) { a.pts += 3; }
+    else if (ga < gb) { b.pts += 3; }
+    else { a.pts += 1; b.pts += 1; }
+  });
+  return map;
+}
+
 export function buildGroupStandings(groupLetter, finishedResults = FINISHED_RESULTS) {
-  const matches = buildMatches(finishedResults).filter(
+  const allGroupMatches = MATCHES.filter(m => m.group === groupLetter);
+  const finishedGroupMatches = buildMatches(finishedResults).filter(
     m => m.group === groupLetter && m.isFinished
   );
 
-  // Collect all teams in group
-  const allGroupMatches = MATCHES.filter(m => m.group === groupLetter);
+  // Build base stats for all 4 teams
   const teamMap = {};
   allGroupMatches.forEach(m => {
     if (!teamMap[m.teamA]) teamMap[m.teamA] = { team:m.teamA, flag:m.flagA, p:0,w:0,d:0,l:0,gf:0,ga:0,gd:0,pts:0 };
     if (!teamMap[m.teamB]) teamMap[m.teamB] = { team:m.teamB, flag:m.flagB, p:0,w:0,d:0,l:0,gf:0,ga:0,gd:0,pts:0 };
   });
-
-  matches.forEach(m => {
-    const a = teamMap[m.teamA];
-    const b = teamMap[m.teamB];
+  finishedGroupMatches.forEach(m => {
+    const a = teamMap[m.teamA], b = teamMap[m.teamB];
     if (!a || !b) return;
     const ga = m.realScoreA, gb = m.realScoreB;
     a.p++; b.p++;
@@ -330,13 +359,83 @@ export function buildGroupStandings(groupLetter, finishedResults = FINISHED_RESU
     else { a.d++; b.d++; a.pts++; b.pts++; }
   });
 
-  return Object.values(teamMap).sort(
-    (a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || a.team.localeCompare(b.team)
-  );
-}
+  const rows = Object.values(teamMap);
 
-// ─── GROUP STANDINGS ──────────────────────────────────────────────────────────
-// Already defined above as buildGroupStandings
+  // ── FIFA tiebreaker comparator ────────────────────────────────────────────
+  // Compares two rows. `miniTable` is pre-computed for the tied group.
+  function cmpWithMini(a, b, miniTable) {
+    // 1. Overall points (already equal when entering h2h)
+    if (a.pts !== b.pts) return b.pts - a.pts;
+
+    if (miniTable) {
+      const mA = miniTable[a.team], mB = miniTable[b.team];
+      if (mA && mB) {
+        // 2. H2H points
+        if (mA.pts !== mB.pts) return mB.pts - mA.pts;
+        // 3. H2H goal difference
+        if (mA.gd !== mB.gd) return mB.gd - mA.gd;
+        // 4. H2H goals scored
+        if (mA.gf !== mB.gf) return mB.gf - mA.gf;
+      }
+    }
+    // 5. Overall goal difference
+    if (a.gd !== b.gd) return b.gd - a.gd;
+    // 6. Overall goals scored
+    if (a.gf !== b.gf) return b.gf - a.gf;
+    // 7-8. Fair play / FIFA ranking — not available, skip
+    // 9. Alphabetical fallback
+    return a.team.localeCompare(b.team);
+  }
+
+  // ── Sort with tiebreaker explanation ──────────────────────────────────────
+  // First pass: group by points
+  const byPts = {};
+  rows.forEach(r => {
+    const k = r.pts;
+    if (!byPts[k]) byPts[k] = [];
+    byPts[k].push(r);
+  });
+
+  const sorted = [];
+  Object.keys(byPts).map(Number).sort((a,b)=>b-a).forEach(pts => {
+    const group = byPts[pts];
+    if (group.length === 1) {
+      sorted.push(...group);
+    } else {
+      // Build mini-table for this tied group
+      const tiedTeams = group.map(r => r.team);
+      const mini = buildMiniTable(tiedTeams, finishedGroupMatches);
+
+      // Sort within tied group using FIFA criteria
+      const tiedSorted = [...group].sort((a, b) => cmpWithMini(a, b, mini));
+
+      // Attach tiebreaker explanation to each row
+      tiedSorted.forEach((row, idx) => {
+        if (idx === 0) { row.tieBreaker = null; return; }
+        const above = tiedSorted[idx - 1];
+        const mR  = mini[row.team],   mA = mini[above.team];
+        let reason = '';
+        if (mA && mR && mA.pts !== mR.pts)
+          reason = 'h2h points (' + mA.pts + ' vs ' + mR.pts + ')';
+        else if (mA && mR && mA.gd !== mR.gd)
+          reason = 'h2h GD (' + (mA.gd>0?'+':'') + mA.gd + ' vs ' + (mR.gd>0?'+':'') + mR.gd + ')';
+        else if (mA && mR && mA.gf !== mR.gf)
+          reason = 'h2h GF (' + mA.gf + ' vs ' + mR.gf + ')';
+        else if (above.gd !== row.gd)
+          reason = 'GD general (' + (above.gd>0?'+':'') + above.gd + ' vs ' + (row.gd>0?'+':'') + row.gd + ')';
+        else if (above.gf !== row.gf)
+          reason = 'GM general (' + above.gf + ' vs ' + row.gf + ')';
+        else
+          reason = 'ordine alfabetica';
+        row.tieBreaker = above.team + ' peste ' + row.team + ' prin ' + reason;
+      });
+
+      sorted.push(...tiedSorted);
+    }
+  });
+
+  return sorted;
+}
 
 // ─── FIFA WC 2026 KNOCKOUT QUALIFICATION ENGINE ───────────────────────────────
 //
@@ -414,14 +513,27 @@ const THIRD_PLACE_SLOTS = [
 
 // ─── BUILD THE QUALIFYING FIELD ───────────────────────────────────────────────
 // Returns full qualification data: winners, runners-up, qualified thirds.
-export function buildQualifiedTeams(finishedResults = FINISHED_RESULTS) {
+export function buildQualifiedTeams(finishedResults = FINISHED_RESULTS, groupOverrides = {}) {
   const ALL_G = ['A','B','C','D','E','F','G','H','I','J','K','L'];
   const fm = buildMatches(finishedResults);
   const groupDone = g => fm.filter(m => m.group === g).every(m => m.isFinished);
 
   const standings = {};
   ALL_G.forEach(g => {
-    if (groupDone(g)) standings[g] = buildGroupStandings(g, finishedResults);
+    if (groupDone(g)) {
+      const calculated = buildGroupStandings(g, finishedResults);
+      // Apply admin override if present — reorder only, keep stats intact
+      if (groupOverrides[g] && groupOverrides[g].length > 0) {
+        const reordered = groupOverrides[g]
+          .map(teamName => calculated.find(r => r.team === teamName))
+          .filter(Boolean);
+        // Append any teams not in override (safety)
+        calculated.forEach(r => { if (!reordered.find(x => x.team === r.team)) reordered.push(r); });
+        standings[g] = reordered;
+      } else {
+        standings[g] = calculated;
+      }
+    }
   });
 
   const groupsCompleted = ALL_G.filter(g => !!standings[g]);
