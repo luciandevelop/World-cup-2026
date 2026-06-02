@@ -184,6 +184,8 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
       awayPossession:  aPoss,
       homeCorners:     hCorn,
       awayCorners:     aCorn,
+      realPossession:  hPoss,
+      realCorners:     (hCorn != null && aCorn != null) ? hCorn + aCorn : null,
       updatedAt:       Date.now(),
       updatedBy:       currentUser?.uid ?? 'admin',
     };
