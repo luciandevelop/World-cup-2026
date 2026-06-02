@@ -42,6 +42,37 @@ const LS_PROFILES    = 'wc2026_profile_';
 const LS_PREDS       = 'wc2026_preds_';
 const LS_RESULTS     = 'wc2026_admin_results';
 const LS_ALL_PREDS   = 'wc2026_all_preds'; // all users' predictions for leaderboard
+const normStatus = (v) => String(v || '').toLowerCase();
+
+function normalizeResult(raw = {}) {
+  const matchId = raw.matchId != null ? Number(raw.matchId) : raw.id != null ? Number(raw.id) : null;
+  const status = normStatus(raw.liveStatus || raw.status || raw.matchStatus);
+  const homeScore = raw.homeScore ?? raw.realScoreA ?? raw.liveScoreA ?? null;
+  const awayScore = raw.awayScore ?? raw.realScoreB ?? raw.liveScoreB ?? null;
+  const homePossession = raw.homePossession ?? raw.realPossession ?? null;
+  const awayPossession = raw.awayPossession ?? (homePossession != null ? 100 - Number(homePossession) : null);
+  const homeCorners = raw.homeCorners ?? null;
+  const awayCorners = raw.awayCorners ?? null;
+  const realCorners = raw.realCorners ?? ((homeCorners != null && awayCorners != null) ? Number(homeCorners) + Number(awayCorners) : null);
+  return {
+    ...raw,
+    matchId,
+    homeScore: homeScore != null ? Number(homeScore) : null,
+    awayScore: awayScore != null ? Number(awayScore) : null,
+    realScoreA: homeScore != null ? Number(homeScore) : null,
+    realScoreB: awayScore != null ? Number(awayScore) : null,
+    liveScoreA: raw.liveScoreA ?? (homeScore != null ? Number(homeScore) : null),
+    liveScoreB: raw.liveScoreB ?? (awayScore != null ? Number(awayScore) : null),
+    liveStatus: status,
+    homePossession: homePossession != null ? Number(homePossession) : null,
+    awayPossession: awayPossession != null ? Number(awayPossession) : null,
+    realPossession: homePossession != null ? Number(homePossession) : null,
+    homeCorners: homeCorners != null ? Number(homeCorners) : null,
+    awayCorners: awayCorners != null ? Number(awayCorners) : null,
+    realCorners: realCorners != null ? Number(realCorners) : null,
+  };
+}
+
 
 // ─── MODE INDICATOR ──────────────────────────────────────────────────────────
 export const REALTIME_MODE = FIREBASE_CONFIGURED; // true = Firestore, false = localStorage
@@ -49,7 +80,7 @@ export const REALTIME_MODE = FIREBASE_CONFIGURED; // true = Firestore, false = l
 // ─── USER PROFILE ─────────────────────────────────────────────────────────────
 
 export async function saveUserProfile(uid, profile) {
-  const data = { uid, ...profile, updatedAt: FIREBASE_CONFIGURED ? serverTimestamp() : Date.now() };
+  const data = { uid, ...profile, nicknameLower: profile?.nickname ? profile.nickname.toLowerCase() : profile?.nicknameLower, updatedAt: FIREBASE_CONFIGURED ? serverTimestamp() : Date.now() };
 
   if (FIREBASE_CONFIGURED) {
     const ref  = doc(db, 'users', uid);
@@ -190,18 +221,11 @@ export async function loadAllUsers() {
 
 export async function saveMatchResult(adminUid, update) {
   const matchId = String(update.matchId);
-  const data    = {
-    matchId:        Number(matchId),
-    realScoreA:     update.realScoreA,
-    realScoreB:     update.realScoreB,
-    realPossession: update.realPossession,
-    realCorners:    update.realCorners,
-    liveScoreA:     update.liveScoreA,
-    liveScoreB:     update.liveScoreB,
-    liveMinute:     update.liveMinute,
-    liveStatus:     update.liveStatus,
-    updatedBy:      adminUid,
-    updatedAt:      FIREBASE_CONFIGURED ? serverTimestamp() : Date.now(),
+  const normalized = normalizeResult({ ...update, matchId:Number(matchId), updatedBy:adminUid });
+  const data = {
+    ...normalized,
+    updatedBy: adminUid,
+    updatedAt: FIREBASE_CONFIGURED ? serverTimestamp() : Date.now(),
   };
 
   if (FIREBASE_CONFIGURED) {
@@ -209,9 +233,9 @@ export async function saveMatchResult(adminUid, update) {
     return;
   }
 
-  // localStorage fallback
+  // localStorage fallback: object keyed by matchId, never array, never duplicates
   const cur = JSON.parse(localStorage.getItem(LS_RESULTS) || '{}');
-  cur[update.matchId] = data;
+  cur[matchId] = data;
   localStorage.setItem(LS_RESULTS, JSON.stringify(cur));
 }
 
@@ -219,10 +243,16 @@ export async function loadMatchResults() {
   if (FIREBASE_CONFIGURED) {
     const snap    = await getDocs(collection(db, 'matchResults'));
     const results = {};
-    snap.forEach(d => { const data = d.data(); results[data.matchId] = data; });
+    snap.forEach(d => {
+      const data = normalizeResult(d.data());
+      if (data.matchId != null) results[data.matchId] = data;
+    });
     return results;
   }
-  try { return JSON.parse(localStorage.getItem(LS_RESULTS) || '{}'); }
+  try {
+    const raw = JSON.parse(localStorage.getItem(LS_RESULTS) || '{}');
+    return Object.fromEntries(Object.entries(raw).map(([id, value]) => [id, normalizeResult({ ...value, matchId:value?.matchId ?? Number(id) })]));
+  }
   catch { return {}; }
 }
 
@@ -234,13 +264,16 @@ export function subscribeToMatchResults(callback) {
   if (FIREBASE_CONFIGURED) {
     return onSnapshot(collection(db, 'matchResults'), (snap) => {
       const results = {};
-      snap.forEach(d => { const data = d.data(); results[data.matchId] = data; });
+      snap.forEach(d => { const data = normalizeResult(d.data()); if (data.matchId != null) results[data.matchId] = data; });
       callback(results);
     });
   }
   // localStorage: poll every 5 seconds (for multi-tab testing on same device)
   const tick = () => {
-    try { callback(JSON.parse(localStorage.getItem(LS_RESULTS) || '{}')); } catch {}
+    try {
+      const raw = JSON.parse(localStorage.getItem(LS_RESULTS) || '{}');
+      callback(Object.fromEntries(Object.entries(raw).map(([id, value]) => [id, normalizeResult({ ...value, matchId:value?.matchId ?? Number(id) })])));
+    } catch {}
   };
   tick();
   const id = setInterval(tick, 5000);
