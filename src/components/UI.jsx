@@ -1,159 +1,93 @@
-// ─── src/components/UI.jsx ────────────────────────────────────────────────────
-// Shared primitive components used throughout the app.
-// ─────────────────────────────────────────────────────────────────────────────
+import { useRef } from 'react';
 
-import { useState } from 'react';
-import { getDefaultAvatarForNick, getAvatarById } from '../data/avatars.js';
-
-// ─── GOOGLE LOGO ──────────────────────────────────────────────────────────────
-export function GoogleLogo({ size = 20 }) {
+// ─── UI COMPONENTS ────────────────────────────────────────────────────────────
+function ScoreInput({ value, onChange, disabled }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 18 18">
-      <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
-      <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z"/>
-      <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
-      <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
-    </svg>
-  );
-}
-
-// ─── APPLE LOGO ───────────────────────────────────────────────────────────────
-export function AppleLogo({ size = 20 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-    </svg>
-  );
-}
-
-// ─── FOOTBALL AVATAR ──────────────────────────────────────────────────────────
-// Emoji-based avatar. Uses avatarId if provided, else derives from nickname.
-export function FootballAvatar({ nickname, avatarId, size = 40, style: extraStyle = {} }) {
-  const av = avatarId ? getAvatarById(avatarId) : getDefaultAvatarForNick(nickname || '?');
-  const fontSize = Math.round(size * 0.52);
-  return (
-    <div style={{
-      width:size, height:size, borderRadius:'50%',
-      background:av.bg, border:`2px solid ${av.accent}44`,
-      display:'flex', alignItems:'center', justifyContent:'center',
-      fontSize, flexShrink:0, position:'relative', overflow:'hidden',
-      ...extraStyle,
-    }}>
-      <span style={{ lineHeight:1 }}>{av.emoji}</span>
+    <div style={{ display:"flex", alignItems:"center", background: disabled?"rgba(255,255,255,0.03)":"rgba(255,255,255,0.07)", borderRadius:12, border:"1px solid rgba(255,255,255,0.1)", overflow:"hidden" }}>
+      <button onClick={() => !disabled && onChange(Math.max(0,value-1))} disabled={disabled} style={{ width:36,height:44,background:"transparent",border:"none",color:disabled?"#333":"#aaa",fontSize:18,cursor:disabled?"default":"pointer" }}>−</button>
+      <span style={{ width:32,textAlign:"center",fontSize:22,fontWeight:700,color:disabled?"#444":"#fff",fontFamily:"'DM Mono',monospace" }}>{value}</span>
+      <button onClick={() => !disabled && onChange(Math.min(20,value+1))} disabled={disabled} style={{ width:36,height:44,background:"transparent",border:"none",color:disabled?"#333":"#aaa",fontSize:18,cursor:disabled?"default":"pointer" }}>+</button>
     </div>
   );
 }
-
-// ─── SCORE INPUT ──────────────────────────────────────────────────────────────
-export function ScoreInput({ value, onChange }) {
+// Step stepper: [-] value [+]
+function StepInput({ value, onChange, min, max, label, unit, color="#00E5A0", wide=false }) {
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:0, userSelect:"none" }}>
-      <button
-        onClick={() => onChange(Math.max(0, value - 1))}
-        style={{ width:38, height:38, borderRadius:"10px 0 0 10px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", color:"rgba(255,255,255,0.6)", fontSize:20, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:300 }}
-      >−</button>
-      <div style={{ width:44, height:38, background:"rgba(255,255,255,0.08)", borderTop:"1px solid rgba(255,255,255,0.1)", borderBottom:"1px solid rgba(255,255,255,0.1)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, fontWeight:800, color:"#fff", fontFamily:"'DM Mono',monospace" }}>
-        {value}
-      </div>
-      <button
-        onClick={() => onChange(Math.min(20, value + 1))}
-        style={{ width:38, height:38, borderRadius:"0 10px 10px 0", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", color:"rgba(255,255,255,0.6)", fontSize:20, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:300 }}
-      >+</button>
-    </div>
-  );
-}
-
-// ─── STEP INPUT ───────────────────────────────────────────────────────────────
-export function StepInput({ value, onChange, min = 0, max = 25, label, unit = "", color = "#4A9EFF", wide = false }) {
-  return (
-    <div style={{ textAlign:"center" }}>
-      <div style={{ fontSize:10, color:"rgba(255,255,255,0.3)", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:10, fontWeight:600 }}>{label}</div>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:12 }}>
-        <button
-          onClick={() => onChange(Math.max(min, value - 1))}
-          style={{ width:40, height:40, borderRadius:10, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.09)", color:"rgba(255,255,255,0.5)", fontSize:20, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}
-        >−</button>
-        <div style={{ minWidth:64, textAlign:"center" }}>
-          <span style={{ fontSize:28, fontWeight:800, color, fontFamily:"'DM Mono',monospace" }}>{value}</span>
-          {unit && <span style={{ fontSize:13, color:"rgba(255,255,255,0.25)", marginLeft:4 }}>{unit}</span>}
-        </div>
-        <button
-          onClick={() => onChange(Math.min(max, value + 1))}
-          style={{ width:40, height:40, borderRadius:10, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.09)", color:"rgba(255,255,255,0.5)", fontSize:20, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}
-        >+</button>
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
+      <span style={{ fontSize:10,color:"#555",letterSpacing:"0.08em",textTransform:"uppercase" }}>{label}</span>
+      <div style={{ display:"flex",alignItems:"center",background:"rgba(255,255,255,0.06)",borderRadius:12,border:"1px solid rgba(255,255,255,0.1)",overflow:"hidden" }}>
+        <button onClick={()=>onChange(Math.max(min,value-1))} style={{ width:wide?44:38,height:44,background:"transparent",border:"none",color:"#aaa",fontSize:20,cursor:"pointer",transition:"color 0.15s" }}
+          onMouseDown={e=>e.currentTarget.style.color=color} onMouseUp={e=>e.currentTarget.style.color="#aaa"}>−</button>
+        <span style={{ minWidth:wide?52:36,textAlign:"center",fontSize:20,fontWeight:800,color:"#fff",fontFamily:"'DM Mono',monospace" }}>{value}{unit}</span>
+        <button onClick={()=>onChange(Math.min(max,value+1))} style={{ width:wide?44:38,height:44,background:"transparent",border:"none",color:"#aaa",fontSize:20,cursor:"pointer",transition:"color 0.15s" }}
+          onMouseDown={e=>e.currentTarget.style.color=color} onMouseUp={e=>e.currentTarget.style.color="#aaa"}>+</button>
       </div>
     </div>
   );
 }
+// Possession: draggable split bar, 20-80%, step 1%
+function PossessionInput({ value, onChange, teamA, teamB, flagA, flagB }) {
+  const away = 100 - value;
+  const trackRef = useRef(null);
+  const dragging = useRef(false);
 
-// ─── POSSESSION INPUT ─────────────────────────────────────────────────────────
-export function PossessionInput({ value, onChange, teamA, teamB, flagA, flagB }) {
-  const [dragging, setDragging] = useState(false);
-
-  const handleTrackClick = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const pct  = Math.round(((e.clientX - rect.left) / rect.width) * 100);
-    onChange(Math.max(20, Math.min(80, pct)));
+  const posFromEvent = (clientX) => {
+    const rect = trackRef.current.getBoundingClientRect();
+    const raw = (clientX - rect.left) / rect.width;
+    return Math.round(Math.min(80, Math.max(20, raw * 100)));
   };
+
+  const onPointerDown = (e) => {
+    dragging.current = true;
+    trackRef.current.setPointerCapture(e.pointerId);
+    onChange(posFromEvent(e.clientX));
+  };
+  const onPointerMove = (e) => {
+    if (!dragging.current) return;
+    onChange(posFromEvent(e.clientX));
+  };
+  const onPointerUp = () => { dragging.current = false; };
+
+  const homePct   = value;
+  const awayPct   = away;
+  const handlePct = ((value - 20) / 60) * 100;
 
   return (
     <div>
-      <div style={{ fontSize:10, color:"rgba(255,255,255,0.3)", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:12, fontWeight:600, textAlign:"center" }}>Posesie</div>
+      <div style={{ fontSize:10,color:"#555",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:14,textAlign:"center" }}>Posesie</div>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-        <span style={{ fontSize:12, color:"rgba(255,255,255,0.6)", fontWeight:600 }}>{flagA} {value}%</span>
-        <span style={{ fontSize:11, color:"rgba(255,255,255,0.2)" }}>vs</span>
-        <span style={{ fontSize:12, color:"rgba(255,255,255,0.6)", fontWeight:600 }}>{100 - value}% {flagB}</span>
+        <div style={{ textAlign:"left" }}>
+          <div style={{ fontSize:11,color:"#aaa",fontWeight:600,marginBottom:2 }}>{flagA} {teamA}</div>
+          <div style={{ fontSize:22,fontWeight:900,color:"#4A9EFF",fontFamily:"'DM Mono',monospace",lineHeight:1 }}>{homePct}%</div>
+        </div>
+        <div style={{ fontSize:12,color:"#333",fontWeight:700 }}>—</div>
+        <div style={{ textAlign:"right" }}>
+          <div style={{ fontSize:11,color:"#aaa",fontWeight:600,marginBottom:2 }}>{flagB} {teamB}</div>
+          <div style={{ fontSize:22,fontWeight:900,color:"#7B5EA7",fontFamily:"'DM Mono',monospace",lineHeight:1 }}>{awayPct}%</div>
+        </div>
       </div>
       <div
-        onClick={handleTrackClick}
-        style={{ position:"relative", height:28, background:"rgba(255,255,255,0.05)", borderRadius:14, cursor:"pointer", overflow:"hidden", border:"1px solid rgba(255,255,255,0.08)" }}
+        ref={trackRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        style={{ position:"relative",height:36,borderRadius:18,overflow:"hidden",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",cursor:"ew-resize",userSelect:"none",touchAction:"none" }}
       >
-        <div style={{ position:"absolute", left:0, top:0, width:`${value}%`, height:"100%", background:"linear-gradient(90deg,rgba(74,158,255,0.5),rgba(74,158,255,0.3))", borderRadius:"14px 0 0 14px", transition:dragging?"none":"width 0.15s" }}/>
-        <div style={{ position:"absolute", left:`${value}%`, top:"50%", transform:"translate(-50%,-50%)", width:22, height:22, borderRadius:"50%", background:"#fff", boxShadow:"0 2px 8px rgba(0,0,0,0.4)", transition:dragging?"none":"left 0.15s" }}/>
-        <div style={{ position:"absolute", left:"50%", top:"50%", transform:"translate(-50%,-50%)", width:1, height:"60%", background:"rgba(255,255,255,0.12)" }}/>
+        <div style={{ position:"absolute",inset:0,right:`${awayPct}%`,background:"linear-gradient(90deg,#4A9EFF33,#4A9EFF55)",borderRadius:"18px 0 0 18px",transition:"right 0.05s" }}/>
+        <div style={{ position:"absolute",inset:0,left:`${homePct}%`,background:"linear-gradient(90deg,#7B5EA733,#7B5EA755)",borderRadius:"0 18px 18px 0",transition:"left 0.05s" }}/>
+        <div style={{ position:"absolute",top:"50%",left:`${handlePct}%`,transform:"translate(-50%,-50%)",width:28,height:28,borderRadius:"50%",background:"linear-gradient(135deg,#4A9EFF,#7B5EA7)",boxShadow:"0 0 0 3px rgba(255,255,255,0.12),0 2px 8px rgba(0,0,0,0.5)",transition:"left 0.05s",pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center" }}>
+          <div style={{ width:2,height:10,borderRadius:1,background:"rgba(255,255,255,0.6)" }}/>
+        </div>
+        <div style={{ position:"absolute",top:0,bottom:0,left:"50%",width:1,background:"rgba(255,255,255,0.08)",pointerEvents:"none" }}/>
       </div>
-      <div style={{ display:"flex", justifyContent:"space-between", marginTop:6, fontSize:10, color:"rgba(255,255,255,0.2)" }}>
-        <span>{teamA}</span>
-        <span>{teamB}</span>
+      <div style={{ display:"flex",justifyContent:"space-between",marginTop:4,fontSize:9,color:"#333" }}>
+        <span>20%</span><span>50%</span><span>80%</span>
       </div>
     </div>
   );
 }
-
-// ─── SPINNER ──────────────────────────────────────────────────────────────────
-export function Spinner({ size = 20, color = "#00E5A0" }) {
-  return (
-    <div style={{ width:size, height:size, border:`2px solid rgba(255,255,255,0.1)`, borderTopColor:color, borderRadius:"50%", animation:"spin 0.7s linear infinite" }}/>
-  );
+function GoogleLogo() {
+  return <svg width="20" height="20" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>;
 }
 
-// ─── STATUS PILL ─────────────────────────────────────────────────────────────
-export function StatusPill({ state }) {
-  const config = {
-    open:     { label:"Deschis",   color:"#4A9EFF", bg:"rgba(74,158,255,0.1)"   },
-    soon:     { label:"Se închide",color:"#F59E0B", bg:"rgba(245,158,11,0.1)"  },
-    locked:   { label:"Blocat",    color:"#6B7280", bg:"rgba(107,114,128,0.1)" },
-    live:     { label:"⬤ Live",   color:"#EF4444", bg:"rgba(239,68,68,0.1)"   },
-    finished: { label:"Final",     color:"#6B7280", bg:"rgba(107,114,128,0.08)"},
-  }[state] || { label:"—", color:"#6B7280", bg:"transparent" };
-
-  return (
-    <div style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 9px", borderRadius:20, background:config.bg, border:`1px solid ${config.color}28` }}>
-      {state === "live" && (
-        <div style={{ width:6, height:6, borderRadius:"50%", background:"#EF4444", animation:"livePulse 1.5s infinite" }}/>
-      )}
-      <span style={{ fontSize:10, fontWeight:700, color:config.color, letterSpacing:"0.05em" }}>{config.label}</span>
-    </div>
-  );
-}
-
-// ─── SECTION DIVIDER ─────────────────────────────────────────────────────────
-export function SectionDivider({ label }) {
-  return (
-    <div style={{ display:"flex", alignItems:"center", gap:10, padding:"4px 0", margin:"4px 0 6px" }}>
-      <div style={{ flex:1, height:1, background:"rgba(255,255,255,0.06)" }}/>
-      {label && <span style={{ fontSize:9, color:"rgba(255,255,255,0.2)", letterSpacing:"0.15em", textTransform:"uppercase", fontWeight:700 }}>{label}</span>}
-      <div style={{ flex:1, height:1, background:"rgba(255,255,255,0.06)" }}/>
-    </div>
-  );
-}
+export { ScoreInput, StepInput, PossessionInput, GoogleLogo };
