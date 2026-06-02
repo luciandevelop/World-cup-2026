@@ -362,7 +362,7 @@ export const TYPE_COLOR = {
 // ─── ADMIN EMAILS (from env + hardcoded fallback) ─────────────────────────────
 // Set VITE_ADMIN_EMAILS=email1,email2 in your .env file
 export const ADMIN_EMAILS_RUNTIME = (() => {
-  const fromEnv = import.meta.env.VITE_ADMIN_EMAILS || '';
+  const fromEnv = (import.meta.env && import.meta.env.VITE_ADMIN_EMAILS) || '';
   const extra = fromEnv.split(',').map(e => e.trim()).filter(Boolean);
   return [...new Set(['admin@worldcup2026.app', ...extra])];
 })();
