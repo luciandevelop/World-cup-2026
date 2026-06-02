@@ -38,8 +38,15 @@ export function buildMatches(finishedResults = FINISHED_RESULTS) {
       isLive,
       realScoreA:     isFinished ? Number(result.realScoreA) : null,
       realScoreB:     isFinished ? Number(result.realScoreB) : null,
-      realPossession: result?.realPossession ?? null,
-      realCorners:    result?.realCorners    ?? null,
+      // Canonical admin result stores homePossession/awayPossession — use home side as realPossession
+      realPossession: result?.homePossession  ?? result?.realPossession ?? null,
+      realPossessionAway: result?.awayPossession ?? null,
+      // Canonical admin result stores homeCorners+awayCorners — sum them for realCorners
+      realCorners:    (result?.homeCorners != null && result?.awayCorners != null)
+                        ? (Number(result.homeCorners) + Number(result.awayCorners))
+                        : (result?.realCorners ?? null),
+      realHomeCorners: result?.homeCorners ?? null,
+      realAwayCorners: result?.awayCorners ?? null,
       liveMinute:     result?.liveMinute     ?? null,
       liveStatus:     result?.liveStatus     ?? (isLive ? "live" : isFinished ? "ft" : now >= kickoff - LOCK_BEFORE_MS ? "locked" : "open"),
     };
@@ -107,34 +114,93 @@ export function matchLockState(match) {
 // ─── SCORING ENGINE ───────────────────────────────────────────────────────────
 // Max per match = 200 pts (100 + 50 + 20 + 15 + 15)
 export function calcBreakdown(pred, match) {
-  if (!match.isFinished || match.realScoreA === null) return null;
-  const { realScoreA:rA, realScoreB:rB, realPossession:rP, realCorners:rC } = match;
-  const { scoreA:pA, scoreB:pB, possession:pPoss, corners:pC } = pred;
+  if (!match.isFinished || match.realScoreA === null || match.realScoreB === null) return null;
 
+  // Real scores (numbers)
+  const rA = Number(match.realScoreA);
+  const rB = Number(match.realScoreB);
+
+  // Predicted scores — support both scoreA and homeScore field names
+  const pA = Number(pred.scoreA ?? pred.homeScore ?? 0);
+  const pB = Number(pred.scoreB ?? pred.awayScore ?? 0);
+
+  // Real possession — homePossession field (canonical admin shape)
+  const rP = match.realPossession;            // already mapped in buildMatches
+
+  // Real corners — total (already summed in buildMatches as realCorners)
+  const rC = match.realCorners;
+
+  // Predicted possession — single "possession" field (home %)
+  const pPoss = pred.possession != null ? Number(pred.possession) : null;
+
+  // Predicted corners — single "corners" field (total predicted)
+  const pC = pred.corners != null ? Number(pred.corners) : null;
+
+  // 1. Exact score: +100
+  const exactScore = (pA === rA && pB === rB) ? 100 : 0;
+
+  // 2. Correct 1X2 outcome: +50 (home/draw/away)
   const realRes = rA > rB ? "1" : rA < rB ? "2" : "X";
   const predRes = pA > pB ? "1" : pA < pB ? "2" : "X";
-
-  const exactScore = (pA === rA && pB === rB) ? 100 : 0;
   const correctRes = (predRes === realRes) ? 50 : 0;
+
+  // 3. Correct total goals: +20
   const totalGoals = (pA + pB === rA + rB) ? 20 : 0;
 
-  const pd = rP !== null ? Math.abs(pPoss - rP) : null;
-  const possession = pd === null ? 0 : pd === 0 ? 15 : pd <= 2 ? 10 : pd <= 5 ? 5 : 0;
+  // 4. Possession accuracy: max(0, 15 - abs(predicted - real))
+  let possession = 0;
+  if (pPoss != null && rP != null) {
+    possession = Math.max(0, 15 - Math.abs(pPoss - rP));
+  }
 
-  const cd2 = rC !== null ? Math.abs(pC - rC) : null;
-  const corners = cd2 === null ? 0 : cd2 === 0 ? 15 : cd2 === 1 ? 10 : cd2 === 2 ? 5 : cd2 === 3 ? 2 : 0;
+  // 5. Corners accuracy: max(0, 15 - abs(predictedTotal - realTotal))
+  let corners = 0;
+  if (pC != null && rC != null) {
+    corners = Math.max(0, 15 - Math.abs(pC - rC));
+  }
 
   const total = exactScore + correctRes + totalGoals + possession + corners;
 
   return {
     exactScore, correctRes, totalGoals, possession, corners, total,
     isPerfect: exactScore === 100 && possession === 15 && corners === 15,
+    // Debug breakdown strings
+    _debug: {
+      rA, rB, pA, pB, realRes, predRes,
+      rP, pPoss, possessionDiff: (pPoss != null && rP != null) ? Math.abs(pPoss - rP) : null,
+      rC, pC, cornerDiff: (pC != null && rC != null) ? Math.abs(pC - rC) : null,
+    },
   };
 }
 
 export function calcPoints(pred, match) {
   const b = calcBreakdown(pred, match);
   return b ? b.total : null;
+}
+
+// ─── SINGLE SOURCE OF TRUTH ───────────────────────────────────────────────────
+// calculateUserScore: ONE function used by profile, header, leaderboard, user card.
+// ALL UI must call this or buildLeaderboard (which calls this internally).
+// Args:
+//   userPreds      — { matchId(Number): pred }
+//   finishedResults — the canonical wc2026_admin_results object
+// Returns: { points, exactScores, lastMatchPts }
+export function calculateUserScore(userPreds, finishedResults = {}) {
+  const fm = buildMatches(finishedResults).filter(m => m.isFinished);
+  let points = 0, exactScores = 0, lastMatchPts = null, lastMatchId = null;
+  fm.forEach(match => {
+    const pred = userPreds[match.id] || userPreds[String(match.id)];
+    if (!pred) return;
+    const b = calcBreakdown(pred, match);
+    if (!b) return;
+    points += b.total;
+    if (b.exactScore > 0) exactScores++;
+    if (lastMatchId === null || match.id > lastMatchId) {
+      lastMatchPts = b.total;
+      lastMatchId  = match.id;
+    }
+  });
+  return { points, exactScores, lastMatchPts, finishedCount: fm.length };
 }
 
 // ─── LEADERBOARD ──────────────────────────────────────────────────────────────
