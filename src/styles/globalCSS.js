@@ -34,6 +34,7 @@ const CSS = `
   @keyframes particlePop  { 0%{ opacity:1;transform:translate(0,0) scale(1) } 100%{ opacity:0;transform:translate(var(--tx,0),var(--ty,-40px)) scale(0) } }
   @keyframes staggerIn  { from{ opacity:0;transform:translateY(20px) } to{ opacity:1;transform:translateY(0) } }
   @keyframes shimmer    { 0%{ background-position:-200% 0 } 100%{ background-position:200% 0 } }
+  @keyframes shimmerPass { 0%{ opacity:0;transform:translateX(-120%) rotate(12deg) } 45%{ opacity:1 } 100%{ opacity:0;transform:translateX(220%) rotate(12deg) } }
   @keyframes scaleIn    { from{ transform:scale(0.92);opacity:0 } to{ transform:scale(1);opacity:1 } }
   @keyframes notifPop   { 0%{ transform:translateY(-100%) } 60%{ transform:translateY(4px) } 100%{ transform:translateY(0) } }
   @keyframes ripple     { 0%{ transform:scale(1);opacity:0.3 } 100%{ transform:scale(2.5);opacity:0 } }
