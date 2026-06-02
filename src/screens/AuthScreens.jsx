@@ -4,9 +4,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState } from 'react';
-import { GoogleLogo, AppleLogo, Spinner } from '../components/UI.jsx';
+import { GoogleLogo, AppleLogo, Spinner, FootballAvatar } from '../components/UI.jsx';
 import { TAKEN_NICKNAMES } from '../data/gameData.js';
-import { AVATARS, getDefaultAvatarForNick } from '../data/avatars.js';
+import { AVATARS, getDefaultAvatarForNick, NICKNAME_SUGGESTIONS } from '../data/avatars.js';
 import {
   signInWithGoogle, signInWithApple,
   checkNicknameAvailable, sendEmailCode, verifyEmailCode,
@@ -233,7 +233,7 @@ const AVATAR_CATEGORIES = [
 ];
 
 function AvatarPicker({ selected, onSelect }) {
-  const [cat, setCat] = useState('personality');
+  const [cat, setCat] = useState('players');
   const catAvatars = AVATAR_CATEGORIES.find(c => c.id === cat)?.filter;
   const visible    = catAvatars ? AVATARS.filter(catAvatars) : AVATARS;
   const selAv      = AVATARS.find(a => a.id === selected);
@@ -258,10 +258,10 @@ function AvatarPicker({ selected, onSelect }) {
               width:'100%', aspectRatio:'1', borderRadius:10, background:av.bg,
               border:`2px solid ${isSel ? av.accent : 'rgba(255,255,255,0.06)'}`,
               display:'flex', alignItems:'center', justifyContent:'center',
-              fontSize:20, cursor:'pointer', transition:'all 0.12s', position:'relative',
+              fontSize:20, cursor:'pointer', transition:'all 0.12s', position:'relative', padding:0,
               boxShadow: isSel ? `0 0 14px ${av.accent}55` : av.shine ? `0 0 6px ${av.accent}22` : 'none',
             }}>
-              {av.emoji}
+              <FootballAvatar avatarId={av.id} nickname={av.name} size={34} style={{border:'none',boxShadow:'none'}}/>
               {rc && rc.label !== 'Comun' && <div style={{ position:'absolute', bottom:0, right:0, width:8, height:8, borderRadius:'50%', background:rc.color, border:'1px solid rgba(0,0,0,0.5)' }}/>}
             </div>
           );
@@ -269,7 +269,7 @@ function AvatarPicker({ selected, onSelect }) {
       </div>
       {selAv && (
         <div style={{ marginTop:8, padding:'6px 10px', background:'rgba(255,255,255,0.04)', borderRadius:8, display:'flex', alignItems:'center', gap:8 }}>
-          <span style={{ fontSize:20 }}>{selAv.emoji}</span>
+          <FootballAvatar avatarId={selAv.id} nickname={selAv.name} size={36}/>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:12, fontWeight:700, color:'#fff', display:'flex', alignItems:'center', gap:6 }}>
               {selAv.name}
@@ -310,7 +310,7 @@ export function NicknameScreen({ googleUser, onComplete }) {
   };
 
   const base = googleUser?.name ? googleUser.name.split(' ')[0] : 'Player';
-  const sugg = [base+'FC', base+'Goat', 'Leu'+(base.length*7%89+10)];
+  const sugg = NICKNAME_SUGGESTIONS.slice(0, 3);
   const bc   = status==='ok'?'#00E5A0':status==='taken'?'#FF6B6B':'rgba(255,255,255,0.1)';
   const av   = AVATARS.find(a => a.id === avatarId) || AVATARS[0];
 
@@ -320,7 +320,7 @@ export function NicknameScreen({ googleUser, onComplete }) {
 
         {/* Who are you */}
         <div style={{ display:'flex', alignItems:'center', gap:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:13, padding:'11px 14px', marginBottom:22 }}>
-          <div style={{ width:42, height:42, borderRadius:'50%', background:av.bg, border:`2px solid ${av.accent}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>{av.emoji}</div>
+          <FootballAvatar avatarId={av.id} nickname={av.name} size={44}/>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>{googleUser?.name || googleUser?.email}</div>
             <div style={{ fontSize:11, color:'rgba(255,255,255,0.3)' }}>{googleUser?.email || 'demo'}</div>
@@ -335,7 +335,7 @@ export function NicknameScreen({ googleUser, onComplete }) {
         <p style={{ fontSize:12, color:'rgba(255,255,255,0.28)', marginBottom:16, lineHeight:1.5 }}>Apare în clasament. Prietenii îl văd. 😈</p>
 
         <div style={{ position:'relative', marginBottom:5 }}>
-          <input value={nick} onChange={e => check(e.target.value)} placeholder="ex: RaduGoalMaster"
+          <input value={nick} onChange={e => check(e.target.value)} placeholder="ex: VARzaCuCarnati"
             onKeyDown={e => e.key === 'Enter' && save()} autoFocus
             style={{ width:'100%', padding:'13px 44px 13px 14px', background:'rgba(255,255,255,0.05)', border:`1px solid ${bc}`, borderRadius:12, color:'#fff', fontSize:16, fontFamily:'inherit', outline:'none', boxSizing:'border-box', transition:'border-color 0.2s' }}
           />

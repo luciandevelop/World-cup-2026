@@ -3,7 +3,6 @@ import { useMemo } from 'react';
 import {
   QUALIFY_PCT,
   CURRENT_STAGE,
-  MOCK_PREDICTIONS_FINISHED,
   buildLeaderboard,
   buildMatches,
   getPredictionStyle,
@@ -38,21 +37,11 @@ export default function LeaderboardScreen({
       const finishedCount = finishedMatches.length;
 
       const myPreds = normalizePredMap(predictions);
-      const hasRealMultiPlayerData = allPredictions && Object.keys(allPredictions).length > 0;
-
-      const demoFallback = hasRealMultiPlayerData ? {} : {
-        RaduGoalz:  { 13: MOCK_PREDICTIONS_FINISHED[0] },
-        AndreiFC:   { 13: MOCK_PREDICTIONS_FINISHED[1] },
-        MihaiUltra: { 13: MOCK_PREDICTIONS_FINISHED[2] },
-        AlexTactic: { 13: MOCK_PREDICTIONS_FINISHED[3] },
-      };
-
       const normalizedAllPreds = Object.fromEntries(
         Object.entries(allPredictions || {}).map(([nick, preds]) => [nick, normalizePredMap(preds)])
       );
 
       const allPlayerPreds = {
-        ...demoFallback,
         ...normalizedAllPreds,
         ...(currentNickname ? { [currentNickname]: myPreds } : {}),
       };

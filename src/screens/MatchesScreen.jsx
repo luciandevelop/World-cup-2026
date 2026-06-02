@@ -5,7 +5,7 @@
 
 import { useState, useMemo } from 'react';
 import {
-  MATCHES, GROUPS, MOCK_PREDICTIONS_FINISHED,
+  MATCHES, GROUPS,
   POPULAR_PICKS, MOST_PREDICTED, LIVE_FEED_EVENTS, TYPE_COLOR,
   calcBreakdown, calcPoints, matchLockState, formatKickoffRO, getGroupLabel,
 } from '../data/gameData.js';
@@ -95,32 +95,8 @@ function CommunityPicks({ matchId, prediction }) {
 
 // ─── FRIEND PREDICTIONS ───────────────────────────────────────────────────────
 function FriendPredictions({ match }) {
-  if (!match.isFinished && !match.isLive) return null;
-  const preds = MOCK_PREDICTIONS_FINISHED;
-  return (
-    <div style={{ marginTop:8, animation:"revealFlip 0.3s ease both" }}>
-      <div style={{ fontSize:10, color:"rgba(255,255,255,0.2)", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:600, marginBottom:8 }}>
-        Predicțiile prietenilor
-      </div>
-      {preds.map((p, i) => {
-        const isExact = match.isFinished && p.scoreA === match.realScoreA && p.scoreB === match.realScoreB;
-        return (
-          <div key={i} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 0", borderBottom:i < preds.length-1?"1px solid rgba(255,255,255,0.04)":"none" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-              <div style={{ width:28, height:28, borderRadius:"50%", background:"rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.5)" }}>
-                {p.nickname[0]}
-              </div>
-              <span style={{ fontSize:12, color:"rgba(255,255,255,0.55)", fontWeight:600 }}>{p.nickname}</span>
-              {isExact && <span style={{ fontSize:9, color:"#FFD700", background:"rgba(255,215,0,0.1)", border:"1px solid rgba(255,215,0,0.2)", padding:"1px 6px", borderRadius:4, fontWeight:700 }}>🎯 EXACT</span>}
-            </div>
-            <span style={{ fontSize:13, fontWeight:800, color:"#fff", fontFamily:"'DM Mono',monospace" }}>
-              {p.scoreA} – {p.scoreB}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
+  // Disabled until real multiplayer data is connected. No fake friends shown.
+  return null;
 }
 
 // ─── MATCH CARD ───────────────────────────────────────────────────────────────
@@ -287,6 +263,7 @@ function GroupHeader({ group, teams, collapsed, onToggle, matchCount, predCount 
 
 // ─── LIVE FEED ────────────────────────────────────────────────────────────────
 function LiveFeed() {
+  if (!LIVE_FEED_EVENTS || LIVE_FEED_EVENTS.length === 0) return null;
   return (
     <div style={{ marginBottom:16 }}>
       <div style={{ fontSize:10, color:"rgba(255,255,255,0.25)", letterSpacing:"0.12em", textTransform:"uppercase", fontWeight:600, marginBottom:10, paddingLeft:2 }}>
