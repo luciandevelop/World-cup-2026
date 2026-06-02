@@ -86,7 +86,7 @@ function AvatarChangeModal({ currentId, onSelect, onClose }) {
       <div style={{ background:'#111820',borderRadius:'22px 22px 0 0',padding:'16px 14px 32px',border:'1px solid rgba(255,255,255,0.08)',borderBottom:'none',animation:'slideUp 0.28s ease',maxHeight:'82dvh',overflowY:'auto' }}>
         <div style={{ width:36,height:3,background:'rgba(255,255,255,0.15)',borderRadius:2,margin:'0 auto 14px' }}/>
         <div style={{ display:'flex',alignItems:'center',gap:10,marginBottom:10 }}>
-          <span style={{ fontSize:24 }}>{av.emoji}</span>
+          <FootballAvatar avatarId={av.id} nickname={av.name} size={42}/>
           <div>
             <div style={{ fontSize:14,fontWeight:800,color:'#fff',display:'flex',alignItems:'center',gap:6 }}>
               {av.name}
@@ -109,8 +109,8 @@ function AvatarChangeModal({ currentId, onSelect, onClose }) {
             const isSel = sel===a.id;
             const arc = a.rarity ? RARITY_CFG[a.rarity] : null;
             return (
-              <div key={a.id} onClick={()=>setSel(a.id)} title={a.name} style={{ width:'100%',aspectRatio:'1',borderRadius:11,background:a.bg,border:`2px solid ${isSel?a.accent:'rgba(255,255,255,0.06)'}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:21,cursor:'pointer',boxShadow:isSel?`0 0 12px ${a.accent}55`:a.shine?`0 0 5px ${a.accent}22`:'none',transition:'all 0.12s',position:'relative' }}>
-                {a.emoji}
+              <div key={a.id} onClick={()=>setSel(a.id)} title={a.name} style={{ width:'100%',aspectRatio:'1',borderRadius:11,background:a.bg,border:`2px solid ${isSel?a.accent:'rgba(255,255,255,0.06)'}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:21,cursor:'pointer',boxShadow:isSel?`0 0 12px ${a.accent}55`:a.shine?`0 0 5px ${a.accent}22`:'none',transition:'all 0.12s',position:'relative',padding:0 }}>
+                <FootballAvatar avatarId={a.id} nickname={a.name} size={36} style={{border:'none',boxShadow:'none'}}/>
                 {arc?.label && <div style={{ position:'absolute',bottom:0,right:0,width:8,height:8,borderRadius:'50%',background:arc.color,border:'1px solid rgba(0,0,0,0.6)' }}/>}
               </div>
             );
