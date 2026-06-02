@@ -1,302 +1,307 @@
-// ─── src/lib/data.js ──────────────────────────────────────────────────────────
-// Pure JS — no React imports. All fixtures, scoring, helpers, demo data.
-// To connect to Supabase: replace FINISHED_RESULTS and demo arrays
-// with real database queries using the Supabase JS client.
+// ─── src/data/avatars.js ─────────────────────────────────────────────────────
+// World Cup Arena 2026 — Premium Avatar Collection
+// 52 collectibles: National Badges · Superstar Jerseys · Achievement Medals
+// Zero external images. All rendered via FootballAvatar SVG engine in UI.jsx.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ─── FIXTURES ─────────────────────────────────────────────────────────────────
-// Real FIFA World Cup 2026 matches. Times in EEST (UTC+3, Romania time).
-const ALL_MATCHES = [
-  // ── GRUPA A ──
-  { id: 1,  group:"A", teamA:"Mexic",         teamB:"Africa de Sud",  flagA:"🇲🇽", flagB:"🇿🇦", time:"2026-06-11T22:00:00", venue:"Mexico City"   },
-  { id: 2,  group:"A", teamA:"Coreea de Sud", teamB:"Cehia",          flagA:"🇰🇷", flagB:"🇨🇿", time:"2026-06-12T01:00:00", venue:"Dallas"        },
-  { id: 3,  group:"A", teamA:"Mexic",         teamB:"Coreea de Sud",  flagA:"🇲🇽", flagB:"🇰🇷", time:"2026-06-15T22:00:00", venue:"Dallas"        },
-  { id: 4,  group:"A", teamA:"Cehia",         teamB:"Africa de Sud",  flagA:"🇨🇿", flagB:"🇿🇦", time:"2026-06-15T19:00:00", venue:"Atlanta"       },
-  { id: 5,  group:"A", teamA:"Mexic",         teamB:"Cehia",          flagA:"🇲🇽", flagB:"🇨🇿", time:"2026-06-19T22:00:00", venue:"Los Angeles"   },
-  { id: 6,  group:"A", teamA:"Africa de Sud", teamB:"Coreea de Sud",  flagA:"🇿🇦", flagB:"🇰🇷", time:"2026-06-19T22:00:00", venue:"Houston"       },
-  // ── GRUPA C ──
-  { id: 7,  group:"C", teamA:"Brazilia",      teamB:"Maroc",          flagA:"🇧🇷", flagB:"🇲🇦", time:"2026-06-13T23:00:00", venue:"New York"      },
-  { id: 8,  group:"C", teamA:"Haiti",         teamB:"Scoția",         flagA:"🇭🇹", flagB:"🏴󠁧󠁢󠁳󠁣󠁴󠁿", time:"2026-06-14T02:00:00", venue:"Houston"       },
-  { id: 9,  group:"C", teamA:"Brazilia",      teamB:"Scoția",         flagA:"🇧🇷", flagB:"🏴󠁧󠁢󠁳󠁣󠁴󠁿", time:"2026-06-18T02:30:00", venue:"Miami"         },
-  { id: 10, group:"C", teamA:"Maroc",         teamB:"Haiti",          flagA:"🇲🇦", flagB:"🇭🇹", time:"2026-06-17T23:00:00", venue:"Atlanta"       },
-  { id: 11, group:"C", teamA:"Brazilia",      teamB:"Haiti",          flagA:"🇧🇷", flagB:"🇭🇹", time:"2026-06-22T02:00:00", venue:"Miami"         },
-  { id: 12, group:"C", teamA:"Scoția",        teamB:"Maroc",          flagA:"🏴󠁧󠁢󠁳󠁣󠁴󠁿", flagB:"🇲🇦", time:"2026-06-22T02:00:00", venue:"Seattle"       },
-  // ── GRUPA H ──
-  { id: 13, group:"H", teamA:"Spania",        teamB:"Cap Verde",      flagA:"🇪🇸", flagB:"🇨🇻", time:"2026-06-15T18:00:00", venue:"Atlanta"       },
-  { id: 14, group:"H", teamA:"Arabia Saudită",teamB:"Uruguay",        flagA:"🇸🇦", flagB:"🇺🇾", time:"2026-06-15T21:00:00", venue:"New York"      },
-  { id: 15, group:"H", teamA:"Spania",        teamB:"Arabia Saudită", flagA:"🇪🇸", flagB:"🇸🇦", time:"2026-06-21T18:00:00", venue:"Atlanta"       },
-  { id: 16, group:"H", teamA:"Uruguay",       teamB:"Cap Verde",      flagA:"🇺🇾", flagB:"🇨🇻", time:"2026-06-21T21:00:00", venue:"Dallas"        },
-  { id: 17, group:"H", teamA:"Spania",        teamB:"Uruguay",        flagA:"🇪🇸", flagB:"🇺🇾", time:"2026-06-25T03:00:00", venue:"Guadalajara"   },
-  { id: 18, group:"H", teamA:"Cap Verde",     teamB:"Arabia Saudită", flagA:"🇨🇻", flagB:"🇸🇦", time:"2026-06-25T03:00:00", venue:"Atlanta"       },
-  // ── GRUPA I (Grupa Morții) ──
-  { id: 19, group:"I", teamA:"Franța",        teamB:"Senegal",        flagA:"🇫🇷", flagB:"🇸🇳", time:"2026-06-16T00:00:00", venue:"New York"      },
-  { id: 20, group:"I", teamA:"Norvegia",      teamB:"Irak",           flagA:"🇳🇴", flagB:"🇮🇶", time:"2026-06-16T03:00:00", venue:"Philadelphia"  },
-  { id: 21, group:"I", teamA:"Franța",        teamB:"Irak",           flagA:"🇫🇷", flagB:"🇮🇶", time:"2026-06-20T02:00:00", venue:"Philadelphia"  },
-  { id: 22, group:"I", teamA:"Senegal",       teamB:"Norvegia",       flagA:"🇸🇳", flagB:"🇳🇴", time:"2026-06-20T02:00:00", venue:"New York"      },
-  { id: 23, group:"I", teamA:"Franța",        teamB:"Norvegia",       flagA:"🇫🇷", flagB:"🇳🇴", time:"2026-06-24T00:00:00", venue:"Boston"        },
-  { id: 24, group:"I", teamA:"Irak",          teamB:"Senegal",        flagA:"🇮🇶", flagB:"🇸🇳", time:"2026-06-24T00:00:00", venue:"New York"      },
-  // ── GRUPA J ──
-  { id: 25, group:"J", teamA:"Argentina",     teamB:"Algeria",        flagA:"🇦🇷", flagB:"🇩🇿", time:"2026-06-17T03:00:00", venue:"Kansas City"   },
-  { id: 26, group:"J", teamA:"Austria",       teamB:"Iordania",       flagA:"🇦🇹", flagB:"🇯🇴", time:"2026-06-17T00:00:00", venue:"Dallas"        },
-  { id: 27, group:"J", teamA:"Argentina",     teamB:"Austria",        flagA:"🇦🇷", flagB:"🇦🇹", time:"2026-06-21T02:00:00", venue:"Dallas"        },
-  { id: 28, group:"J", teamA:"Algeria",       teamB:"Iordania",       flagA:"🇩🇿", flagB:"🇯🇴", time:"2026-06-21T05:00:00", venue:"San Francisco" },
-  { id: 29, group:"J", teamA:"Argentina",     teamB:"Iordania",       flagA:"🇦🇷", flagB:"🇯🇴", time:"2026-06-25T01:00:00", venue:"Dallas"        },
-  { id: 30, group:"J", teamA:"Algeria",       teamB:"Austria",        flagA:"🇩🇿", flagB:"🇦🇹", time:"2026-06-25T01:00:00", venue:"Kansas City"   },
-  // ── GRUPA K ──
-  { id: 31, group:"K", teamA:"Portugalia",    teamB:"Uzbekistan",     flagA:"🇵🇹", flagB:"🇺🇿", time:"2026-06-17T18:00:00", venue:"Houston"       },
-  { id: 32, group:"K", teamA:"Colombia",      teamB:"Congo RD",       flagA:"🇨🇴", flagB:"🇨🇩", time:"2026-06-17T04:00:00", venue:"Guadalajara"   },
-  { id: 33, group:"K", teamA:"Portugalia",    teamB:"Congo RD",       flagA:"🇵🇹", flagB:"🇨🇩", time:"2026-06-21T18:00:00", venue:"Boston"        },
-  { id: 34, group:"K", teamA:"Uzbekistan",    teamB:"Colombia",       flagA:"🇺🇿", flagB:"🇨🇴", time:"2026-06-21T21:00:00", venue:"Guadalajara"   },
-  { id: 35, group:"K", teamA:"Portugalia",    teamB:"Colombia",       flagA:"🇵🇹", flagB:"🇨🇴", time:"2026-06-25T22:00:00", venue:"Los Angeles"   },
-  { id: 36, group:"K", teamA:"Congo RD",      teamB:"Uzbekistan",     flagA:"🇨🇩", flagB:"🇺🇿", time:"2026-06-25T22:00:00", venue:"Guadalajara"   },
-  // ── GRUPA L ──
-  { id: 37, group:"L", teamA:"Anglia",        teamB:"Ghana",          flagA:"🏴󠁧󠁢󠁥󠁮󠁧󠁿", flagB:"🇬🇭", time:"2026-06-17T21:00:00", venue:"Boston"        },
-  { id: 38, group:"L", teamA:"Panama",        teamB:"Croația",        flagA:"🇵🇦", flagB:"🇭🇷", time:"2026-06-18T00:00:00", venue:"Toronto"       },
-  { id: 39, group:"L", teamA:"Anglia",        teamB:"Panama",         flagA:"🏴󠁧󠁢󠁥󠁮󠁧󠁿", flagB:"🇵🇦", time:"2026-06-22T00:00:00", venue:"Miami"         },
-  { id: 40, group:"L", teamA:"Croația",       teamB:"Ghana",          flagA:"🇭🇷", flagB:"🇬🇭", time:"2026-06-22T03:00:00", venue:"Philadelphia"  },
-  { id: 41, group:"L", teamA:"Anglia",        teamB:"Croația",        flagA:"🏴󠁧󠁢󠁥󠁮󠁧󠁿", flagB:"🇭🇷", time:"2026-06-27T01:00:00", venue:"Seattle"       },
-  { id: 42, group:"L", teamA:"Ghana",         teamB:"Panama",         flagA:"🇬🇭", flagB:"🇵🇦", time:"2026-06-27T01:00:00", venue:"New York"      },
+export const AVATARS = [
+
+  // ═══════════════════════════════════════════════════════════
+  // CATEGORY 1 — NATIONAL BADGES (20)
+  // Each entry encodes: flag emoji, 3 national colors, glow, rarity
+  // ═══════════════════════════════════════════════════════════
+
+  { id:'flag_bra', kind:'nation', name:'Brasil', desc:'Jogo bonito. Eternitate.',
+    flag:'🇧🇷', bg:'#051a0d', c1:'#009C3B', c2:'#FEDF00', c3:'#002776',
+    glow:'#FEDF00', glow2:'#009C3B', rarity:'legendary', shine:true },
+
+  { id:'flag_arg', kind:'nation', name:'Argentina', desc:'Rece la penalty. Campion.',
+    flag:'🇦🇷', bg:'#051525', c1:'#74ACDF', c2:'#FFFFFF', c3:'#74ACDF',
+    glow:'#74ACDF', glow2:'#FFFFFF', rarity:'legendary', shine:true },
+
+  { id:'flag_fra', kind:'nation', name:'France', desc:'Viteză, stil, victorie.',
+    flag:'🇫🇷', bg:'#04091e', c1:'#002395', c2:'#FFFFFF', c3:'#ED2939',
+    glow:'#002395', glow2:'#ED2939', rarity:'legendary', shine:true },
+
+  { id:'flag_eng', kind:'nation', name:'England', desc:'It\'s coming home.',
+    flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿', bg:'#120608', c1:'#FFFFFF', c2:'#CF091C', c3:'#FFFFFF',
+    glow:'#CF091C', glow2:'#FFFFFF', rarity:'epic', shine:true },
+
+  { id:'flag_esp', kind:'nation', name:'España', desc:'Tiki-taka cu sânge regal.',
+    flag:'🇪🇸', bg:'#1e0407', c1:'#AA151B', c2:'#F1BF00', c3:'#AA151B',
+    glow:'#AA151B', glow2:'#F1BF00', rarity:'epic', shine:true },
+
+  { id:'flag_ger', kind:'nation', name:'Germany', desc:'Eficiență fără emoții.',
+    flag:'🇩🇪', bg:'#0e0e0e', c1:'#000000', c2:'#DD0000', c3:'#FFCE00',
+    glow:'#FFCE00', glow2:'#DD0000', rarity:'epic', shine:false },
+
+  { id:'flag_por', kind:'nation', name:'Portugal', desc:'Dramă, goluri, glorie.',
+    flag:'🇵🇹', bg:'#03100a', c1:'#006600', c2:'#FF0000', c3:'#FFFFFF',
+    glow:'#FF0000', glow2:'#006600', rarity:'epic', shine:true },
+
+  { id:'flag_ita', kind:'nation', name:'Italia', desc:'Apărare, stil, espresso.',
+    flag:'🇮🇹', bg:'#040c20', c1:'#009246', c2:'#FFFFFF', c3:'#CE2B37',
+    glow:'#0055A4', glow2:'#FFFFFF', rarity:'rare', shine:false },
+
+  { id:'flag_ned', kind:'nation', name:'Nederland', desc:'Fotbal total. Portocaliu total.',
+    flag:'🇳🇱', bg:'#1a0700', c1:'#FF6600', c2:'#FFFFFF', c3:'#003A8C',
+    glow:'#FF6600', glow2:'#003A8C', rarity:'rare', shine:false },
+
+  { id:'flag_cro', kind:'nation', name:'Hrvatska', desc:'Șah pe tricou, nervi de oțel.',
+    flag:'🇭🇷', bg:'#130610', c1:'#FF0000', c2:'#FFFFFF', c3:'#171796',
+    glow:'#FF0000', glow2:'#171796', rarity:'epic', shine:true },
+
+  { id:'flag_bel', kind:'nation', name:'Belgique', desc:'Generația de aur.',
+    flag:'🇧🇪', bg:'#130305', c1:'#000000', c2:'#FFD700', c3:'#EF3340',
+    glow:'#EF3340', glow2:'#FFD700', rarity:'rare', shine:false },
+
+  { id:'flag_usa', kind:'nation', name:'USA', desc:'Gazdă cu marketing maxim.',
+    flag:'🇺🇸', bg:'#050b1a', c1:'#3C3B6E', c2:'#FFFFFF', c3:'#B22234',
+    glow:'#3C3B6E', glow2:'#B22234', rarity:'rare', shine:false },
+
+  { id:'flag_mex', kind:'nation', name:'México', desc:'Stadion plin, haos frumos.',
+    flag:'🇲🇽', bg:'#031508', c1:'#006847', c2:'#FFFFFF', c3:'#CE1126',
+    glow:'#006847', glow2:'#CE1126', rarity:'rare', shine:false },
+
+  { id:'flag_jpn', kind:'nation', name:'Japan', desc:'Disciplină. Pressing. Onoare.',
+    flag:'🇯🇵', bg:'#100408', c1:'#FFFFFF', c2:'#BC002D', c3:'#FFFFFF',
+    glow:'#BC002D', glow2:'#FFFFFF', rarity:'rare', shine:false },
+
+  { id:'flag_mar', kind:'nation', name:'Maroc', desc:'Underdog cu suflet de leu.',
+    flag:'🇲🇦', bg:'#0a0404', c1:'#C1272D', c2:'#006233', c3:'#C1272D',
+    glow:'#C1272D', glow2:'#006233', rarity:'epic', shine:true },
+
+  { id:'flag_uru', kind:'nation', name:'Uruguay', desc:'Mici, furioși, legendari.',
+    flag:'🇺🇾', bg:'#050f20', c1:'#5AAAE7', c2:'#FFFFFF', c3:'#5AAAE7',
+    glow:'#5AAAE7', glow2:'#FFFFFF', rarity:'common', shine:false },
+
+  { id:'flag_col', kind:'nation', name:'Colombia', desc:'Coffee, dribbling, glorie.',
+    flag:'🇨🇴', bg:'#1a1200', c1:'#FCD116', c2:'#003087', c3:'#CE1126',
+    glow:'#FCD116', glow2:'#CE1126', rarity:'common', shine:false },
+
+  { id:'flag_srb', kind:'nation', name:'Serbia', desc:'Balcanic, furios, periculos.',
+    flag:'🇷🇸', bg:'#150308', c1:'#C6363C', c2:'#0C4076', c3:'#FFFFFF',
+    glow:'#C6363C', glow2:'#0C4076', rarity:'common', shine:false },
+
+  { id:'flag_kor', kind:'nation', name:'Korea', desc:'Cardio fără limite, inimă mare.',
+    flag:'🇰🇷', bg:'#130308', c1:'#CD2E3A', c2:'#FFFFFF', c3:'#003478',
+    glow:'#CD2E3A', glow2:'#003478', rarity:'common', shine:false },
+
+  { id:'flag_can', kind:'nation', name:'Canada', desc:'Frig afară, ritm de foc.',
+    flag:'🇨🇦', bg:'#150404', c1:'#FF0000', c2:'#FFFFFF', c3:'#FF0000',
+    glow:'#FF0000', glow2:'#FFFFFF', rarity:'common', shine:false },
+
+
+  // ═══════════════════════════════════════════════════════════
+  // CATEGORY 2 — SUPERSTAR JERSEYS (20)
+  // surname · number · flag · shirt colors all encoded
+  // ═══════════════════════════════════════════════════════════
+
+  { id:'kit_messi', kind:'jersey', name:'Messi #10', desc:'Ultimul dans. Titlul suprem.',
+    surname:'MESSI', num:'10', flag:'🇦🇷',
+    body:'#74ACDF', bodyEnd:'#5590c8', stripe:'#FFFFFF', collar:'#FFFFFF', sleeve:'#FFFFFF',
+    bg:'#041525', glow:'#74ACDF', glow2:'#FFFFFF',
+    rarity:'legendary', shine:true, stripes:'vertical' },
+
+  { id:'kit_neymar', kind:'jersey', name:'Neymar #10', desc:'Dribling, samba, magie pură.',
+    surname:'NEYMAR', num:'10', flag:'🇧🇷',
+    body:'#009C3B', bodyEnd:'#007830', stripe:'#FEDF00', collar:'#002776', sleeve:'#FEDF00',
+    bg:'#04180a', glow:'#FEDF00', glow2:'#009C3B',
+    rarity:'legendary', shine:true, stripes:'none' },
+
+  { id:'kit_mbappe', kind:'jersey', name:'Mbappé #10', desc:'100m în 10s, gol în 11.',
+    surname:'MBAPPÉ', num:'10', flag:'🇫🇷',
+    body:'#002395', bodyEnd:'#001570', stripe:'#FFFFFF', collar:'#ED2939', sleeve:'#ED2939',
+    bg:'#03081a', glow:'#002395', glow2:'#ED2939',
+    rarity:'legendary', shine:true, stripes:'none' },
+
+  { id:'kit_ronaldo', kind:'jersey', name:'Ronaldo #7', desc:'SIUUU. Gol. Glorie.',
+    surname:'RONALDO', num:'7', flag:'🇵🇹',
+    body:'#006600', bodyEnd:'#004400', stripe:'#FFFFFF', collar:'#FF0000', sleeve:'#FF0000',
+    bg:'#021008', glow:'#FF0000', glow2:'#006600',
+    rarity:'legendary', shine:true, stripes:'none' },
+
+  { id:'kit_yamal', kind:'jersey', name:'Yamal #19', desc:'17 ani. Campion mondial.',
+    surname:'YAMAL', num:'19', flag:'🇪🇸',
+    body:'#AA151B', bodyEnd:'#8a1015', stripe:'#F1BF00', collar:'#F1BF00', sleeve:'#F1BF00',
+    bg:'#180304', glow:'#AA151B', glow2:'#F1BF00',
+    rarity:'legendary', shine:true, stripes:'none' },
+
+  { id:'kit_haaland', kind:'jersey', name:'Haaland #9', desc:'Robot norvegian. Gol garantat.',
+    surname:'HAALAND', num:'9', flag:'🇳🇴',
+    body:'#EF0000', bodyEnd:'#bb0000', stripe:'#FFFFFF', collar:'#003B6F', sleeve:'#003B6F',
+    bg:'#150202', glow:'#EF0000', glow2:'#003B6F',
+    rarity:'epic', shine:true, stripes:'none' },
+
+  { id:'kit_bellingham', kind:'jersey', name:'Bellingham #10', desc:'Regele nou al fotbalului.',
+    surname:'BELLINGHAM', num:'10', flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+    body:'#FFFFFF', bodyEnd:'#eeeeee', stripe:'#CF091C', collar:'#CF091C', sleeve:'#CF091C',
+    bg:'#101010', glow:'#CF091C', glow2:'#FFFFFF',
+    rarity:'epic', shine:true, stripes:'none' },
+
+  { id:'kit_vinicius', kind:'jersey', name:'Vinicius #7', desc:'Dribling pur, presiune zero.',
+    surname:'VINICIUS', num:'7', flag:'🇧🇷',
+    body:'#009C3B', bodyEnd:'#007830', stripe:'#FEDF00', collar:'#002776', sleeve:'#FEDF00',
+    bg:'#04180a', glow:'#FEDF00', glow2:'#009C3B',
+    rarity:'epic', shine:true, stripes:'none' },
+
+  { id:'kit_modric', kind:'jersey', name:'Modrić #10', desc:'Regele mijlocașilor.',
+    surname:'MODRIĆ', num:'10', flag:'🇭🇷',
+    body:'#FF0000', bodyEnd:'#cc0000', stripe:'#FFFFFF', collar:'#FFFFFF', sleeve:'#171796',
+    bg:'#120308', glow:'#FF0000', glow2:'#171796',
+    rarity:'epic', shine:true, stripes:'checker' },
+
+  { id:'kit_musiala', kind:'jersey', name:'Musiala #10', desc:'Dribbling bavarez cu viteză.',
+    surname:'MUSIALA', num:'10', flag:'🇩🇪',
+    body:'#FFFFFF', bodyEnd:'#eeeeee', stripe:'#000000', collar:'#DD0000', sleeve:'#DD0000',
+    bg:'#0d0d0d', glow:'#FFCE00', glow2:'#DD0000',
+    rarity:'epic', shine:false, stripes:'none' },
+
+  { id:'kit_rodri', kind:'jersey', name:'Rodri #16', desc:'Box-to-box la putere maximă.',
+    surname:'RODRI', num:'16', flag:'🇪🇸',
+    body:'#AA151B', bodyEnd:'#8a1015', stripe:'#F1BF00', collar:'#F1BF00', sleeve:'#F1BF00',
+    bg:'#180304', glow:'#AA151B', glow2:'#F1BF00',
+    rarity:'rare', shine:false, stripes:'none' },
+
+  { id:'kit_kane', kind:'jersey', name:'Kane #9', desc:'Alb simplu, gol urat, 3 puncte.',
+    surname:'KANE', num:'9', flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+    body:'#FFFFFF', bodyEnd:'#eeeeee', stripe:'#CF091C', collar:'#CF091C', sleeve:'#CF091C',
+    bg:'#0e0e0e', glow:'#FFFFFF', glow2:'#CF091C',
+    rarity:'rare', shine:false, stripes:'none' },
+
+  { id:'kit_salah', kind:'jersey', name:'Salah #10', desc:'Viteza lui e altă dimensiune.',
+    surname:'SALAH', num:'10', flag:'🇪🇬',
+    body:'#CC0000', bodyEnd:'#990000', stripe:'#FFFFFF', collar:'#FFFFFF', sleeve:'#FFFFFF',
+    bg:'#120202', glow:'#CC0000', glow2:'#FFFFFF',
+    rarity:'rare', shine:false, stripes:'none' },
+
+  { id:'kit_son', kind:'jersey', name:'Son #7', desc:'K-pop meets goluri mondiale.',
+    surname:'SON', num:'7', flag:'🇰🇷',
+    body:'#CD2E3A', bodyEnd:'#a02030', stripe:'#FFFFFF', collar:'#003478', sleeve:'#003478',
+    bg:'#130408', glow:'#CD2E3A', glow2:'#003478',
+    rarity:'rare', shine:false, stripes:'none' },
+
+  { id:'kit_alvarez', kind:'jersey', name:'Álvarez #9', desc:'Mic, rapid, lethal.',
+    surname:'ÁLVAREZ', num:'9', flag:'🇦🇷',
+    body:'#74ACDF', bodyEnd:'#5590c8', stripe:'#FFFFFF', collar:'#FFFFFF', sleeve:'#FFFFFF',
+    bg:'#041525', glow:'#74ACDF', glow2:'#FFFFFF',
+    rarity:'rare', shine:false, stripes:'vertical' },
+
+  { id:'kit_valverde', kind:'jersey', name:'Valverde #15', desc:'Box-to-box, energie infinită.',
+    surname:'VALVERDE', num:'15', flag:'🇺🇾',
+    body:'#5AAAE7', bodyEnd:'#3a8acc', stripe:'#FFFFFF', collar:'#FFFFFF', sleeve:'#FFFFFF',
+    bg:'#060f1e', glow:'#5AAAE7', glow2:'#FFFFFF',
+    rarity:'rare', shine:false, stripes:'none' },
+
+  { id:'kit_leao', kind:'jersey', name:'Leão #10', desc:'Viteză, flamă, Lisabona.',
+    surname:'LEÃO', num:'10', flag:'🇵🇹',
+    body:'#006600', bodyEnd:'#004400', stripe:'#FFFFFF', collar:'#FF0000', sleeve:'#FF0000',
+    bg:'#021008', glow:'#FF0000', glow2:'#006600',
+    rarity:'rare', shine:false, stripes:'none' },
+
+  { id:'kit_kvara', kind:'jersey', name:'Kvaratskhelia #7', desc:'Georgia pe podium.',
+    surname:'KVARA', num:'7', flag:'🇬🇪',
+    body:'#FFFFFF', bodyEnd:'#eeeeee', stripe:'#FF0000', collar:'#FF0000', sleeve:'#FF0000',
+    bg:'#0e0e0e', glow:'#FF0000', glow2:'#FFFFFF',
+    rarity:'rare', shine:false, stripes:'cross' },
+
+  { id:'kit_saka', kind:'jersey', name:'Saka #7', desc:'Banda stângă e a lui.',
+    surname:'SAKA', num:'7', flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+    body:'#FFFFFF', bodyEnd:'#eeeeee', stripe:'#CF091C', collar:'#CF091C', sleeve:'#CF091C',
+    bg:'#0e0e0e', glow:'#CF091C', glow2:'#FFFFFF',
+    rarity:'common', shine:false, stripes:'none' },
+
+  { id:'kit_palmer', kind:'jersey', name:'Palmer #10', desc:'Next gen. Acum.',
+    surname:'PALMER', num:'10', flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+    body:'#FFFFFF', bodyEnd:'#eeeeee', stripe:'#CF091C', collar:'#CF091C', sleeve:'#CF091C',
+    bg:'#0e0e0e', glow:'#CF091C', glow2:'#FFFFFF',
+    rarity:'common', shine:false, stripes:'none' },
+
+
+  // ═══════════════════════════════════════════════════════════
+  // CATEGORY 3 — ACHIEVEMENT MEDALS (12)
+  // ═══════════════════════════════════════════════════════════
+
+  { id:'ach_champion', kind:'achievement', name:'World Champion', desc:'Cel mai bun din toate grupele.',
+    icon:'🏆', label:'WORLD\nCHAMPION',
+    bg:'#100900', c1:'#FFD700', c2:'#FFF3A0', c3:'#B8860B',
+    glow:'#FFD700', glow2:'#FFA500', rarity:'legendary', shine:true },
+
+  { id:'ach_golden_boot', kind:'achievement', name:'Golden Boot', desc:'Golgeterul predicțiilor.',
+    icon:'👟', label:'GOLDEN\nBOOT',
+    bg:'#180800', c1:'#FF6B00', c2:'#FFD700', c3:'#8B3A00',
+    glow:'#FF6B00', glow2:'#FFD700', rarity:'legendary', shine:true },
+
+  { id:'ach_golden_glove', kind:'achievement', name:'Golden Glove', desc:'Portar de diamant.',
+    icon:'🧤', label:'GOLDEN\nGLOVE',
+    bg:'#070f1a', c1:'#FFD700', c2:'#60A5FA', c3:'#B8860B',
+    glow:'#FFD700', glow2:'#60A5FA', rarity:'legendary', shine:true },
+
+  { id:'ach_king', kind:'achievement', name:'Prediction King', desc:'Coroana îți aparține.',
+    icon:'👑', label:'PREDICTION\nKING',
+    bg:'#120a00', c1:'#FFD700', c2:'#FFA500', c3:'#8B6914',
+    glow:'#FFD700', glow2:'#FFA500', rarity:'legendary', shine:true },
+
+  { id:'ach_perfect', kind:'achievement', name:'Perfect Score', desc:'Toate predicțiile corecte.',
+    icon:'💎', label:'PERFECT\nSCORE',
+    bg:'#040e1c', c1:'#7DF9FF', c2:'#FFFFFF', c3:'#40A8CC',
+    glow:'#7DF9FF', glow2:'#FFFFFF', rarity:'legendary', shine:true },
+
+  { id:'ach_goat', kind:'achievement', name:'GOAT', desc:'Nimeni nu prezice mai bine.',
+    icon:'🐐', label:'G.O.A.T.',
+    bg:'#080810', c1:'#E2E8FF', c2:'#C0C0FF', c3:'#8080C0',
+    glow:'#C0C0FF', glow2:'#E2E8FF', rarity:'legendary', shine:true },
+
+  { id:'ach_streak', kind:'achievement', name:'Streak ×10', desc:'10 predicții corecte la rând.',
+    icon:'🔥', label:'STREAK\n×10',
+    bg:'#140400', c1:'#FF4500', c2:'#FFD700', c3:'#FF6B00',
+    glow:'#FF4500', glow2:'#FFD700', rarity:'epic', shine:true },
+
+  { id:'ach_elite', kind:'achievement', name:'Elite Predictor', desc:'Top 1% din toți jucătorii.',
+    icon:'⚡', label:'ELITE\nPREDICTOR',
+    bg:'#08081a', c1:'#9B59B6', c2:'#E056FD', c3:'#5b2b85',
+    glow:'#9B59B6', glow2:'#E056FD', rarity:'epic', shine:true },
+
+  { id:'ach_top3', kind:'achievement', name:'Top 3', desc:'Podium. Mereu.',
+    icon:'🥉', label:'TOP 3',
+    bg:'#0a0700', c1:'#CD7F32', c2:'#F4A460', c3:'#8B4513',
+    glow:'#CD7F32', glow2:'#F4A460', rarity:'epic', shine:false },
+
+  { id:'ach_top10', kind:'achievement', name:'Top 10', desc:'Printre cei mai buni.',
+    icon:'🎯', label:'TOP 10',
+    bg:'#040d1c', c1:'#60A5FA', c2:'#FFFFFF', c3:'#1a4a8a',
+    glow:'#60A5FA', glow2:'#FFFFFF', rarity:'rare', shine:false },
+
+  { id:'ach_legend', kind:'achievement', name:'Legend', desc:'Numele tău în istoria jocului.',
+    icon:'⭐', label:'LEGEND',
+    bg:'#080808', c1:'#FFD700', c2:'#FFFFFF', c3:'#888',
+    glow:'#FFD700', glow2:'#FFFFFF', rarity:'rare', shine:false },
+
+  { id:'ach_champion2', kind:'achievement', name:'Champion', desc:'Câștigătorul sezonului.',
+    icon:'🏅', label:'CHAMPION',
+    bg:'#0a0800', c1:'#FFD700', c2:'#FFF3A0', c3:'#B8860B',
+    glow:'#FFD700', glow2:'#FFA500', rarity:'rare', shine:false },
+
 ];
-
-// ─── MATCH STATUS ─────────────────────────────────────────────────────────────
-// To mark a match finished after admin enters the result, add its ID here.
-// In production: this object is replaced by a Supabase query.
-export const FINISHED_RESULTS = {
-  // Example (uncomment to test):
-  // 7: { realScoreA: 2, realScoreB: 1, realPossession: 58, realCorners: 9 },
-};
-
-export const LOCK_BEFORE_MS = 30 * 60 * 1000; // predictions lock 30 min before kickoff
-
-const _now = Date.now();
-
-export const MATCHES = ALL_MATCHES.map((m) => {
-  const kickoff    = new Date(m.time).getTime();
-  const isLocked   = _now >= kickoff - LOCK_BEFORE_MS;
-  const result     = FINISHED_RESULTS[m.id] ?? null;
-  const isFinished = result !== null;
-  return {
-    ...m,
-    isLocked,
-    isFinished,
-    realScoreA:     result?.realScoreA     ?? null,
-    realScoreB:     result?.realScoreB     ?? null,
-    realPossession: result?.realPossession ?? null,
-    realCorners:    result?.realCorners    ?? null,
-  };
-});
-
-export const GROUPS = ["A","C","H","I","J","K","L"];
-
-// ─── DEMO / MOCK DATA ─────────────────────────────────────────────────────────
-// Replace all of these with real Supabase queries in production.
-
-// Demo predictions shown after a finished match
-export const MOCK_PREDICTIONS_FINISHED = [
-  { nickname:"RaduGoalz",  scoreA:2, scoreB:0, possession:60, corners:7 },
-  { nickname:"AndreiFC",   scoreA:1, scoreB:1, possession:55, corners:9 },
-  { nickname:"MihaiUltra", scoreA:2, scoreB:1, possession:58, corners:8 },
-  { nickname:"AlexTactic", scoreA:0, scoreB:1, possession:45, corners:6 },
-];
-
-export const TAKEN_NICKNAMES = ["RaduGoalz","AndreiFC","MihaiUltra","AlexTactic","CostinPro"];
-
-// Community pick % per match (replace with Supabase `match_picks_summary` view)
-export const POPULAR_PICKS = {
-  7:  { homeWin:68, draw:18, awayWin:14 },
-  13: { homeWin:74, draw:16, awayWin:10 },
-  19: { homeWin:72, draw:15, awayWin:13 },
-  25: { homeWin:79, draw:12, awayWin:9  },
-  31: { homeWin:76, draw:14, awayWin:10 },
-  37: { homeWin:48, draw:28, awayWin:24 },
-};
-
-// Most predicted score per match (replace with Supabase aggregation)
-export const MOST_PREDICTED = {
-  7:  { scoreA:2, scoreB:0, pct:31 },
-  13: { scoreA:2, scoreB:1, pct:28 },
-  19: { scoreA:2, scoreB:0, pct:34 },
-  25: { scoreA:3, scoreB:1, pct:26 },
-  31: { scoreA:2, scoreB:0, pct:29 },
-  37: { scoreA:1, scoreB:1, pct:22 },
-};
-
-// Live score hook — swap with real API fetch in production
-// Fields: liveHomeScore, liveAwayScore, matchMinute, matchStatus
-export const LIVE_STUB = {
-  liveHomeScore: null,   // number | null — from livescore API
-  liveAwayScore: null,   // number | null
-  matchMinute:   null,   // number | null — 1-90+
-  matchStatus:   "scheduled", // "scheduled"|"live"|"ht"|"finished"
-};
-
-// Live feed events (replace with Supabase realtime channel in production)
-// Table: activity_feed(id, icon, text, type, pts, ago, group_id)
-export const LIVE_FEED_EVENTS = [
-  { icon:"🎯", text:"RaduGoalz a ghicit scorul exact",    pts:"+100", type:"exact",  ago:"2m"  },
-  { icon:"🚀", text:"AlexTactic a urcat pe locul #2",     pts:null,   type:"rank",   ago:"4m"  },
-  { icon:"💥", text:"MihaiUltra a ratat scorul exact",    pts:"+30",  type:"miss",   ago:"6m"  },
-  { icon:"🔥", text:"RaduGoalz — 3 corecte la rând",     pts:null,   type:"streak", ago:"8m"  },
-  { icon:"📊", text:"74% au prezis victorie Spania",      pts:null,   type:"stat",   ago:"11m" },
-  { icon:"⬆",  text:"AndreiFC a câștigat 45 de puncte",  pts:"+45",  type:"pts",    ago:"14m" },
-  { icon:"👀", text:"Numai 2 jucători au prezis egal",    pts:null,   type:"social", ago:"18m" },
-  { icon:"🏆", text:"RaduGoalz conduce cu 85 de puncte", pts:null,   type:"leader", ago:"22m" },
-];
-export const TYPE_COLOR = {
-  exact:"#FFD700", rank:"#00E5A0", miss:"#FF6B6B", streak:"#FF9800",
-  stat:"#4A9EFF",  pts:"#00E5A0",  social:"#7B5EA7", leader:"#FFD700",
-};
-
-// Leaderboard competition config
-export const QUALIFY_PCT   = 0.70; // top 70% qualify to next stage
-export const CURRENT_STAGE = "Faza grupelor";
-
-// Demo player form (replace with Supabase `player_form` view)
-const DEMO_FORM_OVERRIDE = {
-  "RaduGoalz":  { streak:4,  exactToday:1, rankDelta: 0 },
-  "AndreiFC":   { streak:0,  exactToday:0, rankDelta:-1 },
-  "MihaiUltra": { streak:2,  exactToday:0, rankDelta: 1 },
-  "AlexTactic": { streak:-2, exactToday:0, rankDelta: 0 },
-};
-
-// ─── SCORING ENGINE ───────────────────────────────────────────────────────────
-// Max per match = 200 pts (100+50+20+15+15)
-// Exact score STACKS with correct result + correct total goals.
-export function calcBreakdown(pred, match) {
-  if (!match.isFinished) return null;
-  const { realScoreA:rA, realScoreB:rB, realPossession:rP, realCorners:rC } = match;
-  const { scoreA:pA, scoreB:pB, possession:pPoss, corners:pC } = pred;
-  const realRes = rA > rB ? "1" : rA < rB ? "2" : "X";
-  const predRes = pA > pB ? "1" : pA < pB ? "2" : "X";
-
-  const exactScore = (pA === rA && pB === rB) ? 100 : 0;
-  const correctRes = (predRes === realRes) ? 50 : 0;
-  const totalGoals = (pA + pB === rA + rB) ? 20 : 0;
-  const pd = Math.abs(pPoss - rP);
-  const possession = pd === 0 ? 15 : pd <= 2 ? 10 : pd <= 5 ? 5 : 0;
-  const cd = Math.abs(pC - rC);
-  const corners = cd === 0 ? 15 : cd === 1 ? 10 : cd === 2 ? 5 : cd === 3 ? 2 : 0;
-
-  return {
-    exactScore, correctRes, totalGoals, possession, corners,
-    total: exactScore + correctRes + totalGoals + possession + corners,
-    isPerfect: exactScore === 100 && possession === 15 && corners === 15,
-  };
-}
-
-export function calcPoints(pred, match) {
-  const b = calcBreakdown(pred, match);
-  return b ? b.total : null;
-}
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
-export function formatTime(iso) {
-  const d = new Date(iso);
-  return d.toLocaleString("ro-RO", { weekday:"short", day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" });
+export const NICKNAME_SUGGESTIONS = [
+  'VARzaCuCarnati', 'AutobazaFC', 'RegeleRemizei', 'NicuOffside', 'GolInMin90',
+  'Sambalero', 'TikiTakaBoss', 'CornerDealer', 'XGPreotul', 'PenaltyGoblin',
+  'DodelMondial', 'CapitanHaos', 'CotaDeAur', 'HagiDeCanapea', 'MaradonaDeMall',
+  'MessiDinMoldova', 'CR7DinPloiesti', 'MbaGelu', 'OffsideOliver', 'GolazoGheorghe',
+];
+
+export function getAvatarById(id) {
+  return AVATARS.find(a => a.id === id) || AVATARS[0];
 }
 
-// Returns { state, label } for a match based on current time vs kickoff.
-// state: "open" | "soon" | "locked" | "live" | "finished"
-export function matchLockState(match) {
-  if (match.isFinished) return { state:"finished", label:"✓ Terminat" };
-  const kickoff  = new Date(match.time).getTime();
-  const msNow    = Date.now();
-  const msToLock = kickoff - LOCK_BEFORE_MS - msNow;
-
-  if (msNow >= kickoff)                  return { state:"live",   label:"🔴 Live" };
-  if (msNow >= kickoff - LOCK_BEFORE_MS) return { state:"locked", label:"🔒 Blocat" };
-  if (msToLock <= LOCK_BEFORE_MS) {
-    const h = Math.floor(msToLock / 3600000);
-    const m = Math.floor((msToLock % 3600000) / 60000);
-    return { state:"soon", label:`⚠ se blochează în ${h > 0 ? `${h}h ${m}m` : `${m}m`}` };
+export function getDefaultAvatarForNick(nickname) {
+  let hash = 0;
+  const text = String(nickname || 'Player');
+  for (let i = 0; i < text.length; i++) {
+    hash = ((hash << 5) - hash) + text.charCodeAt(i);
+    hash |= 0;
   }
-  const h = Math.floor(msToLock / 3600000);
-  const m = Math.floor((msToLock % 3600000) / 60000);
-  const cd = h > 48 ? `${Math.floor(h/24)}z` : h > 0 ? `${h}h ${m}m` : `${m}m`;
-  return { state:"open", label:`🔓 ${cd} rămas` };
-}
-
-// ─── LEADERBOARD ENGINE ───────────────────────────────────────────────────────
-// allPlayerPreds: { [nickname]: { [matchId]: prediction } }
-export function buildLeaderboard(allPlayerPreds, currentUser) {
-  const finishedMatches = MATCHES.filter(m => m.isFinished);
-  const nicknames = new Set([currentUser, ...Object.keys(allPlayerPreds)]);
-
-  const players = Array.from(nicknames).map(nick => {
-    const preds = allPlayerPreds[nick] || {};
-    let totalPoints = 0, exactScores = 0, lastMatchPts = null, lastMatchId = null;
-    finishedMatches.forEach(match => {
-      const pred = preds[match.id];
-      if (!pred) return;
-      const b = calcBreakdown(pred, match);
-      if (!b) return;
-      totalPoints += b.total;
-      if (b.exactScore > 0) exactScores++;
-      if (lastMatchId === null || match.id > lastMatchId) { lastMatchPts = b.total; lastMatchId = match.id; }
-    });
-    return { nickname:nick, points:totalPoints, exactScores, lastMatchPts };
-  });
-
-  players.sort((a, b) => b.points - a.points || a.nickname.localeCompare(b.nickname));
-  const cutoff = Math.max(1, Math.ceil(players.length * QUALIFY_PCT));
-  return players.map((p, i) => ({ ...p, rank:i+1, qualified:i < cutoff }));
-}
-
-// ─── IDENTITY ENGINE ──────────────────────────────────────────────────────────
-export function getBadge(exactScores, points) {
-  if (exactScores >= 3) return "🔮 Nostradamus";
-  if (exactScores >= 1) return "🎯 Ghicitor";
-  if (points > 100)     return "📺 Expert Canapea";
-  if (points > 0)       return "🍺 Patron de Bar";
-  return "🆕 Nou venit";
-}
-
-// Auto-generated prediction style label from behavior stats.
-// In production: feed real per-user stats from Supabase `player_stats` view.
-export function getPredictionStyle(exactScores, points, corners) {
-  if (exactScores >= 2)                 return { label:"Exact Score Hunter", color:"#FFD700", icon:"🎯" };
-  if (exactScores === 0 && points > 60) return { label:"Safe Player",        color:"#00E5A0", icon:"🛡" };
-  if (exactScores === 1 && points < 50) return { label:"Risk Taker",         color:"#FF6B6B", icon:"💣" };
-  if (corners > 0)                      return { label:"Corner King",        color:"#4A9EFF", icon:"📐" };
-  return                                       { label:"Late Clutcher",      color:"#7B5EA7", icon:"⚡" };
-}
-
-export function getAvatarRing(style) {
-  const map = {
-    "#FFD700":"linear-gradient(135deg,#FFD700,#FF9800)",
-    "#00E5A0":"linear-gradient(135deg,#00E5A0,#00C27A)",
-    "#FF6B6B":"linear-gradient(135deg,#FF6B6B,#FF4444)",
-    "#4A9EFF":"linear-gradient(135deg,#4A9EFF,#7B5EA7)",
-    "#7B5EA7":"linear-gradient(135deg,#7B5EA7,#4A9EFF)",
-  };
-  return map[style.color] || "linear-gradient(135deg,#4285F4,#34A853)";
-}
-
-// Rivalry pressure line shown in the "my position" card.
-// In production: replace with real-time data from Supabase leaderboard subscription.
-export function getRivalryMessage(myRank, myPts, sorted, currentUser) {
-  if (!sorted || sorted.length < 2) return null;
-  const above   = sorted.find(p => p.rank === myRank - 1 && p.nickname !== currentUser);
-  const chasers = sorted.filter(p => p.rank > myRank && p.nickname !== currentUser);
-  const rival   = sorted.find(p => p.nickname !== currentUser && p.rank <= 3);
-  if (above && (above.points - myPts) <= 20)  return { text:`${above.points - myPts} pts îl despart de ${above.nickname}`, urgency:"high" };
-  if (above && (above.points - myPts) <= 50)  return { text:`Un scor exact te poate urca peste ${above.nickname}`, urgency:"medium" };
-  if (chasers.length >= 2)                     return { text:`${chasers.length} jucători te urmăresc îndeaproape`, urgency:"medium" };
-  if (rival)                                   return { text:`${rival.nickname} a prezis rezultatul opus`, urgency:"low" };
-  return null;
-}
-
-// Dynamic form tag shown below player nickname in leaderboard.
-// In production: replace DEMO_FORM_OVERRIDE with Supabase `player_form` view query.
-export function getPlayerForm(nick, exactScores, mov) {
-  const demo       = DEMO_FORM_OVERRIDE[nick];
-  const streak     = demo ? demo.streak     : 0;
-  const exactToday = demo ? demo.exactToday : 0;
-  const rankDelta  = demo ? demo.rankDelta  : mov;
-  if (exactScores >= 3) return { icon:"🎯", text:`${exactScores} scoruri exacte`,  color:"#FFD700" };
-  if (streak >= 3)      return { icon:"🔥", text:`${streak} corecte la rând`,      color:"#FF9800" };
-  if (exactToday >= 1)  return { icon:"⚡", text:"Scor exact azi",                color:"#00E5A0" };
-  if (rankDelta >= 2)   return { icon:"⬆",  text:`+${rankDelta} locuri azi`,       color:"#00E5A0" };
-  if (streak <= -2)     return { icon:"🧊", text:"Formă slabă",                   color:"#4A9EFF" };
-  return null;
+  return AVATARS[Math.abs(hash) % AVATARS.length];
 }
