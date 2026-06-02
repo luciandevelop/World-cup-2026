@@ -23,7 +23,7 @@ import {
 } from './services/authService.js';
 import {
   savePrediction, loadUserPredictions,
-  loadAllPredictions, loadMatchResults,
+  loadAllPredictions, loadAllUsers, loadMatchResults,
   subscribeToMatchResults, subscribeToPredictions, subscribeToUsers,
   REALTIME_MODE,
 } from './services/firestoreService.js';
@@ -203,8 +203,9 @@ export default function App() {
     // Realtime: user profiles (for leaderboard nicknames/avatars)
     const unsubUsers   = subscribeToUsers(users => setAllUsers(users));
 
-    // Load initial all-users predictions
+    // Load initial all-users predictions and profiles
     loadAllPredictions().then(setAllPredictions);
+    loadAllUsers().then(setAllUsers);
 
     // Auth state
     const unsubAuth = onFirebaseAuthChange(async (fbUser) => {
@@ -266,7 +267,12 @@ export default function App() {
     const next = { ...predictions, [id]: pred };
     setPredictions(next);
     // Save to Firestore (or localStorage) — syncs to all users via realtime listener
-    if (user?.uid) await savePrediction(user.uid, id, pred);
+    if (user?.uid) {
+      await savePrediction(user.uid, id, pred);
+      const [allPredsSnapshot, allUsersSnapshot] = await Promise.all([loadAllPredictions(), loadAllUsers()]);
+      setAllPredictions(allPredsSnapshot);
+      setAllUsers(allUsersSnapshot);
+    }
     const m = liveMatches.find(m => m.id === Number(id));
     if (m?.isFinished) {
       const b = calcBreakdown(pred, m);
@@ -298,8 +304,7 @@ export default function App() {
         const fullUser = { ...googleData, ...profile };
         setUser(fullUser);
         persistSession(fullUser);
-        const raw = localStorage.getItem(`preds_${googleData.uid}`);
-        if (raw) try { setPredictions(JSON.parse(raw)); } catch {}
+        loadUserPredictions(googleData.uid).then(setPredictions);
         setStage('app');
       } else {
         setStage('pick-nick');
