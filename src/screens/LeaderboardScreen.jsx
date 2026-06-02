@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import {
   MATCHES, QUALIFY_PCT, CURRENT_STAGE, MOCK_PREDICTIONS_FINISHED,
-  buildLeaderboard, getBadge, getPredictionStyle, getAvatarRing,
+  buildLeaderboard, buildMatches, getBadge, getPredictionStyle, getAvatarRing,
   getRivalryMessage, getPlayerForm,
 } from '../data/gameData.js';
 import { FootballAvatar } from '../components/UI.jsx';
