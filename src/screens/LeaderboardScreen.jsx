@@ -7,7 +7,7 @@ import {
 } from '../data/gameData.js';
 import { FootballAvatar } from '../components/UI.jsx';
 
-export default function LeaderboardScreen({ currentUser, predictions, allPredictions, allUsers }) {
+export default function LeaderboardScreen({ currentUser, predictions, allPredictions, allUsers, finishedResults }) {
   // When allPredictions is available (Firestore or multi-tab localStorage), use real data.
   // Otherwise fall back to demo friends so the screen never looks empty.
   const hasMPData = allPredictions && Object.keys(allPredictions).length > 1;
@@ -29,12 +29,16 @@ export default function LeaderboardScreen({ currentUser, predictions, allPredict
     ...(allPredictions || {}),
     [currentUser]: myPreds,
   };
-  const sorted = buildLeaderboard(allPlayerPreds, currentUser);
+  // CRITICAL FIX: pass liveMatches so leaderboard uses same FT results as profile/header
+  const liveMatchesFT = liveMatches.filter(m => m.isFinished);
+  const sorted = buildLeaderboard(allPlayerPreds, currentUser, liveMatchesFT);
 
   const total         = sorted.length;
   const cutoff        = Math.max(1, Math.ceil(total * QUALIFY_PCT));
   const eliminated    = total - cutoff;
-  const finishedCount = MATCHES.filter(m => m.isFinished).length;
+  // Use buildMatches with live finishedResults so admin FT results are reflected
+  const liveMatches  = buildMatches(finishedResults || {});
+  const finishedCount = liveMatches.filter(m => m.isFinished).length;
 
   const my = sorted.find(p => p.nickname === currentUser)
     || { rank:"?", points:0, exactScores:0, lastMatchPts:null, qualified:true };

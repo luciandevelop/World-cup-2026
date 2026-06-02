@@ -8,7 +8,7 @@ import { useState, useMemo } from 'react';
 import { ScoreInput } from '../components/UI.jsx';
 import {
   MATCHES, ADMIN_EMAILS, ADMIN_EMAILS_RUNTIME,
-  formatKickoffRO, buildGroupStandings, buildQualifiedTeams, buildMatches,
+  formatKickoffRO, buildGroupStandings, buildQualifiedTeams, buildMatches, calcBreakdown,
 } from '../data/gameData.js';
 import { ALL_GROUPS } from '../data/matches.js';
 import { saveMatchResult, REALTIME_MODE } from '../services/firestoreService.js';
@@ -118,6 +118,7 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
   const [showLineupPanel, setShowLineupPanel] = useState(false);
   const [showHelp,         setShowHelp]          = useState(false);
   const [showOverridePanel,setShowOverridePanel] = useState(false);
+  const [showDebug,        setShowDebug]         = useState(false);
   const [groupOverrides,   setGroupOverrides]    = useState(() => loadGroupOverrides());
   const [lineupFormation, setLineupFormation] = useState('4-3-3');
   const [lineupHome, setLineupHome] = useState('');
@@ -513,6 +514,64 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
           )}
         </div>
       )}
+
+      {/* Scoring Debug Panel (admin only) */}
+      <div style={{ marginTop:10 }}>
+        <button onClick={() => setShowDebug(p => !p)} style={{ width:'100%', padding:'8px 12px', background:'rgba(6,182,212,0.06)', border:'1px solid rgba(6,182,212,0.18)', borderRadius:10, color:'rgba(6,182,212,0.7)', fontSize:11, fontWeight:700, cursor:'pointer', textAlign:'left' }}>
+          {showDebug ? '× Inchide' : '🔍 Debug predictii + punctaj'}
+        </button>
+        {showDebug && (() => {
+          const ftMatches = buildMatches(finishedResults || {}).filter(m => m.isFinished);
+          if (!ftMatches.length) return (
+            <div style={{ padding:'10px 12px', fontSize:11, color:'rgba(255,255,255,0.25)', fontStyle:'italic' }}>
+              Niciun meci cu status FT. Salveaza un meci cu status Final.
+            </div>
+          );
+          return (
+            <div style={{ marginTop:6, background:'rgba(6,182,212,0.03)', border:'1px solid rgba(6,182,212,0.12)', borderRadius:10, overflow:'hidden' }}>
+              {ftMatches.map(match => {
+                const stored = JSON.parse(localStorage.getItem('wc2026_all_preds') || '{}');
+                const allPreds = Object.entries(stored);
+                return (
+                  <div key={match.id} style={{ borderBottom:'1px solid rgba(255,255,255,0.05)', padding:'10px 12px' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'rgba(6,182,212,0.8)', marginBottom:6 }}>
+                      {match.flagA}{match.teamA} {match.realScoreA}–{match.realScoreB} {match.teamB}{match.flagB}
+                      <span style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginLeft:8 }}>
+                        Poseie: {match.realPossession ?? 'N/A'} · Cornere total: {match.realCorners ?? 'N/A'}
+                      </span>
+                    </div>
+                    {allPreds.length === 0 && (
+                      <div style={{ fontSize:10, color:'rgba(255,255,255,0.2)', fontStyle:'italic' }}>Nicio predictie salvata pentru acest meci.</div>
+                    )}
+                    {allPreds.map(([uid, preds]) => {
+                      const pred = preds[match.id];
+                      if (!pred) return null;
+                      const b = calcBreakdown(pred, match);
+                      if (!b) return null;
+                      return (
+                        <div key={uid} style={{ padding:'5px 8px', background:'rgba(255,255,255,0.02)', borderRadius:6, marginBottom:4 }}>
+                          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
+                            <span style={{ fontSize:11, color:'#fff' }}>{uid.slice(0,12)}…</span>
+                            <span style={{ fontSize:12, fontWeight:800, color:'#00E5A0', fontFamily:"'DM Mono',monospace" }}>{b.total} pct</span>
+                          </div>
+                          <div style={{ fontSize:9, color:'rgba(255,255,255,0.3)', display:'flex', gap:8, flexWrap:'wrap' }}>
+                            <span>Pred: {pred.scoreA}–{pred.scoreB}</span>
+                            {b.exactScore > 0  && <span style={{ color:'#00E5A0' }}>+{b.exactScore} exact</span>}
+                            {b.correctRes > 0  && <span style={{ color:'#4A9EFF' }}>+{b.correctRes} 1X2</span>}
+                            {b.totalGoals > 0  && <span style={{ color:'#FFD700' }}>+{b.totalGoals} totalGM</span>}
+                            {b.possession > 0  && <span style={{ color:'#9B59B6' }}>+{b.possession} pos(diff:{b._debug.possessionDiff})</span>}
+                            {b.corners > 0     && <span style={{ color:'#FF9800' }}>+{b.corners} corn(diff:{b._debug.cornerDiff})</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+      </div>
 
       {/* Recalculate / Reset panel */}
       <div style={{ display:'flex', gap:8, marginTop:10 }}>
