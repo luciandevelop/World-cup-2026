@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import CSS from './styles/globalCSS.js';
 import {
-  MATCHES, buildMatches, calcBreakdown, calcPoints, buildLeaderboard,
+  MATCHES, buildMatches, calcBreakdown, calcPoints, buildLeaderboard, calculateUserScore,
   ADMIN_EMAILS, ADMIN_EMAILS_RUNTIME, QUALIFY_PCT,
 } from './data/gameData.js';
 import { getAvatarById, getDefaultAvatarForNick, AVATARS } from './data/avatars.js';
@@ -238,10 +238,10 @@ export default function App() {
   // ── Computed state ────────────────────────────────────────────────────────
   const liveMatches = buildMatches(finishedResults);
 
-  const totalPts = Object.entries(predictions).reduce((sum, [id, p]) => {
-    const m = liveMatches.find(x => x.id === Number(id));
-    return sum + (m?.isFinished ? calcPoints(p, m) || 0 : 0);
-  }, 0);
+  // Single source of truth for current user's score
+  const myPredsByNumber = Object.fromEntries(Object.entries(predictions).map(([id,p])=>[Number(id),p]));
+  const myScore  = calculateUserScore(myPredsByNumber, finishedResults);
+  const totalPts = myScore.points;
 
   // ── Leaderboard from real multi-user data ────────────────────────────────
   // allPredictions: { uid: { matchId: pred } } — from all registered users
@@ -413,7 +413,7 @@ export default function App() {
           : tab==='matches'
           ? <MatchesScreen predictions={predictions} onPredict={setPredictingMatch} finishedResults={finishedResults} groupOverrides={groupOverrides}/>
           : tab==='leaderboard'
-          ? <LeaderboardScreen currentUser={user?.nickname} predictions={predictions} allPredictions={predsByNick} allUsers={allUsers}/>
+          ? <LeaderboardScreen currentUser={user?.nickname} predictions={predictions} allPredictions={predsByNick} allUsers={allUsers} finishedResults={finishedResults}/>
           : tab==='bracket'
           ? <BracketScreen/>
           : <HowToPlayScreen/>
