@@ -277,7 +277,22 @@ export function subscribeToUsers(callback) {
       callback(users);
     });
   }
+  try { callback(_loadLocalUsers()); } catch {}
   return () => {};
+}
+
+function _loadLocalUsers() {
+  const users = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key?.startsWith(LS_PROFILES)) {
+      try {
+        const p = JSON.parse(localStorage.getItem(key));
+        if (p?.uid) users[p.uid] = p;
+      } catch {}
+    }
+  }
+  return users;
 }
 
 // ─── LOCALHOST HELPERS ────────────────────────────────────────────────────────
