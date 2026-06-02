@@ -65,11 +65,11 @@ const RARITY_CFG = {
 
 const AV_CATS = [
   { id:'all',      label:'Toate' },
-  { id:'nations',  label:'Natiuni',   filter: a => a.id.startsWith('flag_') },
-  { id:'jerseys',  label:'Tricouri',  filter: a => a.id.startsWith('kit_') },
-  { id:'players',  label:'Jucatori',  filter: a => a.rarity==='epic' },
-  { id:'trophies', label:'Trofee',    filter: a => a.rarity==='legendary' || ['clean_sheet','var_hunter','penalty_k','assist_king','top_scorer'].includes(a.id) },
-  { id:'fantasy',  label:'Personaje', filter: a => a.rarity==='common' && !a.id.startsWith('flag_') && !a.id.startsWith('kit_') },
+  { id:'nations',  label:'Natiuni',   filter: a => a.kind === 'nation' },
+  { id:'jerseys',  label:'Tricouri',  filter: a => a.kind === 'jersey' },
+  { id:'players',  label:'Jucători',  filter: a => a.kind === 'jersey' && a.rarity === 'epic' },
+  { id:'trophies', label:'Trofee',    filter: a => a.kind === 'achievement' },
+  { id:'fantasy',  label:'Personaje', filter: a => a.kind === 'achievement' && (a.rarity === 'rare' || a.rarity === 'common') },
 ];
 
 // ─── AVATAR CHANGE MODAL ──────────────────────────────────────────────────────
