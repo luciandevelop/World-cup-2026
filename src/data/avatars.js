@@ -1,76 +1,71 @@
-// ─── src/data/avatars.js ──────────────────────────────────────────────────────
-// Football-style preset avatars. All strings use double quotes to avoid
-// apostrophe/Unicode parse errors. No special Unicode characters in JS strings.
-// ─────────────────────────────────────────────────────────────────────────────
+// Premium avatar pack for World Cup Arena.
+// No external images: every avatar is rendered with CSS in FootballAvatar.
 
 export const AVATARS = [
+  // NATIONS - premium badges
+  { id:'flag_bra', kind:'badge', emoji:'BR', name:'Samba Boss', desc:'Brazilia - galben, verde, tupeu', bg:'#061f12', accent:'#00E5A0', accent2:'#FFD700', ring:'linear-gradient(135deg,#00E5A0,#FFD700)', rarity:'legendary', shine:true },
+  { id:'flag_arg', kind:'badge', emoji:'AR', name:'Albiceleste Ice', desc:'Argentina - rece la penalty-uri', bg:'#061727', accent:'#69B7FF', accent2:'#FFFFFF', ring:'linear-gradient(135deg,#69B7FF,#FFFFFF)', rarity:'legendary', shine:true },
+  { id:'flag_fra', kind:'badge', emoji:'FR', name:'Les Bleus Boss', desc:'Franta - viteza si aroganta fina', bg:'#07142e', accent:'#3B82F6', accent2:'#EF4444', ring:'linear-gradient(135deg,#3B82F6,#EF4444)', rarity:'epic', shine:true },
+  { id:'flag_eng', kind:'badge', emoji:'EN', name:'It Is Coming Home', desc:'Anglia - promisiunea eterna', bg:'#211016', accent:'#FFFFFF', accent2:'#EF4444', ring:'linear-gradient(135deg,#FFFFFF,#EF4444)', rarity:'rare' },
+  { id:'flag_esp', kind:'badge', emoji:'ES', name:'Tiki Taka Don', desc:'Spania - pase pana ametesti', bg:'#26080a', accent:'#EF4444', accent2:'#FFD700', ring:'linear-gradient(135deg,#EF4444,#FFD700)', rarity:'epic' },
+  { id:'flag_ger', kind:'badge', emoji:'DE', name:'Excel Machine', desc:'Germania - eficienta fara emotii', bg:'#151515', accent:'#F8FAFC', accent2:'#FFD700', ring:'linear-gradient(135deg,#F8FAFC,#FFD700)', rarity:'rare' },
+  { id:'flag_por', kind:'badge', emoji:'PT', name:'Siuu Department', desc:'Portugalia - drama si goluri', bg:'#071f12', accent:'#22C55E', accent2:'#EF4444', ring:'linear-gradient(135deg,#22C55E,#EF4444)', rarity:'epic' },
+  { id:'flag_ned', kind:'badge', emoji:'NL', name:'Oranje Dealer', desc:'Olanda - fotbal total si nervi', bg:'#291305', accent:'#F97316', accent2:'#60A5FA', ring:'linear-gradient(135deg,#F97316,#60A5FA)', rarity:'rare' },
+  { id:'flag_ita', kind:'badge', emoji:'IT', name:'Catenaccio Chic', desc:'Italia - stil, aparare, espresso', bg:'#07142e', accent:'#22C55E', accent2:'#FFFFFF', ring:'linear-gradient(135deg,#22C55E,#FFFFFF)', rarity:'rare' },
+  { id:'flag_mex', kind:'badge', emoji:'MX', name:'El Tri Loco', desc:'Mexic - stadion plin, haos frumos', bg:'#062016', accent:'#10B981', accent2:'#EF4444', ring:'linear-gradient(135deg,#10B981,#EF4444)', rarity:'rare' },
+  { id:'flag_jpn', kind:'badge', emoji:'JP', name:'Samurai Calm', desc:'Japonia - disciplina si pressing', bg:'#1c0f16', accent:'#FFFFFF', accent2:'#EF4444', ring:'linear-gradient(135deg,#FFFFFF,#EF4444)', rarity:'rare' },
+  { id:'flag_mar', kind:'badge', emoji:'MA', name:'Atlas Lion', desc:'Maroc - underdog cu tupeu', bg:'#061f12', accent:'#EF4444', accent2:'#22C55E', ring:'linear-gradient(135deg,#EF4444,#22C55E)', rarity:'epic' },
+  { id:'flag_usa', kind:'badge', emoji:'US', name:'Hollywood Press', desc:'SUA - gazda cu marketing', bg:'#081529', accent:'#60A5FA', accent2:'#EF4444', ring:'linear-gradient(135deg,#60A5FA,#EF4444)', rarity:'rare' },
+  { id:'flag_can', kind:'badge', emoji:'CA', name:'Maple Runner', desc:'Canada - frig afara, ritm mare', bg:'#250c0c', accent:'#EF4444', accent2:'#FFFFFF', ring:'linear-gradient(135deg,#EF4444,#FFFFFF)', rarity:'rare' },
+  { id:'flag_cro', kind:'badge', emoji:'HR', name:'Chessboard Menace', desc:'Croatia - sah pe tricou, nervi de otel', bg:'#190b12', accent:'#EF4444', accent2:'#60A5FA', ring:'linear-gradient(135deg,#EF4444,#60A5FA)', rarity:'epic' },
 
-  // ══ A. NATIONAL FLAGS ══════════════════════════════════════════════════════
-  { id:"flag_bra", emoji:"🇧🇷", name:"Brazilia",      desc:"5 titluri mondiale", bg:"#0a2d0a", accent:"#00E5A0", ring:"linear-gradient(135deg,#00E5A0,#FFD700)", rarity:"common" },
-  { id:"flag_arg", emoji:"🇦🇷", name:"Argentina",     desc:"Campioana mondiala in exercitiu", bg:"#0a1a2d", accent:"#4A9EFF", ring:"linear-gradient(135deg,#4A9EFF,#fff)", rarity:"common" },
-  { id:"flag_fra", emoji:"🇫🇷", name:"Franta",        desc:"Les Bleus - forta pura", bg:"#0a0a2d", accent:"#4A9EFF", ring:"linear-gradient(135deg,#4A9EFF,#EF4444)", rarity:"common" },
-  { id:"flag_eng", emoji:"🏴󠁧󠁢󠁥󠁮󠁧󠁿", name:"Anglia",        desc:"It is coming home. Mereu.", bg:"#2d0a0a", accent:"#EF4444", ring:"linear-gradient(135deg,#EF4444,#fff)", rarity:"common" },
-  { id:"flag_esp", emoji:"🇪🇸", name:"Spania",        desc:"Tiki-taka si titluri", bg:"#2d0a0a", accent:"#FFD700", ring:"linear-gradient(135deg,#EF4444,#FFD700)", rarity:"common" },
-  { id:"flag_ger", emoji:"🇩🇪", name:"Germania",      desc:"Eficienta maxima, mereu", bg:"#1a1a1a", accent:"#FFD700", ring:"linear-gradient(135deg,#6B7280,#FFD700)", rarity:"common" },
-  { id:"flag_por", emoji:"🇵🇹", name:"Portugalia",    desc:"Talentul lui Cristiano", bg:"#0a2d0a", accent:"#EF4444", ring:"linear-gradient(135deg,#EF4444,#00E5A0)", rarity:"common" },
-  { id:"flag_ned", emoji:"🇳🇱", name:"Olanda",        desc:"Totaalvoetbal ADN", bg:"#2d1a0a", accent:"#FF9800", ring:"linear-gradient(135deg,#FF9800,#FFD700)", rarity:"common" },
-  { id:"flag_bel", emoji:"🇧🇪", name:"Belgia",        desc:"Generatie de aur", bg:"#2d0a0a", accent:"#FFD700", ring:"linear-gradient(135deg,#EF4444,#FFD700)", rarity:"common" },
-  { id:"flag_ita", emoji:"🇮🇹", name:"Italia",        desc:"Catenaccio si stil", bg:"#0a0a2d", accent:"#4A9EFF", ring:"linear-gradient(135deg,#4A9EFF,#00E5A0)", rarity:"common" },
-  { id:"flag_cro", emoji:"🇭🇷", name:"Croatia",       desc:"Finalisti CM 2018 si 2022", bg:"#2d0a0a", accent:"#EF4444", ring:"linear-gradient(135deg,#EF4444,#fff)", rarity:"common" },
-  { id:"flag_mor", emoji:"🇲🇦", name:"Maroc",         desc:"Revelatia CM 2022", bg:"#0a2d0a", accent:"#EF4444", ring:"linear-gradient(135deg,#EF4444,#00E5A0)", rarity:"common" },
-  { id:"flag_usa", emoji:"🇺🇸", name:"SUA",           desc:"Gazdele turneului 2026", bg:"#0a0a2d", accent:"#EF4444", ring:"linear-gradient(135deg,#EF4444,#4A9EFF)", rarity:"common" },
-  { id:"flag_mex", emoji:"🇲🇽", name:"Mexic",         desc:"Gazdele WC 2026, El Tri", bg:"#0a2d0a", accent:"#00E5A0", ring:"linear-gradient(135deg,#00E5A0,#EF4444)", rarity:"common" },
-  { id:"flag_jpn", emoji:"🇯🇵", name:"Japonia",       desc:"Samuraii Albastri", bg:"#2d0a0a", accent:"#EF4444", ring:"linear-gradient(135deg,#EF4444,#fff)", rarity:"common" },
-  { id:"flag_sen", emoji:"🇸🇳", name:"Senegal",       desc:"Leii Terangei", bg:"#0a2d0a", accent:"#FFD700", ring:"linear-gradient(135deg,#00E5A0,#FFD700)", rarity:"common" },
-  { id:"flag_uru", emoji:"🇺🇾", name:"Uruguay",       desc:"2 titluri mondiale", bg:"#0a1a2d", accent:"#4A9EFF", ring:"linear-gradient(135deg,#4A9EFF,#fff)", rarity:"common" },
-  { id:"flag_col", emoji:"🇨🇴", name:"Columbia",      desc:"Los Cafeteros", bg:"#2d1a0a", accent:"#FFD700", ring:"linear-gradient(135deg,#FFD700,#4A9EFF)", rarity:"common" },
-  { id:"flag_can", emoji:"🇨🇦", name:"Canada",        desc:"Gazdele din nord WC 2026", bg:"#2d0a0a", accent:"#EF4444", ring:"linear-gradient(135deg,#EF4444,#fff)", rarity:"common" },
-  { id:"flag_aus", emoji:"🇦🇺", name:"Australia",     desc:"Socceroos din Pacific", bg:"#0a0a2d", accent:"#FFD700", ring:"linear-gradient(135deg,#FFD700,#00E5A0)", rarity:"common" },
+  // KITS - no emoji shirts, CSS shirts
+  { id:'kit_bra_gold', kind:'kit', emoji:'10', name:'Samba No.10', desc:'Tricou galben premium', bg:'#08230f', accent:'#FFD700', accent2:'#00E5A0', ring:'linear-gradient(135deg,#FFD700,#00E5A0)', rarity:'legendary', shine:true },
+  { id:'kit_arg_10', kind:'kit', emoji:'10', name:'Ice Blue No.10', desc:'Dungi alb-albastre, calm de campion', bg:'#071827', accent:'#7DD3FC', accent2:'#FFFFFF', ring:'linear-gradient(135deg,#7DD3FC,#FFFFFF)', rarity:'legendary', shine:true },
+  { id:'kit_fra_7', kind:'kit', emoji:'7', name:'Turbo Blue No.7', desc:'Viteza pe banda stanga', bg:'#07142e', accent:'#2563EB', accent2:'#EF4444', ring:'linear-gradient(135deg,#2563EB,#EF4444)', rarity:'epic', shine:true },
+  { id:'kit_eng_9', kind:'kit', emoji:'9', name:'Box Striker No.9', desc:'Alb simplu, gol urat, 3 puncte', bg:'#16181f', accent:'#FFFFFF', accent2:'#EF4444', ring:'linear-gradient(135deg,#FFFFFF,#EF4444)', rarity:'rare' },
+  { id:'kit_esp_8', kind:'kit', emoji:'8', name:'Pass Merchant No.8', desc:'Pase pana se blocheaza GPS-ul', bg:'#25080a', accent:'#EF4444', accent2:'#FFD700', ring:'linear-gradient(135deg,#EF4444,#FFD700)', rarity:'epic' },
+  { id:'kit_ger_6', kind:'kit', emoji:'6', name:'Robot DM No.6', desc:'Intercepteaza si factura la curent', bg:'#151515', accent:'#F8FAFC', accent2:'#FFD700', ring:'linear-gradient(135deg,#F8FAFC,#FFD700)', rarity:'rare' },
+  { id:'kit_por_7', kind:'kit', emoji:'7', name:'Siuu No.7', desc:'Pentru cine sarbatoreste inainte de VAR', bg:'#092012', accent:'#EF4444', accent2:'#22C55E', ring:'linear-gradient(135deg,#EF4444,#22C55E)', rarity:'epic', shine:true },
+  { id:'kit_ned_14', kind:'kit', emoji:'14', name:'Total Orange No.14', desc:'Portocaliu aprins, tactica prea complicata', bg:'#291305', accent:'#F97316', accent2:'#FFFFFF', ring:'linear-gradient(135deg,#F97316,#FFFFFF)', rarity:'rare' },
+  { id:'kit_mex_11', kind:'kit', emoji:'11', name:'Azteca Wing No.11', desc:'Sprint, sombrero, centru periculos', bg:'#062016', accent:'#10B981', accent2:'#EF4444', ring:'linear-gradient(135deg,#10B981,#EF4444)', rarity:'rare' },
+  { id:'kit_dark_99', kind:'kit', emoji:'99', name:'Dark Horse No.99', desc:'Nimeni nu te ia in serios pana marchezi', bg:'#0b0f18', accent:'#111827', accent2:'#00E5A0', ring:'linear-gradient(135deg,#111827,#00E5A0)', rarity:'epic', shine:true },
 
-  // ══ B. NATIONAL JERSEYS ════════════════════════════════════════════════════
-  { id:"kit_bra",  emoji:"💛", name:"Brazil Home",    desc:"Galben-verde - cel mai iconic tricou", bg:"#1a2d0a", accent:"#FFD700", ring:"linear-gradient(135deg,#FFD700,#00E5A0)", rarity:"rare" },
-  { id:"kit_arg",  emoji:"💙", name:"Argentina Home", desc:"Albiceleste - Campioni Mondiali", bg:"#0a0a2d", accent:"#4A9EFF", ring:"linear-gradient(135deg,#4A9EFF,#fff)", rarity:"rare" },
-  { id:"kit_fra",  emoji:"🔷", name:"France Home",    desc:"Tricoul albastru Les Bleus", bg:"#0a0a2d", accent:"#4A9EFF", ring:"linear-gradient(135deg,#4A9EFF,#EF4444)", rarity:"rare" },
-  { id:"kit_eng",  emoji:"⬜", name:"England Home",   desc:"Cele Trei Lei - tricoul alb clasic", bg:"#1a1a1a", accent:"#EF4444", ring:"linear-gradient(135deg,#EF4444,#fff)", rarity:"rare" },
-  { id:"kit_esp",  emoji:"🔴", name:"Spain Home",     desc:"La Roja - campioni mondiali", bg:"#2d0a0a", accent:"#EF4444", ring:"linear-gradient(135deg,#EF4444,#FFD700)", rarity:"rare" },
-  { id:"kit_ger",  emoji:"⚪", name:"Germany Home",   desc:"Das Nationalteam - alb clasic", bg:"#1a1a1a", accent:"#6B7280", ring:"linear-gradient(135deg,#6B7280,#FFD700)", rarity:"rare" },
-  { id:"kit_por",  emoji:"🟥", name:"Portugal Home",  desc:"Rosu si verde - CR7 Forever", bg:"#2d0a0a", accent:"#EF4444", ring:"linear-gradient(135deg,#EF4444,#00E5A0)", rarity:"rare" },
-  { id:"kit_ned",  emoji:"🟠", name:"Netherlands Home", desc:"Portocaliu Total Football", bg:"#2d1a0a", accent:"#FF9800", ring:"linear-gradient(135deg,#FF9800,#FFD700)", rarity:"rare" },
-  { id:"kit_cro",  emoji:"🔲", name:"Croatia Home",   desc:"Tabla de sah - nemuritor", bg:"#2d0a0a", accent:"#EF4444", ring:"linear-gradient(135deg,#EF4444,#4A9EFF)", rarity:"rare" },
-  { id:"kit_ita",  emoji:"🔵", name:"Italy Home",     desc:"Azzurri - stil si tactica", bg:"#0a0a2d", accent:"#4A9EFF", ring:"linear-gradient(135deg,#4A9EFF,#00E5A0)", rarity:"rare" },
+  // PLAYERS - fictional/funny roles
+  { id:'player_goat', kind:'beast', emoji:'GO', name:'GOAT de Canapea', desc:'Nu alearga, dar stie scorul', bg:'#20160a', accent:'#FFD700', accent2:'#F97316', ring:'linear-gradient(135deg,#FFD700,#F97316)', rarity:'legendary', shine:true },
+  { id:'player_var', kind:'badge', emoji:'VAR', name:'VAR-ul din Sufragerie', desc:'Pune pauza si da verdict', bg:'#130f24', accent:'#A855F7', accent2:'#60A5FA', ring:'linear-gradient(135deg,#A855F7,#60A5FA)', rarity:'epic' },
+  { id:'player_capitan', kind:'crest', emoji:'C', name:'Capitanul Haosului', desc:'Calm in chat, panica in minutul 90', bg:'#101827', accent:'#00E5A0', accent2:'#FFD700', ring:'linear-gradient(135deg,#00E5A0,#FFD700)', rarity:'epic' },
+  { id:'player_penalty', kind:'crest', emoji:'PK', name:'Penalty Goblin', desc:'Simte bara inaintea portarului', bg:'#260b0b', accent:'#EF4444', accent2:'#FFD700', ring:'linear-gradient(135deg,#EF4444,#FFD700)', rarity:'epic' },
+  { id:'player_tactician', kind:'badge', emoji:'4-3', name:'Profesor 4-3-3', desc:'Schimba sistemul si cand doarme', bg:'#071f12', accent:'#22C55E', accent2:'#60A5FA', ring:'linear-gradient(135deg,#22C55E,#60A5FA)', rarity:'rare' },
+  { id:'player_parkbus', kind:'crest', emoji:'BUS', name:'Autobaza Deluxe', desc:'1-0 si ne vedem la clasament', bg:'#1b1620', accent:'#94A3B8', accent2:'#FFD700', ring:'linear-gradient(135deg,#94A3B8,#FFD700)', rarity:'rare' },
+  { id:'player_ultra', kind:'badge', emoji:'90', name:'Minutul 90+7', desc:'Castiga cand toti au inchis TV-ul', bg:'#240c13', accent:'#F43F5E', accent2:'#FFD700', ring:'linear-gradient(135deg,#F43F5E,#FFD700)', rarity:'epic' },
+  { id:'player_xg', kind:'badge', emoji:'xG', name:'xG Preotul', desc:'Pierde pariul, castiga graficul', bg:'#071827', accent:'#06B6D4', accent2:'#00E5A0', ring:'linear-gradient(135deg,#06B6D4,#00E5A0)', rarity:'rare' },
 
-  // ══ C. FAMOUS PLAYER JERSEYS ═══════════════════════════════════════════════
-  { id:"mbappe_10",  emoji:"👕", name:"MBAPPE #10",    desc:"France - PSG / Real Madrid - Viteza pura", bg:"#0a0a2d", accent:"#4A9EFF", ring:"linear-gradient(135deg,#4A9EFF,#EF4444)", rarity:"epic", shine:true },
-  { id:"vinicius_7", emoji:"👕", name:"VINICIUS #7",   desc:"Brazil - Real Madrid - Balon de Aur 2024", bg:"#0a2d0a", accent:"#FFD700", ring:"linear-gradient(135deg,#FFD700,#00E5A0)", rarity:"epic", shine:true },
-  { id:"neymar_10",  emoji:"👕", name:"NEYMAR #10",    desc:"Brazil - Santos / PSG - O Ney", bg:"#0a2d0a", accent:"#00E5A0", ring:"linear-gradient(135deg,#00E5A0,#FFD700)", rarity:"epic", shine:true },
-  { id:"messi_10",   emoji:"🐐", name:"MESSI #10",     desc:"Argentina - Inter Miami - The GOAT", bg:"#0a1a2d", accent:"#4A9EFF", ring:"linear-gradient(135deg,#4A9EFF,#FFD700)", rarity:"epic", shine:true },
-  { id:"yamal_19",   emoji:"👕", name:"YAMAL #19",     desc:"Spain - Barcelona - Generatia noua", bg:"#2d0a0a", accent:"#FFD700", ring:"linear-gradient(135deg,#EF4444,#FFD700)", rarity:"epic", shine:true },
-  { id:"haaland_9",  emoji:"👕", name:"HAALAND #9",    desc:"Norway - Man City - Masina de goluri", bg:"#0a0a2d", accent:"#4A9EFF", ring:"linear-gradient(135deg,#4A9EFF,#00E5A0)", rarity:"epic", shine:true },
-  { id:"bellingham_5",emoji:"👕", name:"BELLINGHAM #5", desc:"England - Real Madrid - Generatie noua", bg:"#2d0a0a", accent:"#FF9800", ring:"linear-gradient(135deg,#EF4444,#FF9800)", rarity:"epic", shine:true },
-  { id:"ronaldo_7",  emoji:"👕", name:"RONALDO #7",    desc:"Portugal - Al-Nassr - CR7 Forever", bg:"#0a2d0a", accent:"#EF4444", ring:"linear-gradient(135deg,#EF4444,#00E5A0)", rarity:"epic", shine:true },
-  { id:"rodri_16",   emoji:"👕", name:"RODRI #16",     desc:"Spain - Man City - Balon de Aur 2023", bg:"#2d0a0a", accent:"#4A9EFF", ring:"linear-gradient(135deg,#EF4444,#4A9EFF)", rarity:"epic", shine:true },
-  { id:"saka_7",     emoji:"👕", name:"SAKA #7",       desc:"England - Arsenal - Assist machine", bg:"#2d0a0a", accent:"#EF4444", ring:"linear-gradient(135deg,#EF4444,#FFD700)", rarity:"epic", shine:true },
-  { id:"kane_9",     emoji:"👕", name:"KANE #9",       desc:"England - Bayern - Record man", bg:"#2d0a0a", accent:"#fff", ring:"linear-gradient(135deg,#EF4444,#fff)", rarity:"epic", shine:true },
-  { id:"salah_11",   emoji:"👕", name:"SALAH #11",     desc:"Egypt - Liverpool - King of Anfield", bg:"#2d0a0a", accent:"#EF4444", ring:"linear-gradient(135deg,#EF4444,#FFD700)", rarity:"epic", shine:true },
+  // TROPHIES
+  { id:'trophy_wc', kind:'trophy', emoji:'WC', name:'Cupa Interzisa', desc:'O atingi doar daca ai 200p', bg:'#211805', accent:'#FFD700', accent2:'#FFFFFF', ring:'linear-gradient(135deg,#FFD700,#FFFFFF)', rarity:'legendary', shine:true },
+  { id:'trophy_boot', kind:'trophy', emoji:'GB', name:'Gheata de Aur', desc:'Pentru golgeterul predictiilor', bg:'#241404', accent:'#F97316', accent2:'#FFD700', ring:'linear-gradient(135deg,#F97316,#FFD700)', rarity:'legendary', shine:true },
+  { id:'trophy_brain', kind:'trophy', emoji:'IQ', name:'Creierul Grupei', desc:'Nu tipa, calculeaza', bg:'#130f24', accent:'#A855F7', accent2:'#FFD700', ring:'linear-gradient(135deg,#A855F7,#FFD700)', rarity:'legendary', shine:true },
+  { id:'trophy_clean', kind:'trophy', emoji:'0', name:'Clean Sheet Monk', desc:'Nu primeste gol nici in Excel', bg:'#071827', accent:'#60A5FA', accent2:'#FFFFFF', ring:'linear-gradient(135deg,#60A5FA,#FFFFFF)', rarity:'epic' },
+  { id:'trophy_late', kind:'trophy', emoji:'90', name:'Late Clutcher', desc:'Salveaza predictia in ultimul minut', bg:'#241404', accent:'#FFD700', accent2:'#EF4444', ring:'linear-gradient(135deg,#FFD700,#EF4444)', rarity:'epic' },
+  { id:'trophy_safe', kind:'trophy', emoji:'DEF', name:'Safe Player', desc:'Nu risca, dar prinde podiumul', bg:'#071f12', accent:'#00E5A0', accent2:'#FFFFFF', ring:'linear-gradient(135deg,#00E5A0,#FFFFFF)', rarity:'rare' },
 
-  // ══ D. TROPHY & FANTASY FOOTBALL ══════════════════════════════════════════
-  { id:"trophy_gold",  emoji:"🏆", name:"Campion Mondial",  desc:"Numai pentru cei mai buni",        bg:"#2d2000", accent:"#FFD700", ring:"linear-gradient(135deg,#FFD700,#FFA500)", rarity:"legendary", shine:true },
-  { id:"golden_ball",  emoji:"⚽", name:"Mingea de Aur",    desc:"Cel mai bun jucator al turneului", bg:"#2d1800", accent:"#FFD700", ring:"linear-gradient(135deg,#FFD700,#fff)",   rarity:"legendary", shine:true },
-  { id:"golden_boot",  emoji:"👟", name:"Gheata de Aur",    desc:"Golgeterul turneului",             bg:"#1a0d00", accent:"#FF9800", ring:"linear-gradient(135deg,#FF9800,#FFD700)", rarity:"legendary", shine:true },
-  { id:"wc_2026",      emoji:"🌎", name:"WC 2026 Exclusive", desc:"Editie limitata - primul sezon",  bg:"#0a1a2d", accent:"#00E5A0", ring:"linear-gradient(135deg,#00E5A0,#FFD700)", rarity:"legendary", shine:true },
-  { id:"captain",      emoji:"🅰",  name:"Capitanul",        desc:"Lider pe teren si in vestiar",    bg:"#1a0a2d", accent:"#9B59B6", ring:"linear-gradient(135deg,#9B59B6,#FFD700)", rarity:"legendary", shine:true },
-  { id:"mvp",          emoji:"🌟", name:"MVP",               desc:"Cel mai valoros jucator",          bg:"#2d2000", accent:"#FFD700", ring:"linear-gradient(135deg,#FFD700,#FF9800)", rarity:"legendary", shine:true },
-  { id:"clean_sheet",  emoji:"🧱", name:"Clean Sheet",       desc:"Portarul perfect - niciun gol",   bg:"#0a1a2d", accent:"#4A9EFF", ring:"linear-gradient(135deg,#4A9EFF,#00E5A0)", rarity:"rare" },
-  { id:"var_hunter",   emoji:"📺", name:"VAR Hunter",        desc:"Vede totul. Chiar tot.",           bg:"#2d0a2d", accent:"#9B59B6", ring:"linear-gradient(135deg,#9B59B6,#4A9EFF)", rarity:"rare" },
-  { id:"penalty_k",    emoji:"🥅", name:"Penalty Killer",    desc:"Penaltyul nu trece de el",        bg:"#0a2d0a", accent:"#00E5A0", ring:"linear-gradient(135deg,#00E5A0,#4A9EFF)", rarity:"rare" },
-  { id:"assist_king",  emoji:"🎯", name:"Assist King",       desc:"Pasa decisiva mereu",             bg:"#0a1a2d", accent:"#4A9EFF", ring:"linear-gradient(135deg,#4A9EFF,#FFD700)", rarity:"rare" },
-  { id:"top_scorer",   emoji:"🔝", name:"Top Scorer",        desc:"Golgeterul competitiei",          bg:"#2d1a00", accent:"#FF9800", ring:"linear-gradient(135deg,#FF9800,#EF4444)", rarity:"rare" },
-  { id:"tactician",    emoji:"📋", name:"Tacticianul",       desc:"4-3-3 sau moarte",                bg:"#0a1a0a", accent:"#84CC16", ring:"linear-gradient(135deg,#84CC16,#00E5A0)", rarity:"common" },
-  { id:"goat",         emoji:"🐐", name:"The GOAT",          desc:"Niciun comentariu necesar",       bg:"#1a1a2e", accent:"#FFD700", ring:"linear-gradient(135deg,#FFD700,#FFA500)", rarity:"common" },
-  { id:"wonderkid",    emoji:"🌟", name:"Wonderkid",         desc:"Talent de 100M euro",             bg:"#0a1a2d", accent:"#4A9EFF", ring:"linear-gradient(135deg,#4A9EFF,#7B5EA7)", rarity:"common" },
-  { id:"nostradamus",  emoji:"🔮", name:"Nostradamus",       desc:"A prezis totul. Mereu.",          bg:"#2d0a2d", accent:"#9B59B6", ring:"linear-gradient(135deg,#9B59B6,#FFD700)", rarity:"common" },
-  { id:"analyst",      emoji:"📊", name:"Analistul",         desc:"xG xA pressures per 90",         bg:"#0a0a2d", accent:"#06B6D4", ring:"linear-gradient(135deg,#06B6D4,#4A9EFF)", rarity:"common" },
-  { id:"lucky",        emoji:"🍀", name:"Norocosul",         desc:"Ghiceste mereu. Habar n-are cum", bg:"#0a2d0a", accent:"#84CC16", ring:"linear-gradient(135deg,#84CC16,#00E5A0)", rarity:"common" },
+  // FUNNY / BEASTS
+  { id:'fun_lion', kind:'beast', emoji:'L', name:'Leul de Studio', desc:'Rage doar dupa ce vede reluarea', bg:'#241404', accent:'#F97316', accent2:'#FFD700', ring:'linear-gradient(135deg,#F97316,#FFD700)', rarity:'rare' },
+  { id:'fun_shark', kind:'beast', emoji:'S', name:'Rechinul de Cote', desc:'Miroase egalul de la 3 kilometri', bg:'#071827', accent:'#38BDF8', accent2:'#FFFFFF', ring:'linear-gradient(135deg,#38BDF8,#FFFFFF)', rarity:'rare' },
+  { id:'fun_eagle', kind:'beast', emoji:'E', name:'Vulturul VAR', desc:'Vede ofsaidul din profil', bg:'#16181f', accent:'#FFFFFF', accent2:'#FFD700', ring:'linear-gradient(135deg,#FFFFFF,#FFD700)', rarity:'rare' },
+  { id:'fun_wolf', kind:'beast', emoji:'W', name:'Lupul Contraatac', desc:'Sta jos 89 minute, musca o data', bg:'#111827', accent:'#94A3B8', accent2:'#00E5A0', ring:'linear-gradient(135deg,#94A3B8,#00E5A0)', rarity:'common' },
+  { id:'fun_ninja', kind:'crest', emoji:'N', name:'Ninja de Corner', desc:'Fura 15 puncte pe statistica', bg:'#0b0f18', accent:'#111827', accent2:'#00E5A0', ring:'linear-gradient(135deg,#111827,#00E5A0)', rarity:'common' },
+  { id:'fun_samurai', kind:'crest', emoji:'JP', name:'Samurai de Scor', desc:'Taie 2-1 din prima', bg:'#1c0f16', accent:'#EF4444', accent2:'#FFFFFF', ring:'linear-gradient(135deg,#EF4444,#FFFFFF)', rarity:'common' },
+  { id:'fun_king', kind:'trophy', emoji:'K', name:'Regele Remizei', desc:'1-1 pana la moarte', bg:'#211805', accent:'#FFD700', accent2:'#A855F7', ring:'linear-gradient(135deg,#FFD700,#A855F7)', rarity:'rare' },
+  { id:'fun_lucky', kind:'crest', emoji:'7', name:'Norocel 7', desc:'Nu stie fotbal, dar urca', bg:'#071f12', accent:'#22C55E', accent2:'#FFD700', ring:'linear-gradient(135deg,#22C55E,#FFD700)', rarity:'common' },
+  { id:'fun_chaos', kind:'badge', emoji:'!!', name:'Agentul Haos', desc:'Pune 4-3 la Canada-Qatar', bg:'#260b0b', accent:'#EF4444', accent2:'#F97316', ring:'linear-gradient(135deg,#EF4444,#F97316)', rarity:'common' },
+  { id:'fun_oracle', kind:'badge', emoji:'?', name:'Oracolul Beat', desc:'Zice scorul si uita meciul', bg:'#130f24', accent:'#A855F7', accent2:'#60A5FA', ring:'linear-gradient(135deg,#A855F7,#60A5FA)', rarity:'common' },
+];
+
+export const NICKNAME_SUGGESTIONS = [
+  'VARzaCuCarnati', 'AutobazaFC', 'RegeleRemizei', 'NicuOffside', 'GolInMin90',
+  'Sambalero', 'TikiTakaBoss', 'CornerDealer', 'XGPreotul', 'PenaltyGoblin',
+  'DodelMondial', 'CapitanHaos', 'CotaDeAur', 'HagiDeCanapea', 'MaradonaDeMall'
 ];
 
 export function getAvatarById(id) {
@@ -79,8 +74,9 @@ export function getAvatarById(id) {
 
 export function getDefaultAvatarForNick(nickname) {
   let hash = 0;
-  for (let i = 0; i < nickname.length; i++) {
-    hash = ((hash << 5) - hash) + nickname.charCodeAt(i);
+  const text = String(nickname || 'Player');
+  for (let i = 0; i < text.length; i++) {
+    hash = ((hash << 5) - hash) + text.charCodeAt(i);
     hash |= 0;
   }
   return AVATARS[Math.abs(hash) % AVATARS.length];

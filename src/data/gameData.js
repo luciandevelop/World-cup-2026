@@ -322,7 +322,7 @@ export const MOCK_PREDICTIONS_FINISHED = [
   { nickname:"IonelFC",    scoreA:1, scoreB:0, possession:57, corners:7  },
 ];
 
-export const TAKEN_NICKNAMES = ["RaduGoalz","AndreiFC","MihaiUltra","AlexTactic","CostinPro","IonelFC"];
+export const TAKEN_NICKNAMES = [];
 
 export const POPULAR_PICKS = {
   13: { homeWin:68, draw:18, awayWin:14 },
@@ -343,16 +343,7 @@ export const MOST_PREDICTED = {
   67: { scoreA:1, scoreB:1, pct:22 },
 };
 
-export const LIVE_FEED_EVENTS = [
-  { icon:"🎯", text:"RaduGoalz a ghicit scorul exact",   pts:"+100", type:"exact",  ago:"2m"  },
-  { icon:"🚀", text:"AlexTactic a urcat pe locul #2",    pts:null,   type:"rank",   ago:"4m"  },
-  { icon:"💥", text:"MihaiUltra a ratat scorul exact",   pts:"+30",  type:"miss",   ago:"6m"  },
-  { icon:"🔥", text:"RaduGoalz — 3 corecte la rând",    pts:null,   type:"streak", ago:"8m"  },
-  { icon:"📊", text:"74% au prezis victorie Brazilia",   pts:null,   type:"stat",   ago:"11m" },
-  { icon:"⬆",  text:"AndreiFC a câștigat 45 de puncte", pts:"+45",  type:"pts",    ago:"14m" },
-  { icon:"👀", text:"Numai 2 jucători au prezis egal",   pts:null,   type:"social", ago:"18m" },
-  { icon:"🏆", text:"RaduGoalz conduce cu 85 puncte",   pts:null,   type:"leader", ago:"22m" },
-];
+export const LIVE_FEED_EVENTS = [];
 
 export const TYPE_COLOR = {
   exact:"#FFD700", rank:"#00E5A0", miss:"#FF6B6B", streak:"#FF9800",
