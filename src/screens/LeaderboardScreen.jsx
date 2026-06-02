@@ -23,22 +23,25 @@ export default function LeaderboardScreen({ currentUser, predictions, allPredict
     Object.entries(predictions).map(([id, p]) => [Number(id), p])
   );
 
+  // Safe guard — finishedResults may be undefined on first render
+  const safeFinishedResults = finishedResults || {};
+
+  // Build live matches FIRST — used by both sorted and finishedCount
+  const liveMatches   = buildMatches(safeFinishedResults);
+  const liveMatchesFT = liveMatches.filter(m => m.isFinished);
+  const finishedCount = liveMatchesFT.length;
+
   // Merge: real multi-user data + current user always present
   const allPlayerPreds = {
     ...demoFallback,
     ...(allPredictions || {}),
-    [currentUser]: myPreds,
+    ...(currentUser ? { [currentUser]: myPreds } : {}),
   };
-  // CRITICAL FIX: pass liveMatches so leaderboard uses same FT results as profile/header
-  const liveMatchesFT = liveMatches.filter(m => m.isFinished);
-  const sorted = buildLeaderboard(allPlayerPreds, currentUser, liveMatchesFT);
+  const sorted = buildLeaderboard(allPlayerPreds, currentUser || '', liveMatchesFT);
 
-  const total         = sorted.length;
-  const cutoff        = Math.max(1, Math.ceil(total * QUALIFY_PCT));
-  const eliminated    = total - cutoff;
-  // Use buildMatches with live finishedResults so admin FT results are reflected
-  const liveMatches  = buildMatches(finishedResults || {});
-  const finishedCount = liveMatches.filter(m => m.isFinished).length;
+  const total    = sorted.length;
+  const cutoff   = Math.max(1, Math.ceil(total * QUALIFY_PCT));
+  const eliminated = total - cutoff;
 
   const my = sorted.find(p => p.nickname === currentUser)
     || { rank:"?", points:0, exactScores:0, lastMatchPts:null, qualified:true };
