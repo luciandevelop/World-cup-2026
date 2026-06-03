@@ -129,3 +129,58 @@ export const getGroupLabel = (g) => {
   if (g === "I") return "GRUPA I — Grupa Mortii";
   return "GRUPA " + g;
 };
+
+// ─── TEST / AMICALE MATCHES ───────────────────────────────────────────────────
+// Separate group "TEST" — used to verify scoring, lock logic, Firestore sync,
+// and activity feed without touching the real World Cup data.
+// Times are set close to "now" for easy manual testing:
+//   T001 — already finished (verify scoring + standings)
+//   T002 — locked (30m before kickoff) (verify lock UI)
+//   T003 — open in ~2h   (verify countdown)
+//   T004 — open in ~24h  (verify open state)
+// These IDs use 9xx range so they never clash with real match IDs (1–72).
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Helper: ISO string offset from now (minutes)
+function _testTime(offsetMinutes) {
+  return new Date(Date.now() + offsetMinutes * 60 * 1000).toISOString();
+}
+
+export const TEST_MATCHES = [
+  {
+    id:     901,
+    group:  "TEST",
+    isTest: true,
+    teamA:  "Echipa Alpha",   flagA: "🔵",
+    teamB:  "Echipa Beta",    flagB: "🔴",
+    time:   _testTime(-120),  // finished 2h ago
+    venue:  "Test Arena",
+  },
+  {
+    id:     902,
+    group:  "TEST",
+    isTest: true,
+    teamA:  "Echipa Gamma",   flagA: "🟢",
+    teamB:  "Echipa Delta",   flagB: "🟡",
+    time:   _testTime(-10),   // kicked off 10m ago (locked + live)
+    venue:  "Test Arena",
+  },
+  {
+    id:     903,
+    group:  "TEST",
+    isTest: true,
+    teamA:  "Echipa Epsilon", flagA: "🟣",
+    teamB:  "Echipa Zeta",    flagB: "⚫",
+    time:   _testTime(60),    // in 1h (still open — within the 30m lock window check)
+    venue:  "Test Arena",
+  },
+  {
+    id:     904,
+    group:  "TEST",
+    isTest: true,
+    teamA:  "Echipa Eta",     flagA: "🟤",
+    teamB:  "Echipa Theta",   flagB: "⚪",
+    time:   _testTime(180),   // in 3h (open)
+    venue:  "Test Arena",
+  },
+];

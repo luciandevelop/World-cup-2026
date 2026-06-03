@@ -3,7 +3,7 @@
 // All pure JS — no React imports.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { ALL_MATCHES, ALL_GROUPS, getGroupLabel } from './matches.js';
+import { ALL_MATCHES, ALL_GROUPS, getGroupLabel, TEST_MATCHES } from './matches.js';
 export { getGroupLabel };
 
 // ─── MATCH STATUS OVERRIDES ───────────────────────────────────────────────────
@@ -20,9 +20,10 @@ export const ADMIN_EMAILS = [
 ];
 
 // ─── MATCHES (computed) ───────────────────────────────────────────────────────
-export function buildMatches(finishedResults = FINISHED_RESULTS) {
+export function buildMatches(finishedResults = FINISHED_RESULTS, { includeTests = false } = {}) {
   const now = Date.now();
-  return ALL_MATCHES.map((m) => {
+  const source = includeTests ? [...ALL_MATCHES, ...TEST_MATCHES] : ALL_MATCHES;
+  return source.map((m) => {
     const kickoff    = new Date(m.time).getTime();
     const isLocked   = now >= kickoff - LOCK_BEFORE_MS;
     const result     = finishedResults[m.id] ?? null;
@@ -55,6 +56,7 @@ export function buildMatches(finishedResults = FINISHED_RESULTS) {
 
 export const MATCHES = buildMatches();
 export const GROUPS  = ALL_GROUPS;
+export { TEST_MATCHES };
 
 // ─── TIME FORMATTING ──────────────────────────────────────────────────────────
 // Format ISO string to Romanian local time (Europe/Bucharest = EEST/EET)
@@ -344,6 +346,102 @@ export const MOST_PREDICTED = {
 };
 
 export const LIVE_FEED_EVENTS = [];
+
+// ─── AUTOMATED ACTIVITY FEED ─────────────────────────────────────────────────
+// Generates feed events from real match results + leaderboard snapshots.
+// Called after result processing. Returns array of event objects.
+// Components call this and render — no manual news entries needed.
+//
+// event shape: { id, type, icon, text, ts, uid?, nickname? }
+// types: 'exact'|'points'|'rank_up'|'rank_down'|'streak'|'lead'|'result'
+
+export function generateActivityFeed({
+  leaderboard    = [],   // current leaderboard array from buildLeaderboard()
+  prevLeaderboard = [],  // leaderboard before latest result (for rank delta)
+  finishedResults = {},  // { matchId: result }
+  allPredictions  = {},  // { uid: { matchId: pred } }
+  allUsers        = {},  // { uid: { nickname, avatarId } }
+  matches         = [],  // buildMatches() output
+} = {}) {
+  const events = [];
+  let seq = 0;
+  const ev = (type, icon, text, extras = {}) =>
+    events.push({ id: `feed_${Date.now()}_${seq++}`, type, icon, text, ts: Date.now(), ...extras });
+
+  // Map uid → nickname for quick lookup
+  const nickOf = (uid) => allUsers[uid]?.nickname || uid;
+
+  // --- Events from latest finished matches ---
+  const justFinished = Object.values(finishedResults).filter(r =>
+    r.liveStatus === 'ft' && r.homeScore !== null && r.awayScore !== null
+  );
+
+  justFinished.forEach(result => {
+    const match = matches.find(m => m.id === result.matchId);
+    if (!match) return;
+    const scoreStr = `${result.homeScore}–${result.awayScore}`;
+
+    // Who got exact score?
+    const exactScorers = [];
+    Object.entries(allPredictions).forEach(([uid, preds]) => {
+      const p = preds[result.matchId];
+      if (!p) return;
+      if (Number(p.scoreA) === Number(result.homeScore) &&
+          Number(p.scoreB) === Number(result.awayScore)) {
+        exactScorers.push(uid);
+      }
+    });
+
+    if (exactScorers.length === 1) {
+      ev('exact', '🎯', `${nickOf(exactScorers[0])} a prezis scorul exact: ${scoreStr}`, { uid: exactScorers[0] });
+    } else if (exactScorers.length > 1) {
+      const names = exactScorers.slice(0, 3).map(nickOf).join(', ');
+      ev('exact', '🎯', `${names}${exactScorers.length > 3 ? ` și alți ${exactScorers.length - 3}` : ''} au prezis scorul exact: ${scoreStr}`);
+    }
+
+    // Who got the most points on this match?
+    let topUid = null, topPts = 0;
+    Object.entries(allPredictions).forEach(([uid, preds]) => {
+      const p = preds[result.matchId];
+      if (!p) return;
+      const pts = calcPoints(p, match);
+      if (pts > topPts) { topPts = pts; topUid = uid; }
+    });
+    if (topUid && topPts > 0) {
+      ev('points', '🏅', `${nickOf(topUid)} a câștigat ${topPts} pts la ${match.teamA} vs ${match.teamB}`, { uid: topUid });
+    }
+  });
+
+  // --- Rank changes ---
+  leaderboard.forEach(entry => {
+    const prev = prevLeaderboard.find(p => p.nickname === entry.nickname);
+    if (!prev) return;
+    const delta = prev.rank - entry.rank; // positive = moved up
+    if (delta >= 3) {
+      ev('rank_up', '📈', `${entry.nickname} a urcat ${delta} locuri în clasament`, { nickname: entry.nickname });
+    } else if (delta <= -3) {
+      ev('rank_down', '📉', `${entry.nickname} a coborât ${Math.abs(delta)} locuri`, { nickname: entry.nickname });
+    }
+    // New leader
+    if (entry.rank === 1 && prev.rank > 1) {
+      ev('lead', '🏆', `${entry.nickname} a ajuns pe locul 1!`, { nickname: entry.nickname });
+    }
+  });
+
+  // --- Streaks (3+ exact scores — low threshold for early testing) ---
+  leaderboard.forEach(entry => {
+    if ((entry.exactScores || 0) >= 3) {
+      ev('streak', '🔥', `${entry.nickname} are ${entry.exactScores} scoruri exacte! 🔥`, { nickname: entry.nickname });
+    }
+  });
+
+  // Sort by ts desc, deduplicate by text, cap at 20
+  const seen = new Set();
+  return events
+    .filter(e => { if (seen.has(e.text)) return false; seen.add(e.text); return true; })
+    .sort((a, b) => b.ts - a.ts)
+    .slice(0, 20);
+}
 
 export const TYPE_COLOR = {
   exact:"#FFD700", rank:"#00E5A0", miss:"#FF6B6B", streak:"#FF9800",
