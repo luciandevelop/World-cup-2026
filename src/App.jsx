@@ -248,17 +248,14 @@ export default function App() {
         }
       }
 
-      // No Firebase user — try localStorage session (demo mode or stale session)
-      const session = getPersistedSession();
-      if (session?.uid && session?.nickname) {
-        setUser(session);
-        setGoogleUser(session);
-        const preds = await loadUserPredictions(session.uid);
-        setPredictions(preds);
-        setStage('app');
-      } else {
-        setStage('login');
-      }
+      // No Firebase user (signed out or Firebase not configured).
+      // Clear any stale localStorage cache and show the login screen.
+      // Never enter the app from a cached session — real auth is always required.
+      persistSession(null);
+      setUser(null);
+      setGoogleUser(null);
+      setPredictions({});
+      setStage('login');
     });
 
     return () => { unsubResults(); unsubPreds(); unsubUsers(); unsubAuth(); };
@@ -358,24 +355,15 @@ export default function App() {
     }
   }, []);
 
-  // handleLogin is called by LoginScreen after email OTP or Google popup.
-  // In Firebase mode, onFirebaseAuthChange will also fire and handle the state.
-  // We still process it here for demo mode (no Firebase) where onFirebaseAuthChange
-  // returns null and localStorage session is the only source of truth.
-  const handleLogin = (authData) => {
-    setGoogleUser(authData);
-    getUserProfile(authData.uid).then(profile => {
-      if (profile?.nickname) {
-        const fullUser = { ...authData, ...profile };
-        setUser(fullUser);
-        persistSession(fullUser);
-        loadUserPredictions(authData.uid).then(setPredictions);
-        setStage('app');
-      } else {
-        // New user — needs to pick nickname
-        setStage('pick-nick');
-      }
-    });
+  // handleLogin is called by LoginScreen after a successful Firebase sign-in.
+  // It does NOT set stage or user state — that is done exclusively by the
+  // onFirebaseAuthChange listener above, which is the single source of truth.
+  // This function exists only so LoginScreen has a callback to signal that
+  // the Firebase call completed without error (used for UI loading state reset).
+  // eslint-disable-next-line no-unused-vars
+  const handleLogin = (_authData) => {
+    // Intentionally empty: onFirebaseAuthChange handles all state transitions.
+    // Stage is set to 'app' or 'pick-nick' only from inside onFirebaseAuthChange.
   };
 
   const handleNickname = async (nick, avatarId) => {
