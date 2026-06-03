@@ -1,0 +1,5 @@
+WORLD CUP ARENA — HJWG CLEAN UPLOAD
+Generated for GitHub root upload.
+Important: upload the CONTENTS of this zip into repo Prediction, branch main.
+Expected after deploy if Vercel env vars are missing: Firebase config error, NOT Demo User.
+If Demo User still appears, Vercel is not deploying these root files.
