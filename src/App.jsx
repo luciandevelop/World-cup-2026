@@ -211,7 +211,15 @@ export default function App() {
     loadAllPredictions().then(setAllPredictions);
     loadAllUsers().then(setAllUsers);
 
-    // Auth state — handles both Firebase (Google + Email) and demo (localStorage)
+    // Guard: if Firebase env vars are missing, go straight to login.
+    // onFirebaseAuthChange will never call back in that case, leaving stage='init' forever.
+    if (!FIREBASE_CONFIGURED) {
+      setStage('login');
+      // Still clean up the data subscriptions on unmount.
+      return () => { unsubResults(); unsubPreds(); unsubUsers(); };
+    }
+
+    // Auth state — sole gate into the app. Only real Firebase tokens allowed.
     const unsubAuth = onFirebaseAuthChange(async (fbUser) => {
       if (fbUser) {
         // Firebase authenticated user (Google or Email OTP)
