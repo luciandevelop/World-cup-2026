@@ -1,6 +1,6 @@
 // ─── src/services/authService.js ──────────────────────────────────────────────
-// Auth service — routes to Firebase or demo mode based on FIREBASE_CONFIGURED.
-// All other files import from here, never from firebase.js directly.
+// Auth service — Firebase only. NO demo mode. NO fake users.
+// Every function throws or returns an error if Firebase is not configured.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
@@ -16,22 +16,17 @@ import {
   checkNicknameAvailable as fssCheckNick,
 } from './firestoreService.js';
 
-// Re-export for AuthScreens usage
 export { sendEmailCode, verifyEmailCode, onFirebaseAuthChange, FIREBASE_CONFIGURED };
 
 const SESSION_KEY = 'wc2026_session';
 
 // ─── GOOGLE SIGN-IN ───────────────────────────────────────────────────────────
+// Throws if Firebase is not configured — caller must handle the error.
 export async function signInWithGoogle() {
-  if (FIREBASE_CONFIGURED) return firebaseSignInWithGoogle();
-  // Demo fallback
-  return new Promise(resolve => setTimeout(() => resolve({
-    uid: 'demo_' + Math.random().toString(36).slice(2, 8),
-    email: 'demo@worldcup2026.app',
-    name: 'Demo User',
-    photoURL: null,
-    provider: 'google',
-  }), 900));
+  if (!FIREBASE_CONFIGURED) {
+    throw new Error('FIREBASE_NOT_CONFIGURED');
+  }
+  return firebaseSignInWithGoogle();
 }
 
 export async function signInWithApple() {
@@ -39,14 +34,21 @@ export async function signInWithApple() {
 }
 
 // ─── SIGN-OUT ─────────────────────────────────────────────────────────────────
+// Always calls Firebase signOut (throws if not configured, which is fine —
+// if Firebase isn't configured there's no session to clear).
+// Also clears the localStorage cache.
 export async function signOut() {
-  if (FIREBASE_CONFIGURED) await firebaseSignOut();
+  try {
+    await firebaseSignOut();
+  } catch {
+    // Ignore — if Firebase isn't configured there's nothing to sign out from.
+  }
   localStorage.removeItem(SESSION_KEY);
 }
 
-// ─── SESSION ─────────────────────────────────────────────────────────────────
-// localStorage session is the fallback / cache for non-Firebase mode.
-// In Firebase mode, onFirebaseAuthChange is the source of truth.
+// ─── SESSION CACHE ────────────────────────────────────────────────────────────
+// localStorage is ONLY used as a read-cache to avoid a flash on refresh.
+// It is NOT an authentication gate. The real gate is onFirebaseAuthChange.
 export function getPersistedSession() {
   try { return JSON.parse(localStorage.getItem(SESSION_KEY)); }
   catch { return null; }
@@ -74,6 +76,6 @@ export async function updateUserAvatar(uid, avatarId) {
 }
 
 // ─── NICKNAME CHECK ───────────────────────────────────────────────────────────
-export async function checkNicknameAvailable(nick, _takenList) {
+export async function checkNicknameAvailable(nick) {
   return fssCheckNick(nick);
 }

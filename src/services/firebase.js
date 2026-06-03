@@ -1,13 +1,7 @@
 // ─── src/services/firebase.js ─────────────────────────────────────────────────
 // Firebase initialisation — Auth + Firestore.
-// Gracefully no-ops when env vars are absent (localStorage demo mode).
-//
-// AUTH MODES
-//   FIREBASE_CONFIGURED = false → Demo (localStorage OTP, fake UID)
-//   FIREBASE_CONFIGURED = true  → Real Firebase Auth + Firestore
-//     Google  : signInWithPopup
-//     Email   : createUserWithEmailAndPassword / signInWithEmailAndPassword
-//               (standard Firebase Email/Password — no OTP, no stored passwords)
+// NO demo mode. NO fallbacks. NO fake users.
+// If env vars are missing the app shows a config error and stops.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { initializeApp, getApps } from 'firebase/app';
@@ -39,6 +33,8 @@ const firebaseConfig = {
   appId:             import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
+// True only when all required env vars are present.
+// Components read this to decide whether to show a config-error screen.
 export const FIREBASE_CONFIGURED = !!(
   firebaseConfig.apiKey &&
   firebaseConfig.authDomain &&
@@ -47,26 +43,31 @@ export const FIREBASE_CONFIGURED = !!(
 );
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
+// Throws at startup if config is present but invalid (malformed key, etc.).
+// If config is absent entirely, auth/db remain null and every function
+// below throws "Firebase not configured" — which surfaces as a UI error.
 let app  = null;
 let auth = null;
 let db   = null;
 
 if (FIREBASE_CONFIGURED) {
-  try {
-    app  = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db   = getFirestore(app);
-    setPersistence(auth, browserLocalPersistence).catch(console.error);
-  } catch (e) {
-    console.error('[Firebase] Init error:', e);
-  }
+  app  = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db   = getFirestore(app);
+  // Persist auth token in localStorage so the user stays logged in after refresh.
+  setPersistence(auth, browserLocalPersistence).catch(console.error);
 }
 
 export { auth, db };
 
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+function requireAuth() {
+  if (!auth) throw new Error('FIREBASE_NOT_CONFIGURED');
+}
+
 // ─── GOOGLE SIGN-IN ───────────────────────────────────────────────────────────
 export async function firebaseSignInWithGoogle() {
-  if (!auth) throw new Error('Firebase not configured');
+  requireAuth();
   const provider = new GoogleAuthProvider();
   provider.addScope('profile');
   provider.addScope('email');
@@ -81,36 +82,28 @@ export async function firebaseSignInWithGoogle() {
 }
 
 // ─── EMAIL / PASSWORD SIGN-IN ─────────────────────────────────────────────────
-// Checks whether the account exists first so we can call the right method.
-// Returns the same shape as firebaseSignInWithGoogle.
+// Tries signIn first; falls back to createUser on auth/user-not-found.
+// This avoids the deprecated fetchSignInMethodsForEmail.
 export async function firebaseSignInWithEmail(email, password) {
-  if (!auth) throw new Error('Firebase not configured');
-
+  requireAuth();
   const normalised = email.trim().toLowerCase();
   let firebaseUser;
   let isNewUser = false;
 
-  // Try sign-in first. If the account doesn't exist yet, create it.
-  // This avoids fetchSignInMethodsForEmail which is deprecated in Firebase 10+.
   try {
     const result = await signInWithEmailAndPassword(auth, normalised, password);
     firebaseUser  = result.user;
   } catch (signInErr) {
     if (
       signInErr.code === 'auth/user-not-found' ||
-      signInErr.code === 'auth/invalid-credential' ||
-      signInErr.code === 'auth/invalid-email' // first time, no account yet
+      signInErr.code === 'auth/invalid-credential'
     ) {
-      // Account does not exist — create it
-      try {
-        const result = await createUserWithEmailAndPassword(auth, normalised, password);
-        firebaseUser  = result.user;
-        isNewUser     = true;
-      } catch (createErr) {
-        throw createErr; // e.g. weak-password — let caller handle
-      }
+      // No account yet — create one with this password.
+      const result = await createUserWithEmailAndPassword(auth, normalised, password);
+      firebaseUser  = result.user;
+      isNewUser     = true;
     } else {
-      throw signInErr; // wrong password, too-many-requests, etc.
+      throw signInErr; // wrong password, too-many-requests, etc. — caller handles
     }
   }
 
@@ -126,12 +119,16 @@ export async function firebaseSignInWithEmail(email, password) {
 
 // ─── SIGN-OUT ─────────────────────────────────────────────────────────────────
 export async function firebaseSignOut() {
-  if (auth) await fbSignOut(auth);
+  requireAuth();
+  await fbSignOut(auth);
 }
 
 // ─── AUTH STATE LISTENER ──────────────────────────────────────────────────────
+// Calls callback(firebaseUser) whenever auth state changes.
+// If Firebase is not configured, callback is never called — the app stays
+// on the login screen showing a config-error message.
 export function onFirebaseAuthChange(callback) {
-  if (!auth) { callback(null); return () => {}; }
+  if (!auth) return () => {}; // no-op unsubscribe — login screen handles the error UI
   return onAuthStateChanged(auth, callback);
 }
 
