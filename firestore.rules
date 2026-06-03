@@ -1,0 +1,157 @@
+// ─── Firestore Security Rules — World Cup Arena 2026 ─────────────────────────
+//
+// DEPLOY:
+//   firebase deploy --only firestore:rules
+//   OR: Firebase Console → Firestore Database → Rules → Paste → Publish
+//
+// SECURITY MODEL:
+//   isSignedIn()  — caller has a valid Firebase Auth token
+//   isAdmin()     — caller's users/{uid}.isAdmin == true  (set manually in Console)
+//   callerIs(uid) — caller's UID matches the path variable
+//
+//   users/        owner-write (cannot self-elevate isAdmin), world-read (signed-in)
+//   predictions/  owner-write with field allowlist + immutable uid/matchId, world-read
+//   results/      admin-write only, world-read
+//   matchResults/ admin-write only, world-read  (legacy alias for results/)
+//   everything else: DENIED by Firestore default-deny
+//
+// TO MARK YOUR ACCOUNT AS ADMIN — see bottom of this file.
+// ─────────────────────────────────────────────────────────────────────────────
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Reads caller's Firestore profile to check isAdmin flag.
+    // Firestore caches this get() within the same rule evaluation — no extra
+    // billed read beyond the write operation that triggered the rule.
+    function isAdmin() {
+      return isSignedIn()
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    function callerIs(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ── users/{uid} ───────────────────────────────────────────────────────────
+    match /users/{uid} {
+
+      allow read: if isSignedIn();
+
+      // CREATE — owner only; isAdmin must be absent or false.
+      // Prevents self-granting admin on account creation.
+      allow create: if callerIs(uid)
+                    && (!('isAdmin' in request.resource.data)
+                        || request.resource.data.isAdmin == false);
+
+      // UPDATE — owner only; isAdmin is frozen (must equal its stored value).
+      // Prevents self-elevation after account creation.
+      allow update: if callerIs(uid)
+                    && (!('isAdmin' in request.resource.data)
+                        || request.resource.data.isAdmin == resource.data.isAdmin);
+
+      allow delete: if false;
+    }
+
+    // ── predictions/{docId} ───────────────────────────────────────────────────
+    // Document ID: {matchId}_{uid}  e.g.  13_abc123xyz
+    //
+    // Immutable after creation: uid, matchId
+    // Mutable by owner:         scoreA, scoreB, possession, corners, updatedAt
+    // Set only on create:       createdAt
+    // Blocked entirely:         any field not in the hasOnly list below
+    match /predictions/{docId} {
+
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+                    // uid in payload must match the authenticated caller
+                    && request.resource.data.uid == request.auth.uid
+                    // matchId must be stored as an integer (not string or null)
+                    && request.resource.data.matchId is int
+                    // document ID must be exactly "{matchId}_{uid}"
+                    && docId == string(request.resource.data.matchId) + '_' + request.auth.uid
+                    // no extra fields beyond the declared schema
+                    && request.resource.data.keys().hasOnly([
+                         'uid', 'matchId',
+                         'scoreA', 'scoreB', 'possession', 'corners',
+                         'createdAt', 'updatedAt'
+                       ]);
+
+      allow update: if isSignedIn()
+                    // existing document must be owned by the caller
+                    && resource.data.uid == request.auth.uid
+                    // uid field must not change
+                    && request.resource.data.uid == resource.data.uid
+                    // matchId field must not change
+                    && request.resource.data.matchId == resource.data.matchId
+                    // no extra fields beyond the declared schema
+                    && request.resource.data.keys().hasOnly([
+                         'uid', 'matchId',
+                         'scoreA', 'scoreB', 'possession', 'corners',
+                         'createdAt', 'updatedAt'
+                       ]);
+
+      allow delete: if false;
+    }
+
+    // ── results/{matchId} ─────────────────────────────────────────────────────
+    match /results/{matchId} {
+      allow read:   if isSignedIn();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── matchResults/{matchId} — legacy alias ─────────────────────────────────
+    match /matchResults/{matchId} {
+      allow read:   if isSignedIn();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Any collection not matched above is DENIED by Firestore's default-deny.
+    // This covers any path a client might attempt to write to, including
+    // /otpCodes, /emailPasswords, /admin_overrides, etc.
+
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HOW TO MARK YOUR ACCOUNT AS ADMIN (one-time, done in Firebase Console)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// 1. Firebase Console → Authentication → Users
+//    Copy the UID next to your email address.
+//
+// 2. Firebase Console → Firestore Database → Data
+//    Navigate to: users → <your UID>
+//
+// 3a. If the document already exists (you have logged in at least once):
+//     Click "+ Add field"
+//       Field name : isAdmin
+//       Type       : boolean
+//       Value      : true
+//
+// 3b. If the document does not exist yet:
+//     Click "+ Add document", set ID = your UID, add fields:
+//       uid     : string  = your UID
+//       email   : string  = your email
+//       isAdmin : boolean = true
+//
+// 4. Deploy these rules:
+//    firebase deploy --only firestore:rules
+//    (or paste into Firebase Console → Firestore → Rules → Publish)
+//
+// 5. Log out and back into the app.
+//    The app reads isAdmin into the session on login.
+//    Firestore checks it on every write to results/.
+// ─────────────────────────────────────────────────────────────────────────────
