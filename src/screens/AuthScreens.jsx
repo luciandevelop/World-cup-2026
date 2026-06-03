@@ -14,63 +14,74 @@ import {
 
 // ─── EMAIL LOGIN SCREEN ───────────────────────────────────────────────────────
 export function LoginScreen({ onLogin }) {
-  // step: 'email' | 'code' (demo OTP) | 'password' (Firebase email/password)
+  // step: 'email' | 'password'
+  // 'email'    — user enters their email address
+  // 'password' — user enters their password (email/password Firebase Auth)
   const [step,       setStep]     = useState('email');
   const [email,      setEmail]    = useState('');
-  const [code,       setCode]     = useState('');    // demo OTP input
-  const [password,   setPassword] = useState('');    // Firebase password input
-  const [demoCode,   setDemoCode] = useState('');    // shown only in demo mode
-  const [showPw,     setShowPw]   = useState(false); // password visibility toggle
+  const [password,   setPassword] = useState('');
+  const [showPw,     setShowPw]   = useState(false);
   const [loading,    setLoading]  = useState(false);
   const [socialLoad, setSocialLoad] = useState(null);
   const [error,      setError]    = useState('');
+
+  // Hard block: if Firebase is not configured, nothing works.
+  // Show an error and do not render any login form.
+  if (!FIREBASE_CONFIGURED) {
+    return (
+      <div style={{ minHeight:'100dvh', display:'flex', alignItems:'center', justifyContent:'center', background:'#080C0E', padding:'24px' }}>
+        <div style={{ maxWidth:340, textAlign:'center' }}>
+          <div style={{ fontSize:48, marginBottom:16 }}>⚠️</div>
+          <div style={{ fontSize:16, fontWeight:800, color:'#EF4444', marginBottom:8 }}>
+            Firebase nu este configurat
+          </div>
+          <div style={{ fontSize:13, color:'rgba(255,255,255,0.45)', lineHeight:1.7, marginBottom:20 }}>
+            Variabilele de mediu VITE_FIREBASE_* lipsesc.<br/>
+            Adaugă-le în <code style={{ color:'rgba(255,255,255,0.65)' }}>.env.local</code> sau în setările Vercel, apoi redeploy.
+          </div>
+          <div style={{ fontSize:11, color:'rgba(255,255,255,0.2)', fontFamily:"'DM Mono',monospace", padding:'10px 14px', background:'rgba(255,255,255,0.04)', borderRadius:8, textAlign:'left', lineHeight:2 }}>
+            VITE_FIREBASE_API_KEY=...<br/>
+            VITE_FIREBASE_AUTH_DOMAIN=...<br/>
+            VITE_FIREBASE_PROJECT_ID=...<br/>
+            VITE_FIREBASE_MESSAGING_SENDER_ID=...<br/>
+            VITE_FIREBASE_APP_ID=...
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleSendCode = async () => {
     if (!email.trim()) { setError('Introdu adresa de email.'); return; }
     setLoading(true); setError('');
     const res = await sendEmailCode(email.trim());
     setLoading(false);
-    if (!res.success) { setError(res.error || 'Eroare la trimitere.'); return; }
-    if (res.usePassword) {
-      // Firebase mode: go to password step instead of OTP step
-      setStep('password');
-    } else {
-      // Demo mode: show OTP code in UI
-      if (res.demoCode) setDemoCode(res.demoCode);
-      setStep('code');
-    }
-  };
-
-  const handleVerifyCode = async () => {
-    // Demo OTP path
-    if (code.trim().length < 6) { setError('Introdu codul din 6 cifre.'); return; }
-    setLoading(true); setError('');
-    const res = await verifyEmailCode(email.trim(), code.trim());
-    setLoading(false);
-    if (!res.success) { setError(res.error || 'Cod invalid.'); return; }
-    onLogin({ uid:res.uid, email:res.email, name:res.name, provider:'email' });
+    if (!res.success) { setError(res.error || 'Eroare.'); return; }
+    // Firebase mode always returns usePassword:true
+    setStep('password');
   };
 
   const handlePasswordLogin = async () => {
-    // Firebase email/password path
     if (password.length < 6) { setError('Parola trebuie să aibă cel puțin 6 caractere.'); return; }
     setLoading(true); setError('');
-    const res = await verifyEmailCode(email.trim(), password); // emailAuth routes to Firebase
+    const res = await verifyEmailCode(email.trim(), password);
     setLoading(false);
     if (!res.success) { setError(res.error || 'Eroare la autentificare.'); return; }
-    onLogin({ uid:res.uid, email:res.email, name:res.name, provider:'email' });
+    // onLogin is a no-op in App.jsx — onFirebaseAuthChange handles the state transition.
+    onLogin(res);
   };
 
   const handleGoogle = async () => {
     setSocialLoad('google'); setError('');
-    try { onLogin(await signInWithGoogle()); }
-    catch(e) { setError('Eroare Google. Încearcă email.'); setSocialLoad(null); }
-  };
-  const handleApple = async () => {
-    setSocialLoad('apple'); setError('');
-    try { await signInWithApple(); }
-    catch(e) {
-      setError(e.message === 'coming_soon' ? 'Apple Sign-In — în curând 🍎' : 'Eroare Apple.');
+    try {
+      const result = await signInWithGoogle();
+      // onLogin is a no-op — onFirebaseAuthChange handles the state transition.
+      onLogin(result);
+    } catch(e) {
+      const msg = e.message === 'FIREBASE_NOT_CONFIGURED'
+        ? 'Firebase nu este configurat.'
+        : 'Eroare Google. Încearcă email.';
+      setError(msg);
       setSocialLoad(null);
     }
   };
@@ -118,40 +129,6 @@ export function LoginScreen({ onLogin }) {
               <SocialBtn icon={<GoogleLogo size={17}/>} label="Google" loading={socialLoad==='google'} disabled={!!socialLoad} onClick={handleGoogle}/>
               <SocialBtn icon={<AppleLogo size={17}/>}  label="Apple"  loading={socialLoad==='apple'}  disabled={!!socialLoad} onClick={handleApple} muted/>
             </div>
-          </div>
-        )}
-
-        {step === 'code' && (
-          <div>
-            <button onClick={() => { setStep('email'); setCode(''); setError(''); setDemoCode(''); }} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.35)', fontSize:12, cursor:'pointer', padding:'0 0 12px', display:'flex', alignItems:'center', gap:5 }}>
-              ← Înapoi
-            </button>
-            <div style={{ marginBottom:18 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'#fff', marginBottom:4 }}>Verifică emailul</div>
-              <div style={{ fontSize:12, color:'rgba(255,255,255,0.35)', lineHeight:1.5 }}>
-                Am trimis un cod de 6 cifre la<br/>
-                <strong style={{ color:'rgba(255,255,255,0.65)' }}>{email}</strong>
-              </div>
-            </div>
-            {demoCode && (
-              <div style={{ marginBottom:14, padding:'10px 14px', background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.2)', borderRadius:10 }}>
-                <div style={{ fontSize:9, color:'rgba(245,158,11,0.6)', letterSpacing:'0.12em', textTransform:'uppercase', fontWeight:700, marginBottom:4 }}>📧 Demo mode — codul tău</div>
-                <div style={{ fontSize:28, fontWeight:900, color:'#F59E0B', fontFamily:"'DM Mono',monospace", letterSpacing:'0.2em' }}>{demoCode}</div>
-                <div style={{ fontSize:10, color:'rgba(245,158,11,0.4)', marginTop:3 }}>În producție, codul se trimite pe email real.</div>
-              </div>
-            )}
-            <input type="text" inputMode="numeric" maxLength={6}
-              value={code} onChange={e => { setCode(e.target.value.replace(/\D/g,'')); setError(''); }}
-              onKeyDown={e => e.key === 'Enter' && handleVerifyCode()}
-              placeholder="000000" autoFocus
-              style={{ width:'100%', padding:'16px', marginBottom:10, background:'rgba(255,255,255,0.06)', border:`1px solid ${error?'rgba(255,107,107,0.4)':'rgba(255,255,255,0.12)'}`, borderRadius:13, color:'#fff', fontSize:28, fontFamily:"'DM Mono',monospace", outline:'none', boxSizing:'border-box', textAlign:'center', letterSpacing:'0.3em' }}
-            />
-            <button onClick={handleVerifyCode} disabled={loading || code.length < 6} style={{ width:'100%', padding:'14px', background:(loading||code.length<6)?'rgba(255,255,255,0.06)':'linear-gradient(135deg,#00E5A0,#00C27A)', border:'none', borderRadius:13, color:(loading||code.length<6)?'rgba(255,255,255,0.25)':'#060C09', fontSize:15, fontWeight:800, cursor:(loading||code.length<6)?'default':'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, fontFamily:"'Bebas Neue',sans-serif", letterSpacing:'0.08em' }}>
-              {loading ? <><Spinner size={16} color="#060C09"/>Verifică...</> : 'INTRĂ CU COD →'}
-            </button>
-            <button onClick={() => { setCode(''); setDemoCode(''); handleSendCode(); }} style={{ width:'100%', marginTop:10, padding:'8px', background:'none', border:'none', color:'rgba(255,255,255,0.3)', fontSize:12, cursor:'pointer' }}>
-              Retrimite codul
-            </button>
           </div>
         )}
 
@@ -349,7 +326,7 @@ export function NicknameScreen({ googleUser, onComplete }) {
           <FootballAvatar avatarId={av.id} nickname={av.name} size={44}/>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>{googleUser?.name || googleUser?.email}</div>
-            <div style={{ fontSize:11, color:'rgba(255,255,255,0.3)' }}>{googleUser?.email || 'demo'}</div>
+            <div style={{ fontSize:11, color:'rgba(255,255,255,0.3)' }}>{googleUser?.email}</div>
           </div>
           <div style={{ fontSize:9, color:'#00E5A0', background:'rgba(0,229,160,0.1)', border:'1px solid rgba(0,229,160,0.2)', padding:'2px 8px', borderRadius:20, fontWeight:700, flexShrink:0 }}>
             ✓ {googleUser?.provider === 'google' ? 'Google' : googleUser?.provider === 'apple' ? 'Apple' : 'Email'}
