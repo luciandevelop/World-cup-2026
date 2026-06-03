@@ -2,11 +2,11 @@
 // Main application shell — v8 Firestore
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import CSS from './styles/globalCSS.js';
 import {
   MATCHES, buildMatches, calcBreakdown, calcPoints, buildLeaderboard, calculateUserScore,
-  ADMIN_EMAILS, ADMIN_EMAILS_RUNTIME, QUALIFY_PCT,
+  ADMIN_EMAILS, ADMIN_EMAILS_RUNTIME, QUALIFY_PCT, generateActivityFeed, matchLockState,
 } from './data/gameData.js';
 import { getAvatarById, getDefaultAvatarForNick, AVATARS } from './data/avatars.js';
 import { LoginScreen, NicknameScreen } from './screens/AuthScreens.jsx';
@@ -193,6 +193,10 @@ export default function App() {
   const [allPredictions,   setAllPredictions]   = useState({});
   const [groupOverrides,   setGroupOverrides]   = useState(() => loadGroupOverrides()); // { uid: { matchId: pred } } — all users
   const [allUsers,         setAllUsers]         = useState({}); // { uid: { nickname, avatarId, ... } }
+  const [activityFeed,     setActivityFeed]     = useState([]);
+  // prevLeaderboard: snapshot before last finishedResults change, for rank-delta events
+  const prevLeaderboardRef  = useRef([]);
+  const [prevLeaderboard,   setPrevLeaderboard]  = useState([]);
 
   // ── Restore session + set up realtime listeners ──────────────────────────
   useEffect(() => {
@@ -207,24 +211,48 @@ export default function App() {
     loadAllPredictions().then(setAllPredictions);
     loadAllUsers().then(setAllUsers);
 
-    // Auth state
+    // Auth state — handles both Firebase (Google + Email) and demo (localStorage)
     const unsubAuth = onFirebaseAuthChange(async (fbUser) => {
       if (fbUser) {
+        // Firebase authenticated user (Google or Email OTP)
         const profile = await getUserProfile(fbUser.uid);
         if (profile?.nickname) {
-          const fullUser = { uid:fbUser.uid, email:fbUser.email, name:fbUser.displayName, photoURL:fbUser.photoURL, provider:'google', ...profile };
+          // Known user with a nickname — go straight to app
+          const fullUser = {
+            uid:      fbUser.uid,
+            email:    fbUser.email,
+            name:     fbUser.displayName || profile.nickname,
+            photoURL: fbUser.photoURL    || null,
+            provider: fbUser.providerData?.[0]?.providerId === 'google.com' ? 'google' : 'email',
+            ...profile,
+          };
           setUser(fullUser);
+          setGoogleUser(fullUser);
           persistSession(fullUser);
           const preds = await loadUserPredictions(fbUser.uid);
           setPredictions(preds);
           setStage('app');
           return;
+        } else {
+          // Firebase user exists but has no nickname yet → pick nickname
+          const partialUser = {
+            uid:      fbUser.uid,
+            email:    fbUser.email,
+            name:     fbUser.displayName || fbUser.email.split('@')[0],
+            photoURL: fbUser.photoURL    || null,
+            provider: fbUser.providerData?.[0]?.providerId === 'google.com' ? 'google' : 'email',
+          };
+          setGoogleUser(partialUser);
+          setStage('pick-nick');
+          return;
         }
       }
-      // Fallback: localStorage session
+
+      // No Firebase user — try localStorage session (demo mode or stale session)
       const session = getPersistedSession();
       if (session?.uid && session?.nickname) {
         setUser(session);
+        setGoogleUser(session);
         const preds = await loadUserPredictions(session.uid);
         setPredictions(preds);
         setStage('app');
@@ -262,8 +290,27 @@ export default function App() {
   const myRank      = myEntry?.rank;
   const streak      = myEntry?.exactScores || 0;
 
+  // Regenerate activity feed whenever leaderboard or results change (useMemo for perf)
+  const activityFeedComputed = useMemo(() => generateActivityFeed({
+    leaderboard,
+    prevLeaderboard,
+    finishedResults,
+    allPredictions,
+    allUsers,
+    matches: liveMatches,
+  }), [leaderboard.length, prevLeaderboard, finishedResults, allPredictions, allUsers]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleSavePrediction = async (id, pred) => {
+    // BUG-4 fix: enforce lock on save — prevents stale clients from submitting
+    const targetMatch = liveMatches.find(m => m.id === Number(id));
+    if (targetMatch) {
+      const lockInfo = matchLockState(targetMatch);
+      if (lockInfo.state !== 'open') {
+        console.warn('[Lock] Prediction rejected for locked match:', id, lockInfo.state);
+        return;
+      }
+    }
     const next = { ...predictions, [id]: pred };
     setPredictions(next);
     // Save to Firestore (or localStorage) — syncs to all users via realtime listener
@@ -279,6 +326,20 @@ export default function App() {
       if (b?.isPerfect) setPerfectHit({ pts:b.total });
     }
   };
+
+  // BUG-3 fix: capture leaderboard snapshot BEFORE each results update
+  // so generateActivityFeed can compute rank deltas
+  useEffect(() => {
+    return () => {
+      // Save current leaderboard as "previous" when component re-renders with new finishedResults
+      prevLeaderboardRef.current = leaderboard;
+    };
+  });
+
+  useEffect(() => {
+    // When finishedResults change, save the pre-change leaderboard for delta computation
+    setPrevLeaderboard(prevLeaderboardRef.current);
+  }, [finishedResults]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleMatchUpdate = useCallback(async (update) => {
     if (update?._action === 'reset') {
@@ -297,16 +358,21 @@ export default function App() {
     }
   }, []);
 
-  const handleLogin = (googleData) => {
-    setGoogleUser(googleData);
-    getUserProfile(googleData.uid).then(profile => {
+  // handleLogin is called by LoginScreen after email OTP or Google popup.
+  // In Firebase mode, onFirebaseAuthChange will also fire and handle the state.
+  // We still process it here for demo mode (no Firebase) where onFirebaseAuthChange
+  // returns null and localStorage session is the only source of truth.
+  const handleLogin = (authData) => {
+    setGoogleUser(authData);
+    getUserProfile(authData.uid).then(profile => {
       if (profile?.nickname) {
-        const fullUser = { ...googleData, ...profile };
+        const fullUser = { ...authData, ...profile };
         setUser(fullUser);
         persistSession(fullUser);
-        loadUserPredictions(googleData.uid).then(setPredictions);
+        loadUserPredictions(authData.uid).then(setPredictions);
         setStage('app');
       } else {
+        // New user — needs to pick nickname
         setStage('pick-nick');
       }
     });
@@ -416,7 +482,7 @@ export default function App() {
         {adminMode
           ? <AdminScreen currentUser={user} finishedResults={finishedResults} onMatchUpdate={handleMatchUpdate}/>
           : tab==='matches'
-          ? <MatchesScreen predictions={predictions} onPredict={setPredictingMatch} finishedResults={finishedResults} groupOverrides={groupOverrides}/>
+          ? <MatchesScreen predictions={predictions} onPredict={setPredictingMatch} finishedResults={finishedResults} groupOverrides={groupOverrides} allPredictions={allPredictions} allUsers={allUsers} activityFeed={activityFeedComputed}/>
           : tab==='leaderboard'
           ? <LeaderboardScreen currentUser={user?.nickname} predictions={predictions} allPredictions={predsByNick} allUsers={allUsers} finishedResults={finishedResults}/>
           : tab==='bracket'
