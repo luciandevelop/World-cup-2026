@@ -1,3 +1,168 @@
+// ─── FRIEND PREDICTIONS PANEL ────────────────────────────────────────────────
+// Shows after match locks. Before lock, predictions are hidden.
+function FriendPredictionsPanel({ matches, allPredictions, allUsers, myPredictions }) {
+  if (!matches.length) return null;
+
+  const userList = Object.entries(allUsers).map(([uid, u]) => ({
+    uid, nickname: u.nickname, avatarId: u.avatarId,
+  })).filter(u => u.nickname);
+
+  if (userList.length === 0) {
+    return (
+      <div style={{ padding:"16px 4px", textAlign:"center", color:"rgba(255,255,255,0.2)", fontSize:12 }}>
+        Niciun prieten înregistrat încă.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding:"4px 0 16px" }}>
+      <div style={{ fontSize:10, color:"rgba(255,255,255,0.25)", letterSpacing:"0.14em", textTransform:"uppercase", fontWeight:700, marginBottom:10, padding:"0 4px" }}>
+        Predicțiile prietenilor — meciuri blocate
+      </div>
+      {matches.slice(0,10).map(match => {
+        const lockInfo = matchLockState(match);
+        const isVisible = lockInfo.state !== "open";
+        if (!isVisible) return null;
+
+        return (
+          <div key={match.id} style={{ marginBottom:10, background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:12, overflow:"hidden" }}>
+            <div style={{ padding:"8px 12px 6px", borderBottom:"1px solid rgba(255,255,255,0.05)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <span style={{ fontSize:12, fontWeight:700, color:"rgba(255,255,255,0.7)" }}>
+                {match.flagA} {match.teamA} vs {match.teamB} {match.flagB}
+              </span>
+              <span style={{ fontSize:10, color:"rgba(255,255,255,0.3)" }}>{formatKickoffRO(match.time)}</span>
+            </div>
+            <div style={{ padding:"6px 8px 4px" }}>
+              {userList.map(u => {
+                const pred = (allPredictions[u.uid] || {})[match.id];
+                if (!pred) return null;
+                const isMe = myPredictions[match.id] &&
+                  Number(myPredictions[match.id].scoreA) === Number(pred.scoreA) &&
+                  Number(myPredictions[match.id].scoreB) === Number(pred.scoreB);
+                return (
+                  <div key={u.uid} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"5px 6px", borderRadius:8, background: isMe ? "rgba(0,229,160,0.06)" : "transparent" }}>
+                    <span style={{ fontSize:12, color:"rgba(255,255,255,0.6)", fontWeight:600 }}>
+                      {isMe ? "⭐ " : ""}{u.nickname}
+                    </span>
+                    <span style={{ fontSize:14, fontWeight:800, color:"#fff", fontFamily:"'DM Mono',monospace" }}>
+                      {pred.scoreA} – {pred.scoreB}
+                    </span>
+                  </div>
+                );
+              }).filter(Boolean)}
+              {userList.every(u => !(allPredictions[u.uid] || {})[match.id]) && (
+                <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", padding:"4px 6px" }}>Nicio predicție pentru acest meci.</div>
+              )}
+            </div>
+          </div>
+        );
+      }).filter(Boolean)}
+    </div>
+  );
+}
+
+// ─── TEST MATCHES PANEL ───────────────────────────────────────────────────────
+// Renders the 4 test matches for verifying all game mechanics.
+function TestMatchesPanel({ testMatches, predictions, onPredict, finishedResults, allPredictions, allUsers }) {
+  return (
+    <div style={{ padding:"4px 0 16px" }}>
+      <div style={{ padding:"10px 4px 8px", display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+        <span style={{ fontSize:18 }}>🧪</span>
+        <div>
+          <div style={{ fontSize:13, fontWeight:700, color:"rgba(255,255,255,0.8)" }}>Meciuri de Test</div>
+          <div style={{ fontSize:11, color:"rgba(255,255,255,0.3)" }}>
+            Verifică: scoring · lock · Firestore sync · feed activitate
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginBottom:12, padding:"8px 12px", background:"rgba(245,158,11,0.07)", border:"1px solid rgba(245,158,11,0.15)", borderRadius:10 }}>
+        <div style={{ fontSize:10, color:"rgba(245,158,11,0.7)", lineHeight:1.6 }}>
+          ℹ️ <strong>T901</strong>: finalizat (pune rezultat din Admin) ·
+          <strong> T902</strong>: blocat (live) ·
+          <strong> T903</strong>: deschis ~1h ·
+          <strong> T904</strong>: deschis ~3h
+        </div>
+      </div>
+
+      {testMatches.map(match => {
+        const lockInfo = matchLockState(match);
+        const pred     = predictions[match.id];
+        const result   = finishedResults[match.id];
+
+        return (
+          <div key={match.id} style={{ marginBottom:10, background:"rgba(255,255,255,0.03)", border:`1px solid ${lockInfo.state === "open" ? "rgba(0,229,160,0.15)" : lockInfo.state === "live" ? "rgba(239,68,68,0.2)" : "rgba(255,255,255,0.07)"}`, borderRadius:12, overflow:"hidden" }}>
+            <div style={{ padding:"10px 12px", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
+                <span style={{ fontSize:12, fontWeight:700, color:"rgba(255,255,255,0.7)" }}>
+                  {match.flagA} {match.teamA} vs {match.teamB} {match.flagB}
+                </span>
+                <span style={{ fontSize:10, padding:"2px 8px", borderRadius:20,
+                  background: lockInfo.state==="open" ? "rgba(0,229,160,0.1)" : lockInfo.state==="live" ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.05)",
+                  color: lockInfo.state==="open" ? "#00E5A0" : lockInfo.state==="live" ? "#EF4444" : "rgba(255,255,255,0.4)",
+                  fontWeight:700,
+                }}>
+                  {lockInfo.label}
+                </span>
+              </div>
+              <div style={{ fontSize:10, color:"rgba(255,255,255,0.3)" }}>{formatKickoffRO(match.time)} · ID: {match.id}</div>
+            </div>
+
+            <div style={{ padding:"8px 12px" }}>
+              {/* Prediction state */}
+              {pred ? (
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                  <span style={{ fontSize:11, color:"rgba(255,255,255,0.4)" }}>Predicția ta:</span>
+                  <span style={{ fontSize:16, fontWeight:800, color:"#fff", fontFamily:"'DM Mono',monospace" }}>
+                    {pred.scoreA} – {pred.scoreB}
+                  </span>
+                </div>
+              ) : (
+                lockInfo.state === "open" ? (
+                  <button onClick={() => onPredict(match)} style={{ width:"100%", padding:"8px", background:"rgba(0,229,160,0.1)", border:"1px solid rgba(0,229,160,0.2)", borderRadius:8, color:"#00E5A0", fontSize:12, fontWeight:700, cursor:"pointer" }}>
+                    + Adaugă predicție
+                  </button>
+                ) : (
+                  <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)" }}>Fără predicție · blocat</div>
+                )
+              )}
+
+              {/* Result (if admin entered) */}
+              {result && result.homeScore !== null && (
+                <div style={{ marginTop:6, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"6px 10px", background:"rgba(255,255,255,0.04)", borderRadius:8 }}>
+                  <span style={{ fontSize:11, color:"rgba(255,255,255,0.4)" }}>Rezultat oficial:</span>
+                  <span style={{ fontSize:16, fontWeight:900, color:"#FFD700", fontFamily:"'DM Mono',monospace" }}>
+                    {result.homeScore} – {result.awayScore}
+                  </span>
+                </div>
+              )}
+
+              {/* Friend predictions (visible after lock) */}
+              {lockInfo.state !== "open" && Object.keys(allPredictions).length > 0 && (
+                <div style={{ marginTop:6, borderTop:"1px solid rgba(255,255,255,0.05)", paddingTop:6 }}>
+                  <div style={{ fontSize:10, color:"rgba(255,255,255,0.2)", marginBottom:4 }}>Predicții prieteni:</div>
+                  {Object.entries(allPredictions).map(([uid, preds]) => {
+                    const p = preds[match.id];
+                    if (!p) return null;
+                    const nick = allUsers[uid]?.nickname || uid;
+                    return (
+                      <div key={uid} style={{ display:"flex", justifyContent:"space-between", padding:"2px 0", fontSize:11 }}>
+                        <span style={{ color:"rgba(255,255,255,0.45)" }}>{nick}</span>
+                        <span style={{ color:"#fff", fontFamily:"'DM Mono',monospace", fontWeight:700 }}>{p.scoreA}–{p.scoreB}</span>
+                      </div>
+                    );
+                  }).filter(Boolean)}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── src/screens/MatchesScreen.jsx ───────────────────────────────────────────
 // Full FIFA WC 2026 group stage — all 12 groups, all 72 matches.
 // Tabs: "Toate" | "Predicțiile Mele" | "Predicțiile Prietenilor"
@@ -5,9 +170,10 @@
 
 import { useState, useMemo } from 'react';
 import {
-  MATCHES, GROUPS,
+  MATCHES, GROUPS, TEST_MATCHES,
   POPULAR_PICKS, MOST_PREDICTED, LIVE_FEED_EVENTS, TYPE_COLOR,
   calcBreakdown, calcPoints, matchLockState, formatKickoffRO, getGroupLabel,
+  buildMatches,
 } from '../data/gameData.js';
 import { ALL_GROUPS } from '../data/matches.js';
 import { StatusPill, SectionDivider } from '../components/UI.jsx';
@@ -262,27 +428,36 @@ function GroupHeader({ group, teams, collapsed, onToggle, matchCount, predCount 
 }
 
 // ─── LIVE FEED ────────────────────────────────────────────────────────────────
-function LiveFeed() {
-  if (!LIVE_FEED_EVENTS || LIVE_FEED_EVENTS.length === 0) return null;
+function LiveFeed({ events = [] }) {
+  const feed = events.length ? events : LIVE_FEED_EVENTS;
+  if (!feed || feed.length === 0) return null;
   return (
     <div style={{ marginBottom:16 }}>
       <div style={{ fontSize:10, color:"rgba(255,255,255,0.25)", letterSpacing:"0.12em", textTransform:"uppercase", fontWeight:600, marginBottom:10, paddingLeft:2 }}>
         Activitate recentă
       </div>
       <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-        {LIVE_FEED_EVENTS.slice(0,4).map((e, i) => (
-          <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 12px", background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.04)", borderRadius:10, animation:`staggerIn 0.3s ${i*0.06}s ease both` }}>
+        {feed.slice(0,5).map((e, i) => (
+          <div key={e.id || i} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 12px", background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.04)", borderRadius:10, animation:`staggerIn 0.3s ${i*0.06}s ease both` }}>
             <span style={{ fontSize:16 }}>{e.icon}</span>
             <span style={{ fontSize:12, color:"rgba(255,255,255,0.5)", flex:1 }}>{e.text}</span>
             <div style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0 }}>
               {e.pts && <span style={{ fontSize:11, fontWeight:700, color:TYPE_COLOR[e.type] || "#fff", fontFamily:"'DM Mono',monospace" }}>{e.pts}</span>}
-              <span style={{ fontSize:10, color:"rgba(255,255,255,0.2)" }}>{e.ago}</span>
+              {e.ts && <span style={{ fontSize:10, color:"rgba(255,255,255,0.2)" }}>{_relTime(e.ts)}</span>}
             </div>
           </div>
         ))}
       </div>
     </div>
   );
+}
+
+function _relTime(ts) {
+  const diff = Date.now() - ts;
+  if (diff < 60000) return "acum";
+  if (diff < 3600000) return `${Math.floor(diff/60000)}m`;
+  if (diff < 86400000) return `${Math.floor(diff/3600000)}h`;
+  return `${Math.floor(diff/86400000)}z`;
 }
 
 // ─── MATCHES SCREEN ───────────────────────────────────────────────────────────
@@ -577,7 +752,7 @@ function MatchDetailModal({ match, prediction, onClose, onPredict }) {
   );
 }
 
-export default function MatchesScreen({ predictions, onPredict, finishedResults, groupOverrides }) {
+export default function MatchesScreen({ predictions, onPredict, finishedResults, groupOverrides, allPredictions = {}, allUsers = {}, activityFeed = [] }) {
   const [tab, setTab]              = useState("toate"); // "toate" | "mele" | "prieteni"
   const [detailMatch, setDetailMatch] = useState(null);
 
@@ -598,28 +773,44 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
     });
   };
 
-  // Build per-group match lists
-  const groupedMatches = useMemo(() => {
+  // Build per-group match lists — uses finishedResults so isFinished/isLive/isLocked are live
+  const liveGroupedMatches = useMemo(() => {
+    const live = buildMatches(finishedResults);
     return ALL_GROUPS.reduce((acc, g) => {
-      acc[g] = MATCHES.filter(m => m.group === g);
+      acc[g] = live.filter(m => m.group === g);
       return acc;
     }, {});
-  }, []);
+  }, [finishedResults]);
 
-  const myPredMatches = MATCHES.filter(m => predictions[m.id]);
-  const friendMatches = MATCHES.filter(m => m.isFinished || m.isLive);
+  // Alias used by all rendering logic below
+  const groupedMatches = liveGroupedMatches;
+
+  // All live matches (flat array, for friendMatches/myPred filtering)
+  const allLiveMatches = useMemo(() => buildMatches(finishedResults), [finishedResults]);
+
+  // BUG-2 fix: friendMatches includes locked matches (spec: visible after 30-min lock)
+  const myPredMatches = allLiveMatches.filter(m => predictions[m.id]);
+  const friendMatches = allLiveMatches.filter(m => m.isFinished || m.isLive || m.isLocked);
 
   const tabs = [
     { id:"toate",    label:"Toate",       count: MATCHES.length },
     { id:"mele",     label:"Ale mele",    count: myPredMatches.length },
     { id:"prieteni", label:"Prieteni",    count: friendMatches.length },
+    { id:"test",     label:"🧪 Test",     count: TEST_MATCHES.length },
   ];
+
+  // Test matches enriched with live result data (same as buildMatches but for test IDs)
+  const testMatchesLive = useMemo(() =>
+    buildMatches(finishedResults, { includeTests: true })
+      .filter(m => m.isTest),
+    [finishedResults]
+  );
 
   const renderGroupSection = (g) => {
     const matches = tab === "mele"
       ? groupedMatches[g].filter(m => predictions[m.id])
       : tab === "prieteni"
-      ? groupedMatches[g].filter(m => m.isFinished || m.isLive)
+      ? groupedMatches[g].filter(m => m.isFinished || m.isLive || m.isLocked)
       : groupedMatches[g];
 
     if (matches.length === 0) return null;
@@ -708,7 +899,7 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
       <div style={{ padding:"12px 12px 0" }}>
 
         {/* Live feed */}
-        {tab === "toate" && <LiveFeed/>}
+        {tab === "toate" && <LiveFeed events={activityFeed || []}/>}
 
         {/* Empty states */}
         {tab === "mele" && myPredMatches.length === 0 && (
@@ -751,8 +942,28 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
         {/* Group sections */}
         {(tab === "toate" || tab === "mele") && visibleGroups.map(g => renderGroupSection(g))}
 
-        {/* Friends tab */}
+        {/* Friends tab — shows predictions of all users for locked/finished matches */}
         {tab === "prieteni" && visibleGroups.map(g => renderGroupSection(g))}
+        {tab === "prieteni" && friendMatches.length > 0 && (
+          <FriendPredictionsPanel
+            matches={friendMatches}
+            allPredictions={allPredictions}
+            allUsers={allUsers}
+            myPredictions={predictions}
+          />
+        )}
+
+        {/* Test matches tab */}
+        {tab === "test" && (
+          <TestMatchesPanel
+            testMatches={testMatchesLive}
+            predictions={predictions}
+            onPredict={onPredict}
+            finishedResults={finishedResults}
+            allPredictions={allPredictions}
+            allUsers={allUsers}
+          />
+        )}
 
       </div>
     </div>

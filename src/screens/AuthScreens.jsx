@@ -9,14 +9,18 @@ import { AVATARS, getDefaultAvatarForNick, NICKNAME_SUGGESTIONS } from '../data/
 import {
   signInWithGoogle, signInWithApple,
   checkNicknameAvailable, sendEmailCode, verifyEmailCode,
+  FIREBASE_CONFIGURED,
 } from '../services/authService.js';
 
 // ─── EMAIL LOGIN SCREEN ───────────────────────────────────────────────────────
 export function LoginScreen({ onLogin }) {
+  // step: 'email' | 'code' (demo OTP) | 'password' (Firebase email/password)
   const [step,       setStep]     = useState('email');
   const [email,      setEmail]    = useState('');
-  const [code,       setCode]     = useState('');
-  const [demoCode,   setDemoCode] = useState('');
+  const [code,       setCode]     = useState('');    // demo OTP input
+  const [password,   setPassword] = useState('');    // Firebase password input
+  const [demoCode,   setDemoCode] = useState('');    // shown only in demo mode
+  const [showPw,     setShowPw]   = useState(false); // password visibility toggle
   const [loading,    setLoading]  = useState(false);
   const [socialLoad, setSocialLoad] = useState(null);
   const [error,      setError]    = useState('');
@@ -27,16 +31,33 @@ export function LoginScreen({ onLogin }) {
     const res = await sendEmailCode(email.trim());
     setLoading(false);
     if (!res.success) { setError(res.error || 'Eroare la trimitere.'); return; }
-    if (res.demoCode) setDemoCode(res.demoCode);
-    setStep('code');
+    if (res.usePassword) {
+      // Firebase mode: go to password step instead of OTP step
+      setStep('password');
+    } else {
+      // Demo mode: show OTP code in UI
+      if (res.demoCode) setDemoCode(res.demoCode);
+      setStep('code');
+    }
   };
 
   const handleVerifyCode = async () => {
+    // Demo OTP path
     if (code.trim().length < 6) { setError('Introdu codul din 6 cifre.'); return; }
     setLoading(true); setError('');
     const res = await verifyEmailCode(email.trim(), code.trim());
     setLoading(false);
     if (!res.success) { setError(res.error || 'Cod invalid.'); return; }
+    onLogin({ uid:res.uid, email:res.email, name:res.name, provider:'email' });
+  };
+
+  const handlePasswordLogin = async () => {
+    // Firebase email/password path
+    if (password.length < 6) { setError('Parola trebuie să aibă cel puțin 6 caractere.'); return; }
+    setLoading(true); setError('');
+    const res = await verifyEmailCode(email.trim(), password); // emailAuth routes to Firebase
+    setLoading(false);
+    if (!res.success) { setError(res.error || 'Eroare la autentificare.'); return; }
     onLogin({ uid:res.uid, email:res.email, name:res.name, provider:'email' });
   };
 
@@ -130,6 +151,43 @@ export function LoginScreen({ onLogin }) {
             </button>
             <button onClick={() => { setCode(''); setDemoCode(''); handleSendCode(); }} style={{ width:'100%', marginTop:10, padding:'8px', background:'none', border:'none', color:'rgba(255,255,255,0.3)', fontSize:12, cursor:'pointer' }}>
               Retrimite codul
+            </button>
+          </div>
+        )}
+
+        {/* ── Firebase email/password step ─────────────────────────────── */}
+        {step === 'password' && (
+          <div>
+            <button onClick={() => { setStep('email'); setPassword(''); setError(''); }} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.35)', fontSize:12, cursor:'pointer', padding:'0 0 12px', display:'flex', alignItems:'center', gap:5 }}>
+              ← Înapoi
+            </button>
+            <div style={{ marginBottom:18 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'#fff', marginBottom:4 }}>Parolă</div>
+              <div style={{ fontSize:12, color:'rgba(255,255,255,0.35)', lineHeight:1.5 }}>
+                Cont pentru<br/>
+                <strong style={{ color:'rgba(255,255,255,0.65)' }}>{email}</strong>
+              </div>
+              <div style={{ fontSize:11, color:'rgba(0,229,160,0.5)', marginTop:6, lineHeight:1.5 }}>
+                Dacă nu ai cont, introduci o parolă nouă și contul se creează automat.
+              </div>
+            </div>
+            <div style={{ position:'relative', marginBottom:10 }}>
+              <input
+                type={showPw ? 'text' : 'password'}
+                value={password}
+                onChange={e => { setPassword(e.target.value); setError(''); }}
+                onKeyDown={e => e.key === 'Enter' && handlePasswordLogin()}
+                placeholder="Minim 6 caractere"
+                autoFocus
+                style={{ width:'100%', padding:'14px 44px 14px 16px', background:'rgba(255,255,255,0.06)', border:`1px solid ${error?'rgba(255,107,107,0.4)':'rgba(255,255,255,0.12)'}`, borderRadius:13, color:'#fff', fontSize:16, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+              />
+              <button
+                onClick={() => setShowPw(p => !p)}
+                style={{ position:'absolute', right:13, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', color:'rgba(255,255,255,0.3)', cursor:'pointer', fontSize:16, padding:2 }}
+              >{showPw ? '🙈' : '👁️'}</button>
+            </div>
+            <button onClick={handlePasswordLogin} disabled={loading || password.length < 6} style={{ width:'100%', padding:'14px', background:(loading||password.length<6)?'rgba(255,255,255,0.06)':'linear-gradient(135deg,#00E5A0,#00C27A)', border:'none', borderRadius:13, color:(loading||password.length<6)?'rgba(255,255,255,0.25)':'#060C09', fontSize:15, fontWeight:800, cursor:(loading||password.length<6)?'default':'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, fontFamily:"'Bebas Neue',sans-serif", letterSpacing:'0.08em' }}>
+              {loading ? <><Spinner size={16} color="#060C09"/>Se autentifică...</> : 'INTRĂ ÎN JOC →'}
             </button>
           </div>
         )}
