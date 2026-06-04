@@ -198,31 +198,47 @@ export default function App() {
   const prevLeaderboardRef  = useRef([]);
   const [prevLeaderboard,   setPrevLeaderboard]  = useState([]);
 
-  // ── Restore session + set up realtime listeners ──────────────────────────
+  // ── Auth listener — sole gate into the app ───────────────────────────────
+  // Firestore subscriptions are opened ONLY after Firebase confirms a valid user.
+  // Opening them before auth causes "Missing or insufficient permissions" errors
+  // because Firestore rules require request.auth != null.
   useEffect(() => {
-    // Realtime: match results (Firestore or localStorage poll)
-    const unsubResults = subscribeToMatchResults(results => setFinishedResults(results));
-    // Realtime: all users' predictions
-    const unsubPreds   = subscribeToPredictions(preds => setAllPredictions(preds));
-    // Realtime: user profiles (for leaderboard nicknames/avatars)
-    const unsubUsers   = subscribeToUsers(users => setAllUsers(users));
-
-    // Load initial all-users predictions and profiles
-    loadAllPredictions().then(setAllPredictions);
-    loadAllUsers().then(setAllUsers);
-
-    // Guard: if Firebase env vars are missing, go straight to login.
-    // onFirebaseAuthChange will never call back in that case, leaving stage='init' forever.
+    // Guard: if Firebase env vars are missing, go straight to login immediately.
     if (!FIREBASE_CONFIGURED) {
       setStage('login');
-      // Still clean up the data subscriptions on unmount.
-      return () => { unsubResults(); unsubPreds(); unsubUsers(); };
+      return;
     }
+
+    // Track Firestore data subscriptions so we can clean them up when user logs out.
+    let unsubResults = () => {};
+    let unsubPreds   = () => {};
+    let unsubUsers   = () => {};
+
+    const startSubscriptions = () => {
+      // Start realtime listeners — called only after auth confirms a valid user.
+      unsubResults = subscribeToMatchResults(results => setFinishedResults(results));
+      unsubPreds   = subscribeToPredictions(preds   => setAllPredictions(preds));
+      unsubUsers   = subscribeToUsers(users         => setAllUsers(users));
+      loadAllPredictions().then(setAllPredictions);
+      loadAllUsers().then(setAllUsers);
+    };
+
+    const stopSubscriptions = () => {
+      unsubResults();
+      unsubPreds();
+      unsubUsers();
+      unsubResults = () => {};
+      unsubPreds   = () => {};
+      unsubUsers   = () => {};
+    };
 
     // Auth state — sole gate into the app. Only real Firebase tokens allowed.
     const unsubAuth = onFirebaseAuthChange(async (fbUser) => {
       if (fbUser) {
-        // Firebase authenticated user (Google or Email OTP)
+        // Start Firestore subscriptions now that we have an authenticated user.
+        startSubscriptions();
+
+        // Firebase authenticated user (Google or Email/Password)
         const profile = await getUserProfile(fbUser.uid);
         if (profile?.nickname) {
           // Known user with a nickname — go straight to app
@@ -256,17 +272,19 @@ export default function App() {
         }
       }
 
-      // No Firebase user (signed out or Firebase not configured).
-      // Clear any stale localStorage cache and show the login screen.
-      // Never enter the app from a cached session — real auth is always required.
+      // No Firebase user (signed out).
+      // Stop Firestore subscriptions and clear state.
+      stopSubscriptions();
       persistSession(null);
       setUser(null);
       setGoogleUser(null);
       setPredictions({});
+      setAllPredictions({});
+      setAllUsers({});
       setStage('login');
     });
 
-    return () => { unsubResults(); unsubPreds(); unsubUsers(); unsubAuth(); };
+    return () => { stopSubscriptions(); unsubAuth(); };
   }, []);
 
   // ── Computed state ────────────────────────────────────────────────────────
