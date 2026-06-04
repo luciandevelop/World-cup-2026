@@ -86,6 +86,10 @@ export function LoginScreen({ onLogin }) {
     }
   };
 
+  const handleApple = () => {
+    setError('Apple Sign-In — în curând 🍎');
+  };
+
   return (
     <div style={{
       minHeight:'100dvh', display:'flex', flexDirection:'column',
