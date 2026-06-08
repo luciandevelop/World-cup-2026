@@ -19,7 +19,7 @@ export default function PredictionModal({ match, existing, onSave, onClose }) {
   if (!match) return null;
 
   const lockInfo   = matchLockState(match);
-  const isEditable = lockInfo.state === 'open';
+  const isEditable = lockInfo.state === 'open' || lockInfo.state === 'soon';
   const breakdown  = match.isFinished && existing
     ? calcBreakdown(existing, match)
     : null;
