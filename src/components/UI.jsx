@@ -3,7 +3,7 @@
 // FootballAvatar: premium SVG renderer (nation / jersey / achievement)
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { getAvatarById, getDefaultAvatarForNick } from '../data/avatars.js';
 
 // ─── RARITY RING CONFIG ──────────────────────────────────────────────────────
@@ -460,12 +460,14 @@ export function StepInput({ value, onChange, min = 0, max = 25, label, unit = ""
 
 // ─── POSSESSION INPUT ────────────────────────────────────────────────────────
 export function PossessionInput({ value, onChange, teamA, teamB, flagA, flagB }) {
-  const [dragging, setDragging] = useState(false);
-  const handleTrackClick = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const pct  = Math.round(((e.clientX - rect.left) / rect.width) * 100);
-    onChange(Math.max(20, Math.min(80, pct)));
+  const trackRef = useRef(null);
+  const getPct = (clientX) => {
+    const rect = trackRef.current.getBoundingClientRect();
+    const pct  = Math.round(((clientX - rect.left) / rect.width) * 100);
+    return Math.max(20, Math.min(80, pct));
   };
+  const handleClick = (e) => onChange(getPct(e.clientX));
+  const handleTouch = (e) => { e.preventDefault(); onChange(getPct(e.touches[0].clientX)); };
   return (
     <div>
       <div style={{ fontSize:10, color:"rgba(255,255,255,0.3)", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:12, fontWeight:600, textAlign:"center" }}>Posesie</div>
@@ -474,9 +476,9 @@ export function PossessionInput({ value, onChange, teamA, teamB, flagA, flagB })
         <span style={{ fontSize:11, color:"rgba(255,255,255,0.2)" }}>vs</span>
         <span style={{ fontSize:12, color:"rgba(255,255,255,0.6)", fontWeight:600 }}>{100 - value}% {flagB}</span>
       </div>
-      <div onClick={handleTrackClick} style={{ position:"relative", height:28, background:"rgba(255,255,255,0.05)", borderRadius:14, cursor:"pointer", overflow:"hidden", border:"1px solid rgba(255,255,255,0.08)" }}>
-        <div style={{ position:"absolute", left:0, top:0, width:`${value}%`, height:"100%", background:"linear-gradient(90deg,rgba(74,158,255,0.5),rgba(74,158,255,0.3))", borderRadius:"14px 0 0 14px", transition:dragging?"none":"width 0.15s" }}/>
-        <div style={{ position:"absolute", left:`${value}%`, top:"50%", transform:"translate(-50%,-50%)", width:22, height:22, borderRadius:"50%", background:"#fff", boxShadow:"0 2px 8px rgba(0,0,0,0.4)", transition:dragging?"none":"left 0.15s" }}/>
+      <div ref={trackRef} onClick={handleClick} onTouchStart={handleTouch} onTouchMove={handleTouch} style={{ position:"relative", height:36, background:"rgba(255,255,255,0.05)", borderRadius:18, cursor:"pointer", overflow:"hidden", border:"1px solid rgba(255,255,255,0.08)", touchAction:"none" }}>
+        <div style={{ position:"absolute", left:0, top:0, width:`${value}%`, height:"100%", background:"linear-gradient(90deg,rgba(74,158,255,0.5),rgba(74,158,255,0.3))", borderRadius:"18px 0 0 18px" }}/>
+        <div style={{ position:"absolute", left:`${value}%`, top:"50%", transform:"translate(-50%,-50%)", width:26, height:26, borderRadius:"50%", background:"#fff", boxShadow:"0 2px 8px rgba(0,0,0,0.4)" }}/>
         <div style={{ position:"absolute", left:"50%", top:"50%", transform:"translate(-50%,-50%)", width:1, height:"60%", background:"rgba(255,255,255,0.12)" }}/>
       </div>
       <div style={{ display:"flex", justifyContent:"space-between", marginTop:6, fontSize:10, color:"rgba(255,255,255,0.2)" }}>
