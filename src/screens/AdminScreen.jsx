@@ -269,9 +269,9 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
 
       {/* Group filter */}
       <div style={{ display:'flex', gap:4, overflowX:'auto', marginBottom:6 }}>
-        {['all', ...ALL_GROUPS, 'AMICALE'].map(g => (
+        {['all', ...ALL_GROUPS].map(g => (
           <button key={g} onClick={() => setGroupF(g)} style={{ flexShrink:0, padding:'4px 9px', borderRadius:20, background:groupF===g?'rgba(239,68,68,0.15)':'rgba(255,255,255,0.03)', border:`1px solid ${groupF===g?'rgba(239,68,68,0.28)':'rgba(255,255,255,0.07)'}`, color:groupF===g?'#EF4444':'rgba(255,255,255,0.38)', fontSize:10, fontWeight:700, cursor:'pointer' }}>
-            {g === 'all' ? 'Toate' : g === 'AMICALE' ? '🏟 Amicale' : `Gr.${g}`}
+            {g === 'all' ? 'Toate' : `Gr.${g}`}
           </button>
         ))}
       </div>
@@ -407,11 +407,13 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
              'Salvează rezultat'}
           </button>
 
-          {/* Group standings preview */}
+          {/* Group standings preview — only for real WC groups, not friendlies */}
+          {sel.group !== 'AMICALE' && (
           <div style={{ marginTop:12 }}>
             <div style={{ fontSize:9, color:'rgba(255,255,255,0.2)', letterSpacing:'0.1em', textTransform:'uppercase', fontWeight:600, marginBottom:7 }}>Clasament curent Gr.{sel.group}</div>
             <StandingsMini group={sel.group} finishedResults={finishedResults}/>
           </div>
+          )}
         </div>
       )}
 
@@ -594,29 +596,6 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
         >
           Reset rezultate test
         </button>
-      </div>
-
-      {/* ── GLOBAL COMPETITION RESET ───────────────────────────────────── */}
-      <div style={{ marginTop:12, padding:'12px', background:'rgba(255,50,50,0.04)', border:'1px solid rgba(255,50,50,0.15)', borderRadius:12 }}>
-        <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:8, fontWeight:700 }}>⚠ Resetare Competiție</div>
-        <button
-          onClick={async () => {
-            if (!window.confirm('Ești sigur?\nToate punctele și predicțiile de test vor fi șterse.\nUtilizatorii vor rămâne înregistrați.')) return;
-            try {
-              await resetTestData();
-              localStorage.removeItem('wc2026_admin_results');
-              onMatchUpdate?.({ _action:'reset' });
-              setSel(null); setHistory([]);
-              alert('Resetare completă! Toți jucătorii pornesc de la 0.');
-            } catch(e) {
-              alert('Eroare la reset: ' + e.message);
-            }
-          }}
-          style={{ width:'100%', padding:'12px', background:'rgba(239,68,68,0.1)', border:'2px solid rgba(239,68,68,0.3)', borderRadius:10, color:'#EF4444', fontSize:13, fontWeight:800, cursor:'pointer', letterSpacing:'0.04em' }}
-        >
-          🔄 Reset Competiție — Start de la 0
-        </button>
-        <div style={{ fontSize:10, color:'rgba(255,255,255,0.18)', textAlign:'center', marginTop:6 }}>Șterge predicții + rezultate test. Păstrează useri, nickname-uri, avatare.</div>
       </div>
 
       {/* Reset clasament amicale */}
