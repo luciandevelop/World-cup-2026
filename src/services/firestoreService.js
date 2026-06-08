@@ -379,3 +379,52 @@ function _loadLocalUsers() {
   }
   return users;
 }
+
+// ─── RESET TEST / AMICALE DATA ────────────────────────────────────────────────
+// Deletes all predictions and results for test matches (IDs 901-910).
+// Does NOT delete users, real match predictions, or real match results.
+export async function resetTestData() {
+  const TEST_IDS = [901,902,903,904,905,906,907,908,909,910];
+
+  if (FIREBASE_CONFIGURED) {
+    const batch1 = [];
+    // Delete predictions for test matches
+    for (const matchId of TEST_IDS) {
+      const snap = await getDocs(
+        query(collection(db, 'predictions'), where('matchId', '==', matchId))
+      );
+      snap.forEach(d => batch1.push(d.ref));
+    }
+    // Delete results for test matches
+    for (const matchId of TEST_IDS) {
+      const ref = doc(db, 'results', String(matchId));
+      batch1.push(ref);
+    }
+    // Execute in batches of 500
+    const { writeBatch: wb } = await import('firebase/firestore');
+    for (let i = 0; i < batch1.length; i += 400) {
+      const b = wb(db);
+      batch1.slice(i, i+400).forEach(ref => b.delete(ref));
+      await b.commit();
+    }
+    return { success: true };
+  }
+
+  // localStorage fallback
+  const LS_PREDS = 'wc2026_preds_';
+  TEST_IDS.forEach(id => {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith(LS_PREDS))
+      .forEach(k => {
+        try {
+          const preds = JSON.parse(localStorage.getItem(k) || '{}');
+          delete preds[id];
+          localStorage.setItem(k, JSON.stringify(preds));
+        } catch {}
+      });
+    const results = JSON.parse(localStorage.getItem('wc2026_admin_results') || '{}');
+    delete results[id];
+    localStorage.setItem('wc2026_admin_results', JSON.stringify(results));
+  });
+  return { success: true };
+}
