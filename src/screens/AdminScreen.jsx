@@ -596,6 +596,29 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
         </button>
       </div>
 
+      {/* ── GLOBAL COMPETITION RESET ───────────────────────────────────── */}
+      <div style={{ marginTop:12, padding:'12px', background:'rgba(255,50,50,0.04)', border:'1px solid rgba(255,50,50,0.15)', borderRadius:12 }}>
+        <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:8, fontWeight:700 }}>⚠ Resetare Competiție</div>
+        <button
+          onClick={async () => {
+            if (!window.confirm('Ești sigur?\nToate punctele și predicțiile de test vor fi șterse.\nUtilizatorii vor rămâne înregistrați.')) return;
+            try {
+              await resetTestData();
+              localStorage.removeItem('wc2026_admin_results');
+              onMatchUpdate?.({ _action:'reset' });
+              setSel(null); setHistory([]);
+              alert('Resetare completă! Toți jucătorii pornesc de la 0.');
+            } catch(e) {
+              alert('Eroare la reset: ' + e.message);
+            }
+          }}
+          style={{ width:'100%', padding:'12px', background:'rgba(239,68,68,0.1)', border:'2px solid rgba(239,68,68,0.3)', borderRadius:10, color:'#EF4444', fontSize:13, fontWeight:800, cursor:'pointer', letterSpacing:'0.04em' }}
+        >
+          🔄 Reset Competiție — Start de la 0
+        </button>
+        <div style={{ fontSize:10, color:'rgba(255,255,255,0.18)', textAlign:'center', marginTop:6 }}>Șterge predicții + rezultate test. Păstrează useri, nickname-uri, avatare.</div>
+      </div>
+
       {/* Reset clasament amicale */}
       <div style={{ marginTop:10 }}>
         <button
