@@ -142,45 +142,100 @@ export const getGroupLabel = (g) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Helper: ISO string offset from now (minutes)
-function _testTime(offsetMinutes) {
-  return new Date(Date.now() + offsetMinutes * 60 * 1000).toISOString();
-}
+// ─── AMICALE / TEST MATCHES ───────────────────────────────────────────────────
+// Meciuri amicale reale — ora României (EEST = UTC+3)
+// IDs 901-910
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const TEST_MATCHES = [
   {
     id:     901,
-    group:  "TEST",
+    group:  "AMICALE",
     isTest: true,
-    teamA:  "Echipa Alpha",   flagA: "🔵",
-    teamB:  "Echipa Beta",    flagB: "🔴",
-    time:   _testTime(-120),  // finished 2h ago
-    venue:  "Test Arena",
+    teamA:  "Țările de Jos",  flagA: "🇳🇱",
+    teamB:  "Uzbekistan",     flagB: "🇺🇿",
+    time:   "2026-06-08T18:45:00.000Z", // 21:45 Romania (UTC+3)
+    venue:  "Amical",
   },
   {
     id:     902,
-    group:  "TEST",
+    group:  "AMICALE",
     isTest: true,
-    teamA:  "Echipa Gamma",   flagA: "🟢",
-    teamB:  "Echipa Delta",   flagB: "🟡",
-    time:   _testTime(-10),   // kicked off 10m ago (locked + live)
-    venue:  "Test Arena",
+    teamA:  "Franța",         flagA: "🇫🇷",
+    teamB:  "Irlanda de Nord",flagB: "🇬🇧",
+    time:   "2026-06-08T19:10:00.000Z", // 22:10 Romania
+    venue:  "Amical",
   },
   {
     id:     903,
-    group:  "TEST",
+    group:  "AMICALE",
     isTest: true,
-    teamA:  "Echipa Epsilon", flagA: "🟣",
-    teamB:  "Echipa Zeta",    flagB: "⚫",
-    time:   _testTime(60),    // in 1h (still open — within the 30m lock window check)
-    venue:  "Test Arena",
+    teamA:  "Rusia",          flagA: "🇷🇺",
+    teamB:  "Trinidad Tobago",flagB: "🇹🇹",
+    time:   "2026-06-09T17:00:00.000Z", // 20:00 Romania
+    venue:  "Amical",
   },
   {
     id:     904,
-    group:  "TEST",
+    group:  "AMICALE",
     isTest: true,
-    teamA:  "Echipa Eta",     flagA: "🟤",
-    teamB:  "Echipa Theta",   flagB: "⚪",
-    time:   _testTime(180),   // in 3h (open)
-    venue:  "Test Arena",
+    teamA:  "Ungaria",        flagA: "🇭🇺",
+    teamB:  "Kazahstan",      flagB: "🇰🇿",
+    time:   "2026-06-09T17:00:00.000Z", // 20:00 Romania
+    venue:  "Amical",
+  },
+  {
+    id:     905,
+    group:  "AMICALE",
+    isTest: true,
+    teamA:  "Azerbaidjan",    flagA: "🇦🇿",
+    teamB:  "San Marino",     flagB: "🇸🇲",
+    time:   "2026-06-09T18:00:00.000Z", // 21:00 Romania
+    venue:  "Amical",
+  },
+  {
+    id:     906,
+    group:  "AMICALE",
+    isTest: true,
+    teamA:  "Togo",           flagA: "🇹🇬",
+    teamB:  "Benin",          flagB: "🇧🇯",
+    time:   "2026-06-09T18:00:00.000Z", // 21:00 Romania
+    venue:  "Amical",
+  },
+  {
+    id:     907,
+    group:  "AMICALE",
+    isTest: true,
+    teamA:  "Argentina",      flagA: "🇦🇷",
+    teamB:  "Islanda",        flagB: "🇮🇸",
+    time:   "2026-06-10T01:00:00.000Z", // 04:00 Romania
+    venue:  "Amical",
+  },
+  {
+    id:     908,
+    group:  "AMICALE",
+    isTest: true,
+    teamA:  "Irak",           flagA: "🇮🇶",
+    teamB:  "Venezuela",      flagB: "🇻🇪",
+    time:   "2026-06-10T01:00:00.000Z", // 04:00 Romania
+    venue:  "Amical",
+  },
+  {
+    id:     909,
+    group:  "AMICALE",
+    isTest: true,
+    teamA:  "Portugalia",     flagA: "🇵🇹",
+    teamB:  "Nigeria",        flagB: "🇳🇬",
+    time:   "2026-06-10T19:45:00.000Z", // 22:45 Romania
+    venue:  "Amical",
+  },
+  {
+    id:     910,
+    group:  "AMICALE",
+    isTest: true,
+    teamA:  "Anglia",         flagA: "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+    teamB:  "Costa Rica",     flagB: "🇨🇷",
+    time:   "2026-06-10T20:00:00.000Z", // 23:00 Romania
+    venue:  "Amical",
   },
 ];
