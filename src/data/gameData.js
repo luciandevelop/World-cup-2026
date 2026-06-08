@@ -54,7 +54,7 @@ export function buildMatches(finishedResults = FINISHED_RESULTS, { includeTests 
   });
 }
 
-export const MATCHES = buildMatches();
+export const MATCHES = buildMatches(undefined, { includeTests: true });
 export const GROUPS  = ALL_GROUPS;
 export { TEST_MATCHES };
 
