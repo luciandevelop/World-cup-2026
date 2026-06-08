@@ -27,8 +27,7 @@ import {
   subscribeToMatchResults, subscribeToPredictions, subscribeToUsers,
   REALTIME_MODE,
 } from './services/firestoreService.js';
-import { FIREBASE_CONFIGURED } from './services/firebase.js';
-
+import { FIREBASE_CONFIGURED, firebaseGetRedirectResult } from './services/firebase.js';
 export const APP_VERSION = 'v8';
 
 // ─── PERFECT HIT OVERLAY ──────────────────────────────────────────────────────
@@ -208,7 +207,7 @@ export default function App() {
       setStage('login');
       return;
     }
-
+firebaseGetRedirectResult().catch(console.error);
     // Track Firestore data subscriptions so we can clean them up when user logs out.
     let unsubResults = () => {};
     let unsubPreds   = () => {};
