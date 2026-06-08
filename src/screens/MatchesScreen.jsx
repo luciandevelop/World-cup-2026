@@ -786,7 +786,7 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
   const groupedMatches = liveGroupedMatches;
 
   // All live matches (flat array, for friendMatches/myPred filtering)
-  const allLiveMatches = useMemo(() => buildMatches(finishedResults), [finishedResults]);
+  const allLiveMatches = useMemo(() => buildMatches(finishedResults, { includeTests: true }), [finishedResults]);
 
   // BUG-2 fix: friendMatches includes locked matches (spec: visible after 30-min lock)
   const myPredMatches = allLiveMatches.filter(m => predictions[m.id]);
