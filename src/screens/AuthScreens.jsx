@@ -76,11 +76,11 @@ export function LoginScreen({ onLogin }) {
     try {
       const result = await signInWithGoogle();
       // onLogin is a no-op — onFirebaseAuthChange handles the state transition.
-      onLogin(result);
+      return;
     } catch(e) {
       const msg = e.message === 'FIREBASE_NOT_CONFIGURED'
         ? 'Firebase nu este configurat.'
-        : 'Eroare Google. Încearcă email.';
+    : e.message || 'Eroare Google. Încearcă email.';
       setError(msg);
       setSocialLoad(null);
     }
