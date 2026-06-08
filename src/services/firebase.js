@@ -7,7 +7,8 @@
 import { initializeApp, getApps } from 'firebase/app';
 import {
   getAuth,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -34,7 +35,6 @@ const firebaseConfig = {
 };
 
 // True only when all required env vars are present.
-// Components read this to decide whether to show a config-error screen.
 export const FIREBASE_CONFIGURED = !!(
   firebaseConfig.apiKey &&
   firebaseConfig.authDomain &&
@@ -43,9 +43,6 @@ export const FIREBASE_CONFIGURED = !!(
 );
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
-// Throws at startup if config is present but invalid (malformed key, etc.).
-// If config is absent entirely, auth/db remain null and every function
-// below throws "Firebase not configured" — which surfaces as a UI error.
 let app  = null;
 let auth = null;
 let db   = null;
@@ -54,7 +51,6 @@ if (FIREBASE_CONFIGURED) {
   app  = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
   auth = getAuth(app);
   db   = getFirestore(app);
-  // Persist auth token in localStorage so the user stays logged in after refresh.
   setPersistence(auth, browserLocalPersistence).catch(console.error);
 }
 
@@ -65,25 +61,41 @@ function requireAuth() {
   if (!auth) throw new Error('FIREBASE_NOT_CONFIGURED');
 }
 
-// ─── GOOGLE SIGN-IN ───────────────────────────────────────────────────────────
+// ─── GOOGLE SIGN-IN (redirect — works on all browsers including mobile) ───────
+// Step 1: call this to start the redirect flow.
 export async function firebaseSignInWithGoogle() {
   requireAuth();
   const provider = new GoogleAuthProvider();
   provider.addScope('profile');
   provider.addScope('email');
-  const result = await signInWithPopup(auth, provider);
-  return {
-    uid:      result.user.uid,
-    email:    result.user.email,
-    name:     result.user.displayName,
-    photoURL: result.user.photoURL,
-    provider: 'google',
-  };
+  // signInWithRedirect navigates away; result is picked up on return via
+  // firebaseGetRedirectResult() called once at app startup.
+  await signInWithRedirect(auth, provider);
+  // This line is never reached — the page redirects.
+  return null;
+}
+
+// Step 2: call this once on app load to pick up the result after redirect.
+// Returns the user object if returning from Google, or null otherwise.
+export async function firebaseGetRedirectResult() {
+  if (!auth) return null;
+  try {
+    const result = await getRedirectResult(auth);
+    if (!result) return null;
+    return {
+      uid:      result.user.uid,
+      email:    result.user.email,
+      name:     result.user.displayName,
+      photoURL: result.user.photoURL,
+      provider: 'google',
+    };
+  } catch (e) {
+    console.error('Redirect result error:', e);
+    return null;
+  }
 }
 
 // ─── EMAIL / PASSWORD SIGN-IN ─────────────────────────────────────────────────
-// Tries signIn first; falls back to createUser on auth/user-not-found.
-// This avoids the deprecated fetchSignInMethodsForEmail.
 export async function firebaseSignInWithEmail(email, password) {
   requireAuth();
   const normalised = email.trim().toLowerCase();
@@ -98,12 +110,11 @@ export async function firebaseSignInWithEmail(email, password) {
       signInErr.code === 'auth/user-not-found' ||
       signInErr.code === 'auth/invalid-credential'
     ) {
-      // No account yet — create one with this password.
       const result = await createUserWithEmailAndPassword(auth, normalised, password);
       firebaseUser  = result.user;
       isNewUser     = true;
     } else {
-      throw signInErr; // wrong password, too-many-requests, etc. — caller handles
+      throw signInErr;
     }
   }
 
@@ -124,11 +135,8 @@ export async function firebaseSignOut() {
 }
 
 // ─── AUTH STATE LISTENER ──────────────────────────────────────────────────────
-// Calls callback(firebaseUser) whenever auth state changes.
-// If Firebase is not configured, callback is never called — the app stays
-// on the login screen showing a config-error message.
 export function onFirebaseAuthChange(callback) {
-  if (!auth) return () => {}; // no-op unsubscribe — login screen handles the error UI
+  if (!auth) return () => {};
   return onAuthStateChanged(auth, callback);
 }
 
