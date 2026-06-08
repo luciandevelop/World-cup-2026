@@ -291,7 +291,7 @@ export default function App() {
   }, []);
 
   // ── Computed state ────────────────────────────────────────────────────────
-  const liveMatches = buildMatches(finishedResults, { includeTests: true });
+  const liveMatches = buildMatches(finishedResults);
 
   // Single source of truth for current user's score
   const myPredsByNumber = Object.fromEntries(Object.entries(predictions).map(([id,p])=>[Number(id),p]));
@@ -378,10 +378,9 @@ export default function App() {
     }
     // Reload overrides any time admin saves (they may have changed)
     setGroupOverrides(loadGroupOverrides());
-    if (!REALTIME_MODE) {
-      const results = await loadMatchResults();
-      setFinishedResults(results);
-    }
+    // Always reload results after admin save — realtime subscription may lag
+    const results = await loadMatchResults();
+    setFinishedResults(results);
   }, []);
 
   // handleLogin is called by LoginScreen after a successful Firebase sign-in.
