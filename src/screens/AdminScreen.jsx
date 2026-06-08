@@ -11,7 +11,7 @@ import {
   formatKickoffRO, buildGroupStandings, buildQualifiedTeams, buildMatches, calcBreakdown,
 } from '../data/gameData.js';
 import { ALL_GROUPS } from '../data/matches.js';
-import { saveMatchResult, REALTIME_MODE } from '../services/firestoreService.js';
+import { saveMatchResult, resetTestData, REALTIME_MODE } from '../services/firestoreService.js';
 
 // localStorage key for admin-set results (shared across all users on same device)
 const RESULTS_KEY   = 'wc2026_admin_results';
@@ -594,6 +594,28 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
         >
           Reset rezultate test
         </button>
+      </div>
+
+      {/* Reset clasament amicale */}
+      <div style={{ marginTop:10 }}>
+        <button
+          onClick={async () => {
+            if (!window.confirm('Ești sigur? Se șterg toate predicțiile și rezultatele din meciurile amicale (ID 901-910). Punctele din test se resetează. Competiția reală începe de la 0.')) return;
+            try {
+              await resetTestData();
+              onMatchUpdate?.({ _action:'reset' });
+              alert('Clasament amicale resetat! Toți jucătorii pornesc de la 0 puncte pentru Cupa Mondială.');
+            } catch(e) {
+              alert('Eroare la reset: ' + e.message);
+            }
+          }}
+          style={{ width:'100%', padding:'12px 8px', background:'rgba(255,100,0,0.08)', border:'2px solid rgba(255,100,0,0.3)', borderRadius:12, color:'#FF6400', fontSize:12, fontWeight:800, cursor:'pointer', letterSpacing:'0.05em' }}
+        >
+          🏆 Reset clasament amicale — Start Cupă Mondială de la 0
+        </button>
+        <div style={{ fontSize:10, color:'rgba(255,255,255,0.2)', textAlign:'center', marginTop:5 }}>
+          Șterge predicțiile + punctele din meciurile amicale. Nu șterge userii sau meciurile reale.
+        </div>
       </div>
 
       {/* Qualification overview */}
