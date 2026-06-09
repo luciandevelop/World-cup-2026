@@ -347,100 +347,387 @@ export const MOST_PREDICTED = {
 
 export const LIVE_FEED_EVENTS = [];
 
-// ─── AUTOMATED ACTIVITY FEED ─────────────────────────────────────────────────
-// Generates feed events from real match results + leaderboard snapshots.
-// Called after result processing. Returns array of event objects.
-// Components call this and render — no manual news entries needed.
-//
+// ─── SMART ACTIVITY FEED ─────────────────────────────────────────────────────
+// Generates rich, dramatic, varied feed events from real standings + results.
+// Mixes informative / competitive / dramatic / funny headlines.
 // event shape: { id, type, icon, text, ts, uid?, nickname? }
-// types: 'exact'|'points'|'rank_up'|'rank_down'|'streak'|'lead'|'result'
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function generateActivityFeed({
-  leaderboard    = [],   // current leaderboard array from buildLeaderboard()
-  prevLeaderboard = [],  // leaderboard before latest result (for rank delta)
-  finishedResults = {},  // { matchId: result }
-  allPredictions  = {},  // { uid: { matchId: pred } }
-  allUsers        = {},  // { uid: { nickname, avatarId } }
-  matches         = [],  // buildMatches() output
+  leaderboard     = [],   // current leaderboard array from buildLeaderboard()
+  prevLeaderboard = [],   // leaderboard before latest result (for rank delta)
+  finishedResults = {},   // { matchId: result }
+  allPredictions  = {},   // { uid: { matchId: pred } }
+  allUsers        = {},   // { uid: { nickname, avatarId } }
+  matches         = [],   // buildMatches() output
 } = {}) {
   const events = [];
   let seq = 0;
-  const ev = (type, icon, text, extras = {}) =>
-    events.push({ id: `feed_${Date.now()}_${seq++}`, type, icon, text, ts: Date.now(), ...extras });
+  // Each event carries a priority (higher = shown first) and a dedup key
+  const ev = (type, icon, text, priority = 5, extras = {}) =>
+    events.push({ id:`feed_${Date.now()}_${seq++}`, type, icon, text, ts:Date.now(), priority, ...extras });
 
-  // Map uid → nickname for quick lookup
   const nickOf = (uid) => allUsers[uid]?.nickname || uid;
+  const n      = leaderboard.length;
 
-  // --- Events from latest finished matches ---
+  // ── helper: pick one string from array using a stable hash of inputs
+  const pick = (arr, ...seeds) => {
+    const h = Math.abs(seeds.reduce((a, s) => (a * 31 + String(s).charCodeAt(0)|0) | 0, 7));
+    return arr[h % arr.length];
+  };
+
+  // ── helper: get all predictions + points for one match
+  const matchPreds = (matchId, match) => {
+    const out = [];
+    Object.entries(allPredictions).forEach(([uid, preds]) => {
+      const p = preds[matchId] || preds[String(matchId)];
+      if (!p) return;
+      const pts = calcPoints(p, match) || 0;
+      const exact = Number(p.scoreA) === Number(match.realScoreA) &&
+                    Number(p.scoreB) === Number(match.realScoreB);
+      const correctResult = (() => {
+        const rA = Number(match.realScoreA), rB = Number(match.realScoreB);
+        const pA = Number(p.scoreA), pB = Number(p.scoreB);
+        const realRes = rA > rB ? '1' : rA < rB ? '2' : 'X';
+        const predRes = pA > pB ? '1' : pA < pB ? '2' : 'X';
+        return realRes === predRes;
+      })();
+      out.push({ uid, nick:nickOf(uid), pts, exact, correctResult,
+                 pA:Number(p.scoreA), pB:Number(p.scoreB) });
+    });
+    return out;
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // BLOCK 1 — Per-match events (fired for every finished match)
+  // ═══════════════════════════════════════════════════════════════
   const justFinished = Object.values(finishedResults).filter(r =>
-    r.liveStatus === 'ft' && r.homeScore !== null && r.awayScore !== null
+    r.liveStatus === 'ft' &&
+    r.realScoreA !== null && r.realScoreA !== undefined &&
+    r.realScoreB !== null && r.realScoreB !== undefined
   );
 
   justFinished.forEach(result => {
-    const match = matches.find(m => m.id === result.matchId);
+    const match = matches.find(m => m.id === (result.matchId ?? result.id));
     if (!match) return;
-    const scoreStr = `${result.homeScore}–${result.awayScore}`;
+    const mName  = `${match.teamA} vs ${match.teamB}`;
+    const sA     = Number(result.realScoreA ?? result.homeScore ?? 0);
+    const sB     = Number(result.realScoreB ?? result.awayScore ?? 0);
+    const scoreStr = `${sA}–${sB}`;
 
-    // Who got exact score?
-    const exactScorers = [];
-    Object.entries(allPredictions).forEach(([uid, preds]) => {
-      const p = preds[result.matchId];
-      if (!p) return;
-      if (Number(p.scoreA) === Number(result.homeScore) &&
-          Number(p.scoreB) === Number(result.awayScore)) {
-        exactScorers.push(uid);
+    // Build pred stats for this match
+    const preds    = matchPreds(match.id, { ...match, isFinished:true, realScoreA:sA, realScoreB:sB });
+    const exact    = preds.filter(p => p.exact);
+    const correct  = preds.filter(p => p.correctResult);
+    const sorted   = [...preds].sort((a,b) => b.pts - a.pts);
+    const topEntry = sorted[0];
+    const totalPreds = preds.length;
+
+    // ── 1a. Exact score hit(s)
+    if (exact.length === 1) {
+      const phrases = [
+        `${exact[0].nick} a ghicit scorul exact: ${scoreStr} 🎯`,
+        `${exact[0].nick} a nimerit-o perfect: ${scoreStr}!`,
+        `Scor exact pentru ${exact[0].nick} la ${mName}!`,
+      ];
+      ev('exact', '🎯', pick(phrases, exact[0].nick, match.id), 10, { uid:exact[0].uid });
+    } else if (exact.length === 2) {
+      ev('exact', '🎯', `${exact[0].nick} și ${exact[1].nick} au prezis scorul exact: ${scoreStr}`, 10);
+    } else if (exact.length >= 3) {
+      const names = exact.slice(0,2).map(p=>p.nick).join(', ');
+      ev('exact', '🎯', `${names} și alți ${exact.length-2} au nimerit ${scoreStr} — impresionant!`, 10);
+    } else if (totalPreds > 0) {
+      // Nobody got exact
+      ev('miss', '😱', pick([
+        `Nimeni nu a anticipat ${scoreStr} la ${mName}.`,
+        `${mName}: ${scoreStr} — surpriză totală! Zero scoruri exacte.`,
+        `Toată lumea a greșit scorul la ${mName}.`,
+      ], match.id, sA, sB), 6);
+    }
+
+    // ── 1b. Top scorer of the match
+    if (topEntry && topEntry.pts > 0) {
+      const phrases = [
+        `🏅 Cel mai mare punctaj al meciului: ${topEntry.pts} pts — ${topEntry.nick}`,
+        `${topEntry.nick} câștigă ${topEntry.pts} pts la ${mName}`,
+        `Etapa aceasta: ${topEntry.nick} livrează ${topEntry.pts} puncte`,
+      ];
+      ev('points', '🏅', pick(phrases, topEntry.uid, match.id), 8, { uid:topEntry.uid });
+    }
+
+    // ── 1c. How many got the result right
+    if (totalPreds >= 3) {
+      if (correct.length === 0) {
+        ev('miss', '😬', `Nimeni nu a prezis corect rezultatul la ${mName}`, 5);
+      } else if (correct.length >= 3 && correct.length === totalPreds) {
+        ev('stat', '🔥', `Toți jucătorii au prezis corect rezultatul la ${mName}!`, 5);
+      } else if (correct.length >= 3) {
+        ev('stat', '🔥', `${correct.length} jucători au prezis corect rezultatul la ${mName}`, 5);
+      }
+    }
+
+    // ── 1d. Near-miss: someone was one goal away from exact
+    if (exact.length === 0) {
+      const nearMiss = preds.find(p =>
+        Math.abs(p.pA - sA) + Math.abs(p.pB - sB) === 1
+      );
+      if (nearMiss) {
+        ev('near', '🎯', `${nearMiss.nick} a fost la un gol distanță de scorul perfect la ${mName}`, 6, { uid:nearMiss.uid });
+      }
+    }
+
+    // ── 1e. Upset / surprise result (0 correct results at all)
+    if (totalPreds >= 2 && correct.length === 0) {
+      ev('upset', '😱', pick([
+        `Surpriza serii: ${mName} ${scoreStr} — nimeni nu a anticipat-o!`,
+        `${mName}: ${scoreStr} e rezultatul pe care nimeni nu l-a văzut venind.`,
+      ], match.id), 7);
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // BLOCK 2 — Leaderboard rank-change events
+  // ═══════════════════════════════════════════════════════════════
+  const hasPrev = prevLeaderboard.length > 0;
+
+  if (hasPrev) {
+    leaderboard.forEach(entry => {
+      const prev = prevLeaderboard.find(p => p.nickname === entry.nickname);
+      if (!prev) return;
+      const delta    = prev.rank - entry.rank;  // positive = climbed
+      const prevPts  = prev.points || 0;
+      const ptsDiff  = entry.points - prevPts;
+      const nick     = entry.nickname;
+
+      // ── 2a. Took the lead
+      if (entry.rank === 1 && prev.rank > 1) {
+        const displaced = prevLeaderboard.find(p => p.rank === 1);
+        if (displaced) {
+          ev('lead', '🏆', pick([
+            `${nick} l-a depășit pe ${displaced.nickname} și a urcat pe locul 1!`,
+            `${nick} preia conducerea clasamentului! ${displaced.nickname} coboară.`,
+            `Schimbare la vârf: ${nick} detronează pe ${displaced.nickname}.`,
+          ], nick, displaced.nickname), 10, { nickname:nick });
+        } else {
+          ev('lead', '🏆', `${nick} este noul lider al clasamentului!`, 10, { nickname:nick });
+        }
+      }
+
+      // ── 2b. Lost the lead (was #1, no longer)
+      if (prev.rank === 1 && entry.rank > 1) {
+        // Find how long they were at #1 (count consecutive prev tops — approximate)
+        ev('fall', '😬', pick([
+          `${nick} pierde locul 1 după ce a condus clasamentul.`,
+          `${nick} coboară de pe tron — locul ${entry.rank} acum.`,
+          `Schimbare la vârf! ${nick} nu mai este lider.`,
+        ], nick, entry.rank), 9, { nickname:nick });
+      }
+
+      // ── 2c. Big climb (3+ positions)
+      if (delta >= 3) {
+        const phrases = [
+          `${nick} urcă ${delta} poziții după ultimul meci!`,
+          `${nick} avansează ${delta} locuri și intră în Top ${entry.rank}!`,
+          `${nick} face saltul de ${delta} locuri — periculos!`,
+        ];
+        ev('rank_up', '📈', pick(phrases, nick, delta), 8, { nickname:nick });
+      }
+
+      // ── 2d. Big drop (3+ positions)
+      if (delta <= -3) {
+        ev('rank_down', '📉', pick([
+          `${nick} coboară ${Math.abs(delta)} locuri în clasament.`,
+          `${nick} pierde ${Math.abs(delta)} poziții — loc ${entry.rank} acum.`,
+        ], nick, delta), 7, { nickname:nick });
+      }
+
+      // ── 2e. Just entered Top 3
+      if (entry.rank <= 3 && prev.rank > 3) {
+        ev('top3', '🚀', pick([
+          `${nick} intră în Top 3 pentru prima dată!`,
+          `${nick} forțează intrarea în podium — locul ${entry.rank}!`,
+        ], nick), 9, { nickname:nick });
+      }
+
+      // ── 2f. Just fell out of Top 3
+      if (entry.rank > 3 && prev.rank <= 3) {
+        ev('top3_exit', '💀', `${nick} iese din Top 3 — locul ${entry.rank} acum.`, 8, { nickname:nick });
+      }
+
+      // ── 2g. Crossed the qualification line (was below cutoff, now above)
+      if (entry.qualified && !prev.qualified) {
+        ev('qualify', '⚡', pick([
+          `${nick} revine în cursa pentru calificare!`,
+          `${nick} trece linia calificării — mai are de luptat!`,
+        ], nick), 8, { nickname:nick });
+      }
+
+      // ── 2h. Fell below qualification line
+      if (!entry.qualified && prev.qualified) {
+        ev('disqualify', '💀', pick([
+          `${nick} cade sub linia calificării!`,
+          `${nick} pierde zona calificată — nevoie urgentă de puncte.`,
+        ], nick), 8, { nickname:nick });
       }
     });
 
-    if (exactScorers.length === 1) {
-      ev('exact', '🎯', `${nickOf(exactScorers[0])} a prezis scorul exact: ${scoreStr}`, { uid: exactScorers[0] });
-    } else if (exactScorers.length > 1) {
-      const names = exactScorers.slice(0, 3).map(nickOf).join(', ');
-      ev('exact', '🎯', `${names}${exactScorers.length > 3 ? ` și alți ${exactScorers.length - 3}` : ''} au prezis scorul exact: ${scoreStr}`);
+    // ── 2i. Gap at the top widened
+    const leader     = leaderboard[0];
+    const second     = leaderboard[1];
+    const prevLeader = prevLeaderboard[0];
+    const prevSecond = prevLeaderboard[1];
+    if (leader && second && prevLeader && prevSecond) {
+      const gap     = leader.points   - second.points;
+      const prevGap = prevLeader.points - prevSecond.points;
+      if (gap > prevGap && gap >= 20) {
+        ev('gap', '👑', `${leader.nickname} își mărește avantajul la ${gap} puncte față de ${second.nickname}.`, 7);
+      }
     }
 
-    // Who got the most points on this match?
-    let topUid = null, topPts = 0;
-    Object.entries(allPredictions).forEach(([uid, preds]) => {
-      const p = preds[result.matchId];
-      if (!p) return;
-      const pts = calcPoints(p, match);
-      if (pts > topPts) { topPts = pts; topUid = uid; }
+    // ── 2j. Tight battle for a specific rank (≤5 pts between adjacent players)
+    for (let i = 1; i < Math.min(leaderboard.length, 5); i++) {
+      const a = leaderboard[i-1], b = leaderboard[i];
+      const diff = a.points - b.points;
+      if (diff <= 5 && diff >= 0) {
+        ev('battle', '⚔️', pick([
+          `Luptă strânsă: doar ${diff} puncte îi despart pe ${a.nickname} (loc ${a.rank}) și ${b.nickname} (loc ${b.rank})!`,
+          `${a.nickname} vs ${b.nickname}: ${diff} puncte diferență — totul se poate schimba!`,
+        ], a.nickname, b.nickname), 6);
+        break; // one battle message is enough
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // BLOCK 3 — Leaderboard stats (from current state, no prev needed)
+  // ═══════════════════════════════════════════════════════════════
+  if (leaderboard.length >= 2) {
+    const leader  = leaderboard[0];
+    const last    = leaderboard[leaderboard.length - 1];
+
+    // ── 3a. Exact score streaks
+    leaderboard.forEach(entry => {
+      const es = entry.exactScores || 0;
+      if (es >= 5) {
+        ev('streak', '🔥', `${entry.nickname} are ${es} scoruri exacte — e nebun!`, 9, { nickname:entry.nickname });
+      } else if (es >= 3) {
+        ev('streak', '🔥', `${entry.nickname} are ${es} scoruri exacte în total.`, 7, { nickname:entry.nickname });
+      } else if (es >= 2) {
+        ev('streak', '🔥', `${entry.nickname} a mai nimerit un scor exact — ${es} total.`, 6, { nickname:entry.nickname });
+      }
     });
-    if (topUid && topPts > 0) {
-      ev('points', '🏅', `${nickOf(topUid)} a câștigat ${topPts} pts la ${match.teamA} vs ${match.teamB}`, { uid: topUid });
+
+    // ── 3b. Leader near a "round number" points milestone
+    const milestones = [50, 100, 150, 200, 250, 300, 400, 500];
+    milestones.forEach(m => {
+      const diff = m - leader.points;
+      if (diff > 0 && diff <= 15) {
+        ev('milestone', '🔥', `${leader.nickname} este la doar ${diff} puncte de ${m} — recordul se apropie!`, 6);
+      }
+    });
+
+    // ── 3c. Top 5 tension blurb (points spread)
+    const top5 = leaderboard.slice(0, Math.min(5, leaderboard.length));
+    const spread = top5[0].points - top5[top5.length-1].points;
+    if (spread <= 30 && top5.length >= 4) {
+      ev('tension', '📊', `Lupta pentru Top ${top5.length} se încinge — doar ${spread} puncte îi despart pe toți!`, 5);
+    }
+
+    // ── 3d. Last place player comment (only if 4+ players)
+    if (n >= 4 && last.points === 0 && events.length < 8) {
+      ev('fun', '😂', `${last.nickname} are 0 puncte — turneul abia a început!`, 3, { nickname:last.nickname });
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // BLOCK 4 — Per-match "best of round" summary (after all matches done)
+  // ═══════════════════════════════════════════════════════════════
+  if (justFinished.length >= 2) {
+    // Find the overall highest single-match scorer
+    let globalTopUid = null, globalTopPts = 0, globalTopMatch = null;
+    justFinished.forEach(result => {
+      const match = matches.find(m => m.id === (result.matchId ?? result.id));
+      if (!match) return;
+      const sA = Number(result.realScoreA ?? result.homeScore ?? 0);
+      const sB = Number(result.realScoreB ?? result.awayScore ?? 0);
+      const preds = matchPreds(match.id, { ...match, isFinished:true, realScoreA:sA, realScoreB:sB });
+      preds.forEach(p => {
+        if (p.pts > globalTopPts) { globalTopPts = p.pts; globalTopUid = p.uid; globalTopMatch = match; }
+      });
+    });
+    if (globalTopUid && globalTopPts > 0) {
+      ev('best_round', '🏅', `Cel mai mare punctaj al etapei: ${globalTopPts} pts — ${nickOf(globalTopUid)} la ${globalTopMatch.teamA} vs ${globalTopMatch.teamB}.`, 9);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // BLOCK 5 — Special narrative events (adds colour/drama)
+  // ═══════════════════════════════════════════════════════════════
+  if (leaderboard.length >= 3) {
+    const leader = leaderboard[0];
+    const second = leaderboard[1];
+    const third  = leaderboard[2];
+
+    // Podium is all within 20 pts — dramatic!
+    if (leader.points - third.points <= 20 && leader.points > 0) {
+      ev('drama', '⚔️', `Podiumul e la un meci distanță: ${leader.nickname}, ${second.nickname}, ${third.nickname} — orice e posibil!`, 6);
+    }
+
+    // Leader has twice the points of 2nd — domination
+    if (second.points > 0 && leader.points >= second.points * 2 && leader.points >= 100) {
+      ev('domination', '👑', `${leader.nickname} domină clasamentul cu ${leader.points} pts — dublul rivalilor!`, 6, { nickname:leader.nickname });
+    }
+  }
+
+  // ── 5b. "Nobody predicted the winner" for any finished match
+  justFinished.forEach(result => {
+    const match = matches.find(m => m.id === (result.matchId ?? result.id));
+    if (!match) return;
+    const sA = Number(result.realScoreA ?? result.homeScore ?? 0);
+    const sB = Number(result.realScoreB ?? result.awayScore ?? 0);
+    const ps  = matchPreds(match.id, { ...match, isFinished:true, realScoreA:sA, realScoreB:sB });
+    const allMissedResult = ps.length >= 2 && ps.every(p => !p.correctResult);
+    if (allMissedResult) {
+      ev('upset2', '😱', `Toată lumea a greșit rezultatul la ${match.teamA} vs ${match.teamB} — surpriza serii!`, 7);
     }
   });
 
-  // --- Rank changes ---
-  leaderboard.forEach(entry => {
-    const prev = prevLeaderboard.find(p => p.nickname === entry.nickname);
-    if (!prev) return;
-    const delta = prev.rank - entry.rank; // positive = moved up
-    if (delta >= 3) {
-      ev('rank_up', '📈', `${entry.nickname} a urcat ${delta} locuri în clasament`, { nickname: entry.nickname });
-    } else if (delta <= -3) {
-      ev('rank_down', '📉', `${entry.nickname} a coborât ${Math.abs(delta)} locuri`, { nickname: entry.nickname });
-    }
-    // New leader
-    if (entry.rank === 1 && prev.rank > 1) {
-      ev('lead', '🏆', `${entry.nickname} a ajuns pe locul 1!`, { nickname: entry.nickname });
-    }
+  // ─── Deduplicate, sort by priority then ts, cap at 20 ──────────
+  const seen    = new Set();
+  const deduped = events.filter(e => {
+    const key = e.text;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
   });
 
-  // --- Streaks (3+ exact scores — low threshold for early testing) ---
-  leaderboard.forEach(entry => {
-    if ((entry.exactScores || 0) >= 3) {
-      ev('streak', '🔥', `${entry.nickname} are ${entry.exactScores} scoruri exacte! 🔥`, { nickname: entry.nickname });
-    }
-  });
+  // Sort: higher priority first, then newer first; also avoid showing
+  // two events of the exact same type back-to-back (interleave types)
+  deduped.sort((a, b) => (b.priority - a.priority) || (b.ts - a.ts));
 
-  // Sort by ts desc, deduplicate by text, cap at 20
-  const seen = new Set();
-  return events
-    .filter(e => { if (seen.has(e.text)) return false; seen.add(e.text); return true; })
-    .sort((a, b) => b.ts - a.ts)
-    .slice(0, 20);
+  // Interleave: don't show 3 consecutive items of the same type
+  const result = [];
+  const typeCounts = {};
+  for (const e of deduped) {
+    const recent = result.slice(-2).map(x => x.type);
+    const consecSame = recent.length === 2 && recent[0] === e.type && recent[1] === e.type;
+    if (!consecSame) {
+      result.push(e);
+      typeCounts[e.type] = (typeCounts[e.type] || 0) + 1;
+      if (result.length >= 20) break;
+    }
+  }
+  // Fill back up with remaining items if we dropped some
+  if (result.length < Math.min(20, deduped.length)) {
+    for (const e of deduped) {
+      if (!result.find(x => x.id === e.id)) {
+        result.push(e);
+        if (result.length >= 20) break;
+      }
+    }
+  }
+
+  return result.slice(0, 20);
 }
 
 export const TYPE_COLOR = {
