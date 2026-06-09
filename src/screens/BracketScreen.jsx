@@ -131,10 +131,10 @@ function ThirdsPanel({ allThirds, qualifiedThirds }) {
 // ─── QUALIFICATION BANNER ─────────────────────────────────────────────────────
 function QualificationBanner() {
   const bullets = [
-    { icon:'⚔️', text:'Dacă ești aici, ai supraviețuit grupelor.', accent:'rgba(0,229,160,0.9)'  },
-    { icon:'🔥', text:'Acum nu mai există meciuri de antrenament.', accent:'rgba(255,152,0,0.9)'  },
-    { icon:'⚡', text:'Punctele se înjumătățesc. Presiunea se dublează.', accent:'rgba(212,175,55,0.9)' },
-    { icon:'💀', text:'Top 70% merge mai departe. Restul dispar.', accent:'rgba(239,68,68,0.85)' },
+    { icon:'⚔️', text:'Faza eliminatorie — fiecare meci contează dublu.', accent:'rgba(0,229,160,0.9)'  },
+    { icon:'🔥', text:'Toți jucătorii rămân activi până la finală.',       accent:'rgba(255,152,0,0.9)'  },
+    { icon:'👑', text:'Clasamentul principal continuă fără întrerupere.',   accent:'rgba(212,175,55,0.9)' },
+    { icon:'🏆', text:'Câștigă cel mai bun pronosticator al turneului.',    accent:'rgba(255,215,0,0.9)'  },
   ];
 
   return (

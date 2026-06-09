@@ -130,10 +130,9 @@ function HowToPlayScreen() {
       <Divider label="Formatul competiției" />
       <div style={{ display:"flex",flexDirection:"column",gap:0,background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:14,overflow:"hidden" }}>
         {[
-          { icon:"1️⃣", label:"Faza grupelor",   desc:"Toți jucătorii. Fiecare meci contează.",                accent:"#00E5A0" },
-          { icon:"✂",  label:"Top 70% avansează", desc:"Restul de 30% sunt eliminați. Punctele se împart la 2.", accent:"#FF6B6B" },
-          { icon:"⚡", label:"Playoff",           desc:"Noi categorii: golscoreri & cartonașe.",                 accent:"#4A9EFF" },
-          { icon:"🏆", label:"Finala",            desc:"Un singur câștigător.",                                  accent:"#FFD700" },
+          { icon:"1️⃣", label:"Faza grupelor",     desc:"Toți jucătorii. Fiecare meci contează.",                          accent:"#00E5A0" },
+          { icon:"⚡", label:"Faza eliminatorie", desc:"Continuați să preziceți din optimi până în semifinale.",            accent:"#4A9EFF" },
+          { icon:"🏆", label:"Finala",            desc:"Toți jucătorii rămân activi. Câștigă cel cu cele mai multe puncte.", accent:"#FFD700" },
         ].map((s,i,arr)=>(
           <div key={i} style={{ display:"flex",gap:14,alignItems:"flex-start",padding:"13px 16px",borderBottom:i<arr.length-1?"1px solid rgba(255,255,255,0.04)":"none",background:i===3?"rgba(255,215,0,0.03)":"transparent" }}>
             <div style={{ fontSize:17,flexShrink:0,marginTop:1 }}>{s.icon}</div>
