@@ -123,7 +123,7 @@ service cloud.firestore {
     // /otpCodes, /emailPasswords, /admin_overrides, etc.
 
 
-    // ── specialPredictions/{uid} — user writes only their own ─────────────────
+    // ── specialPredictions/{uid} — each user writes only their own ────────────
     match /specialPredictions/{uid} {
       allow read:   if isSignedIn();
       allow create: if callerIs(uid);
@@ -131,7 +131,7 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // ── specialResults/main — admin only ──────────────────────────────────────
+    // ── specialResults/main — admin only ─────────────────────────────────────
     match /specialResults/{docId} {
       allow read:   if isSignedIn();
       allow create: if isAdmin();
