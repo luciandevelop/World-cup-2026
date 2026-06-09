@@ -12,8 +12,7 @@ import {
 } from '../data/gameData.js';
 import { ALL_GROUPS } from '../data/matches.js';
 import { saveMatchResult, resetTestData, REALTIME_MODE } from '../services/firestoreService.js';
-import { saveSpecialResults, WC_TEAMS } from '../services/specialEventsService.js';
-import { resetSpecialDataFS, loadAllSpecialPredictionsFS } from '../services/firestoreService.js';
+import { saveSpecialResults, resetSpecialData, WC_TEAMS } from '../services/specialEventsService.js';
 
 // localStorage key for admin-set results (shared across all users on same device)
 const RESULTS_KEY   = 'wc2026_admin_results';
@@ -104,12 +103,12 @@ function AdminHelp({ open, onToggle }) {
 
 export default function AdminScreen({ currentUser, finishedResults, onMatchUpdate, specialResultsInit = null }) {
   const [sel,     setSel]    = useState(null);
-  const [specialResults, setSpecialResults] = useState(
+  const [specialRes, setSpecialRes] = useState(
     specialResultsInit
-      ? { winner: specialResultsInit.winner || '', semifinalists: specialResultsInit.semifinalists || [], topScorerCountry: specialResultsInit.topScorerCountry || '' }
+      ? { winner:specialResultsInit.winner||'', semifinalists:specialResultsInit.semifinalists||[], topScorerCountry:specialResultsInit.topScorerCountry||'' }
       : { winner:'', semifinalists:[], topScorerCountry:'' }
   );
-  const [specialMsg, setSpecialMsg]         = useState('');
+  const [specialMsg, setSpecialMsg] = useState('');
   const [sA,      setSA]     = useState(0);
   const [sB,      setSB]     = useState(0);
   const [possA,   setPossA]  = useState('');
@@ -611,45 +610,26 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
         <div style={{ fontSize:10, color:'rgba(255,215,0,0.7)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10, fontWeight:700 }}>⭐ Rezultate Evenimente Speciale</div>
         <div style={{ marginBottom:8 }}>
           <div style={{ fontSize:10, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>🏆 Câștigătoarea (500 pts)</div>
-          <select value={specialResults.winner} onChange={e => setSpecialResults(r => ({ ...r, winner: e.target.value }))}
-            style={{ width:'100%', padding:'7px 8px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:7, color:'#fff', fontSize:12, outline:'none' }}>
+          <select value={specialRes.winner} onChange={e=>setSpecialRes(r=>({...r,winner:e.target.value}))} style={{ width:'100%', padding:'7px 8px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:7, color:'#fff', fontSize:12, outline:'none' }}>
             <option value="">— Nesetat —</option>
-            {WC_TEAMS.map(t => <option key={t.name} value={t.name}>{t.flag} {t.name}</option>)}
+            {WC_TEAMS.map(t=><option key={t.name} value={t.name}>{t.flag} {t.name}</option>)}
           </select>
         </div>
         <div style={{ marginBottom:8 }}>
-          <div style={{ fontSize:10, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>🥈 Semifinaliste — {specialResults.semifinalists.length}/4</div>
+          <div style={{ fontSize:10, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>🥈 Semifinaliste — {specialRes.semifinalists.length}/4</div>
           <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
-            {WC_TEAMS.map(t => {
-              const isSel = specialResults.semifinalists.includes(t.name);
-              const isFull = specialResults.semifinalists.length >= 4 && !isSel;
-              return (
-                <button key={t.name} onClick={() => setSpecialResults(r => {
-                  const arr = r.semifinalists;
-                  return { ...r, semifinalists: arr.includes(t.name) ? arr.filter(x=>x!==t.name) : arr.length < 4 ? [...arr, t.name] : arr };
-                })} disabled={isFull}
-                  style={{ padding:'2px 6px', background: isSel ? 'rgba(0,229,160,0.2)' : 'rgba(255,255,255,0.05)', border:`1px solid ${isSel ? 'rgba(0,229,160,0.4)' : 'rgba(255,255,255,0.08)'}`, borderRadius:5, fontSize:10, color: isFull ? 'rgba(255,255,255,0.2)' : '#fff', cursor: isFull ? 'default' : 'pointer' }}>
-                  {t.flag} {t.name}
-                </button>
-              );
-            })}
+            {WC_TEAMS.map(t=>{ const isSel=specialRes.semifinalists.includes(t.name); const isFull=specialRes.semifinalists.length>=4&&!isSel; return <button key={t.name} onClick={()=>setSpecialRes(r=>{ const arr=r.semifinalists; return {...r,semifinalists:arr.includes(t.name)?arr.filter(x=>x!==t.name):arr.length<4?[...arr,t.name]:arr}; })} disabled={isFull} style={{ padding:'2px 6px', background:isSel?'rgba(0,229,160,0.2)':'rgba(255,255,255,0.05)', border:`1px solid ${isSel?'rgba(0,229,160,0.4)':'rgba(255,255,255,0.08)'}`, borderRadius:5, fontSize:10, color:isFull?'rgba(255,255,255,0.2)':'#fff', cursor:isFull?'default':'pointer' }}>{t.flag} {t.name}</button>; })}
           </div>
         </div>
         <div style={{ marginBottom:10 }}>
           <div style={{ fontSize:10, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>⚽ Țara golgheterului (300 pts)</div>
-          <select value={specialResults.topScorerCountry} onChange={e => setSpecialResults(r => ({ ...r, topScorerCountry: e.target.value }))}
-            style={{ width:'100%', padding:'7px 8px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:7, color:'#fff', fontSize:12, outline:'none' }}>
+          <select value={specialRes.topScorerCountry} onChange={e=>setSpecialRes(r=>({...r,topScorerCountry:e.target.value}))} style={{ width:'100%', padding:'7px 8px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:7, color:'#fff', fontSize:12, outline:'none' }}>
             <option value="">— Nesetat —</option>
-            {WC_TEAMS.map(t => <option key={t.name} value={t.name}>{t.flag} {t.name}</option>)}
+            {WC_TEAMS.map(t=><option key={t.name} value={t.name}>{t.flag} {t.name}</option>)}
           </select>
         </div>
-        {specialMsg && <div style={{ fontSize:11, color: specialMsg.startsWith('✅') ? 'rgba(0,229,160,0.8)' : '#EF4444', marginBottom:6 }}>{specialMsg}</div>}
-        <button onClick={async () => {
-          setSpecialMsg('');
-          const res = await saveSpecialResults(adminUid, specialResults);
-          if (res.success) { setSpecialMsg('✅ Salvat! Punctele se recalculează.'); onMatchUpdate?.({ _action:'specialResults' }); }
-          else setSpecialMsg('Eroare: ' + res.error);
-        }} style={{ width:'100%', padding:'9px', background:'rgba(255,215,0,0.1)', border:'1px solid rgba(255,215,0,0.25)', borderRadius:9, color:'#FFD700', fontSize:12, fontWeight:800, cursor:'pointer' }}>
+        {specialMsg && <div style={{ fontSize:11, color:specialMsg.startsWith('✅')?'rgba(0,229,160,0.8)':'#EF4444', marginBottom:6 }}>{specialMsg}</div>}
+        <button onClick={async()=>{ setSpecialMsg(''); const res=await saveSpecialResults(adminUid, specialRes); if(res.success){setSpecialMsg('✅ Salvat! Clasamentul se actualizează.'); onMatchUpdate?.({_action:'specialResults'});} else setSpecialMsg('Eroare: '+res.error); }} style={{ width:'100%', padding:'9px', background:'rgba(255,215,0,0.1)', border:'1px solid rgba(255,215,0,0.25)', borderRadius:9, color:'#FFD700', fontSize:12, fontWeight:800, cursor:'pointer' }}>
           💾 Salvează rezultate speciale
         </button>
       </div>
@@ -658,15 +638,16 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
       <div style={{ marginTop:10 }}>
         <button
           onClick={async () => {
-            if (!window.confirm('Ești sigur?\nSe șterg:\n- Predicțiile + rezultatele din meciurile amicale\n- Predicțiile + rezultatele din Evenimentele Speciale\n\nPunctele revin la 0. Utilizatorii rămân înregistrați.')) return;
+            if (!window.confirm('Ești sigur? Se șterg toate predicțiile și rezultatele din meciurile amicale (ID 901-910). Punctele din test se resetează. Competiția reală începe de la 0.')) return;
             try {
               await resetTestData();
-              await resetSpecialDataFS();
+              await resetSpecialData();
               localStorage.removeItem('wc2026_admin_results');
               onMatchUpdate?.({ _action:'reset' });
-              setSpecialResults({ winner:'', semifinalists:[], topScorerCountry:'' });
+              setSel(null);
+              setSpecialRes({ winner:'', semifinalists:[], topScorerCountry:'' });
               setSpecialMsg('');
-              alert('Resetare completă! Toți jucătorii pornesc de la 0 puncte.');
+              alert('Resetare completă! Toți jucătorii pornesc de la 0.');
             } catch(e) {
               alert('Eroare la reset: ' + e.message);
             }
