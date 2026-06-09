@@ -107,7 +107,8 @@ export async function loadSpecialResults() {
 
 // ── WRITE ─────────────────────────────────────────────────────────────────────
 export async function saveSpecialPrediction(uid, prediction) {
-  if (isSpecialLocked()) throw new Error('Evenimentele speciale sunt blocate.');
+  if (isSpecialLocked()) return { success: false, error: 'Evenimentele speciale sunt blocate.' };
+  if (!uid) return { success: false, error: 'Utilizator neautentificat.' };
   const data = { ...prediction, uid, updatedAt: serverTimestamp() };
   if (!FIREBASE_CONFIGURED) {
     localStorage.setItem('wc_sp_' + uid, JSON.stringify(prediction));
