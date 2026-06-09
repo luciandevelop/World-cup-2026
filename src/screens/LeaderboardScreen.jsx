@@ -32,7 +32,7 @@ export default function LeaderboardScreen({
   const data = useMemo(() => {
     try {
       const safeFinishedResults = finishedResults || {};
-      const liveMatches = buildMatches(safeFinishedResults);
+      const liveMatches = buildMatches(safeFinishedResults, { includeTests: true });
       const finishedMatches = liveMatches.filter(m => m && m.isFinished);
       const finishedCount = finishedMatches.length;
 
