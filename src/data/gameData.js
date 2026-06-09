@@ -187,7 +187,7 @@ export function calcPoints(pred, match) {
 //   userPreds      — { matchId(Number): pred }
 //   finishedResults — the canonical wc2026_admin_results object
 // Returns: { points, exactScores, lastMatchPts }
-export function calculateUserScore(userPreds, finishedResults = {}) {
+export function calculateUserScore(userPreds, finishedResults = {}, specialPts = 0) {
   const fm = buildMatches(finishedResults, { includeTests: true }).filter(m => m.isFinished);
   let points = 0, exactScores = 0, lastMatchPts = null, lastMatchId = null;
   fm.forEach(match => {
@@ -202,28 +202,30 @@ export function calculateUserScore(userPreds, finishedResults = {}) {
       lastMatchId  = match.id;
     }
   });
-  return { points, exactScores, lastMatchPts, finishedCount: fm.length };
+  return { points: points + specialPts, matchPoints: points, specialPoints: specialPts, exactScores, lastMatchPts, finishedCount: fm.length };
 }
 
 // ─── LEADERBOARD ──────────────────────────────────────────────────────────────
 export const QUALIFY_PCT   = 0.70;
 export const CURRENT_STAGE = "Faza grupelor";
 
-// calcSpecialPts — standalone so App.jsx can also call it
-export function calcSpecialPtsStandalone(userSpecialPred, specialResults) {
+// calcSpecialPts: standalone, used by both App.jsx and buildLeaderboard
+export function calcSpecialPts(userSpecialPred, specialResults) {
   if (!userSpecialPred || !specialResults) return 0;
   let pts = 0;
   if (specialResults.winner && userSpecialPred.winner === specialResults.winner) pts += 500;
   if (specialResults.semifinalists && userSpecialPred.semifinalists) {
-    const correct = (userSpecialPred.semifinalists || []).filter(t => (specialResults.semifinalists || []).includes(t));
+    const correct = (userSpecialPred.semifinalists || []).filter(t =>
+      (specialResults.semifinalists || []).includes(t)
+    );
     pts += correct.length * 200;
   }
   if (specialResults.topScorerCountry && userSpecialPred.topScorerCountry === specialResults.topScorerCountry) pts += 300;
   return pts;
 }
 
-// allSpecialPredsByNick: { nickname: specialPredObject }
-// specialResults: { winner, semifinalists, topScorerCountry }
+// allSpecialPredsByNick: { nickname: specialPredObject } — optional
+// specialResults: { winner, semifinalists, topScorerCountry } — optional
 export function buildLeaderboard(allPlayerPreds, currentUser, finishedMatches = null, allSpecialPredsByNick = {}, specialResults = null) {
   const fm = finishedMatches || buildMatches({}, { includeTests: true }).filter(m => m.isFinished);
   const nicknames = new Set([currentUser, ...Object.keys(allPlayerPreds), ...Object.keys(allSpecialPredsByNick)]);
@@ -240,8 +242,7 @@ export function buildLeaderboard(allPlayerPreds, currentUser, finishedMatches = 
       if (b.exactScore > 0) exactScores++;
       if (lastMatchId === null || match.id > lastMatchId) { lastMatchPts = b.total; lastMatchId = match.id; }
     });
-    const specialPred = allSpecialPredsByNick[nick] || null;
-    const specialPoints = calcSpecialPtsStandalone(specialPred, specialResults);
+    const specialPoints = calcSpecialPts(allSpecialPredsByNick[nick] || null, specialResults);
     const totalPoints = matchPoints + specialPoints;
     return { nickname:nick, points:totalPoints, matchPoints, specialPoints, exactScores, lastMatchPts };
   });
