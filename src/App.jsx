@@ -7,6 +7,7 @@ import CSS from './styles/globalCSS.js';
 import {
   MATCHES, buildMatches, calcBreakdown, calcPoints, buildLeaderboard, calculateUserScore,
   ADMIN_EMAILS, ADMIN_EMAILS_RUNTIME, QUALIFY_PCT, generateActivityFeed, matchLockState,
+  calcSpecialPts,
 } from './data/gameData.js';
 import { getAvatarById, getDefaultAvatarForNick, AVATARS } from './data/avatars.js';
 import { LoginScreen, NicknameScreen } from './screens/AuthScreens.jsx';
@@ -28,8 +29,9 @@ import {
   REALTIME_MODE,
 } from './services/firestoreService.js';
 import { FIREBASE_CONFIGURED, firebaseGetRedirectResult } from './services/firebase.js';
-import { loadAllSpecialPredictionsFS, loadSpecialResultsFS, resetSpecialDataFS } from './services/firestoreService.js';
-import { calcSpecialPtsStandalone } from './data/gameData.js';
+import {
+  loadAllSpecialPredictions, loadSpecialResults,
+} from './services/specialEventsService.js';
 
 export const APP_VERSION = 'v8';
 
@@ -157,7 +159,7 @@ function ProfileDrawer({ user, totalPts, matchPts = 0, specialPts = 0, myRank, s
           ))}
         </div>
         {specialPts > 0 && (
-          <div style={{ textAlign:'center', fontSize:11, color:'rgba(255,255,255,0.35)', marginBottom:12, fontFamily:"'DM Mono',monospace" }}>
+          <div style={{ textAlign:'center', fontSize:11, color:'rgba(255,255,255,0.35)', marginBottom:10, fontFamily:"'DM Mono',monospace" }}>
             meciuri {matchPts} + speciale <span style={{ color:'#FFD700', fontWeight:700 }}>⭐{specialPts}</span>
           </div>
         )}
@@ -200,7 +202,7 @@ export default function App() {
   const [allPredictions,   setAllPredictions]   = useState({});
   const [groupOverrides,   setGroupOverrides]   = useState(() => loadGroupOverrides()); // { uid: { matchId: pred } } — all users
   const [allUsers,         setAllUsers]         = useState({}); // { uid: { nickname, avatarId, ... } }
-  const [allSpecialPreds,  setAllSpecialPreds]  = useState({}); // { uid: specialPred }
+  const [allSpecialPreds,  setAllSpecialPreds]  = useState({}); // { uid: specialPredObject }
   const [specialResults,   setSpecialResults]   = useState(null); // { winner, semifinalists, topScorerCountry }
   const [activityFeed,     setActivityFeed]     = useState([]);
   // prevLeaderboard: snapshot before last finishedResults change, for rank-delta events
@@ -233,9 +235,8 @@ export default function App() {
       unsubUsers   = subscribeToUsers(users         => setAllUsers(users));
       loadAllPredictions().then(setAllPredictions);
       loadAllUsers().then(setAllUsers);
-      // Load special events data
-      loadAllSpecialPredictionsFS().then(setAllSpecialPreds);
-      loadSpecialResultsFS().then(r => { if (r) setSpecialResults(r); });
+      loadAllSpecialPredictions().then(setAllSpecialPreds);
+      loadSpecialResults().then(r => { if (r) setSpecialResults(r); });
     };
 
     const stopSubscriptions = () => {
@@ -308,7 +309,7 @@ export default function App() {
   // Single source of truth for current user's score
   const myPredsByNumber = Object.fromEntries(Object.entries(predictions).map(([id,p])=>[Number(id),p]));
   const mySpecialPred   = user?.uid ? (allSpecialPreds[user.uid] || null) : null;
-  const mySpecialPts    = calcSpecialPtsStandalone(mySpecialPred, specialResults);
+  const mySpecialPts    = calcSpecialPts(mySpecialPred, specialResults);
   const myScore         = calculateUserScore(myPredsByNumber, finishedResults, mySpecialPts);
   const totalPts        = myScore.points;
 
@@ -331,11 +332,9 @@ export default function App() {
     if (nick) acc[nick] = pred;
     return acc;
   }, {});
-  // Include current user's special pred
   if (user?.uid && user?.nickname && allSpecialPreds[user.uid]) {
     allSpecialPredsByNick[user.nickname] = allSpecialPreds[user.uid];
   }
-
   const leaderboard = buildLeaderboard(predsByNick, user?.nickname||'Me', liveMatches.filter(m=>m.isFinished), allSpecialPredsByNick, specialResults);
   const myEntry     = leaderboard.find(p => p.nickname === user?.nickname);
   const myRank      = myEntry?.rank;
@@ -404,9 +403,8 @@ export default function App() {
       return;
     }
     if (update?._action === 'specialResults') {
-      // Reload special results and predictions for leaderboard recalc
-      loadAllSpecialPredictionsFS().then(setAllSpecialPreds);
-      loadSpecialResultsFS().then(r => { if (r) setSpecialResults(r); });
+      loadAllSpecialPredictions().then(setAllSpecialPreds);
+      loadSpecialResults().then(r => { if (r) setSpecialResults(r); });
       return;
     }
     // Reload overrides any time admin saves (they may have changed)
@@ -562,7 +560,7 @@ export default function App() {
       )}
       {perfectHit && <PerfectHitOverlay pts={perfectHit.pts} onDone={()=>setPerfectHit(null)}/>}
       {showProfile && (
-        <ProfileDrawer user={user} totalPts={totalPts} matchPts={myScore.points - mySpecialPts} specialPts={mySpecialPts} myRank={myRank} streak={streak} onClose={()=>setShowProfile(false)} onLogout={handleLogout} onAdmin={()=>{setAdminMode(true);setShowProfile(false);}} onAvatarChange={()=>{setShowProfile(false);setShowAvatarPicker(true);}}/>
+        <ProfileDrawer user={user} totalPts={totalPts} matchPts={myScore.matchPoints||0} specialPts={mySpecialPts} myRank={myRank} streak={streak} onClose={()=>setShowProfile(false)} onLogout={handleLogout} onAdmin={()=>{setAdminMode(true);setShowProfile(false);}} onAvatarChange={()=>{setShowProfile(false);setShowAvatarPicker(true);}}/>
       )}
       {showAvatarPicker && (
         <AvatarChangeModal currentId={user?.avatarId} onSelect={handleAvatarChange} onClose={()=>setShowAvatarPicker(false)}/>
