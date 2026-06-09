@@ -206,7 +206,8 @@ export function calculateUserScore(userPreds, finishedResults = {}) {
 }
 
 // ─── LEADERBOARD ──────────────────────────────────────────────────────────────
-export const QUALIFY_PCT   = 0.70;
+// All players compete for the entire tournament — no elimination, no cutoff.
+export const QUALIFY_PCT   = 1.0;   // kept for import compatibility; not used for elimination
 export const CURRENT_STAGE = "Faza grupelor";
 
 export function buildLeaderboard(allPlayerPreds, currentUser, finishedMatches = null) {
@@ -229,8 +230,8 @@ export function buildLeaderboard(allPlayerPreds, currentUser, finishedMatches = 
   });
 
   players.sort((a, b) => b.points - a.points || a.nickname.localeCompare(b.nickname));
-  const cutoff = Math.max(1, Math.ceil(players.length * QUALIFY_PCT));
-  return players.map((p, i) => ({ ...p, rank:i+1, qualified:i < cutoff }));
+  // qualified is always true — no one is eliminated from the fantasy competition
+  return players.map((p, i) => ({ ...p, rank:i+1, qualified:true }));
 }
 
 // ─── IDENTITY ────────────────────────────────────────────────────────────────
@@ -469,22 +470,20 @@ export function generateActivityFeed({
         ], nick, delta), 8, { nickname:nick });
       }
 
-      // ── 1g. Crossed into qualification zone
-      if (entry.qualified && !prev.qualified) {
-        ev('qualify', '⚡', pick([
-          `${nick} revine în cursa pentru calificare!`,
-          `🏃 ${nick} reintră în zona calificată — lupta continuă!`,
-          `${nick} trece linia calificării. Nu e terminat!`,
-        ], nick), 9, { nickname:nick });
+      // ── 1g. Entered Top 5 (climbing into 4th or 5th place)
+      if (entry.rank <= 5 && entry.rank > 3 && prev.rank > 5) {
+        ev('top5', '📈', pick([
+          `${nick} intră în Top 5 — locul ${entry.rank}!`,
+          `${nick} urcă în Top 5. Locul ${entry.rank} acum.`,
+        ], nick), 7, { nickname:nick });
       }
 
-      // ── 1h. Fell below qualification line
-      if (!entry.qualified && prev.qualified) {
-        ev('disqualify', '💀', pick([
-          `${nick} cade sub linia calificării!`,
-          `🫣 ${nick} caută telecomanda. A căzut sub linia calificării.`,
-          `${nick} pierde zona calificată — urgență maximă.`,
-        ], nick), 9, { nickname:nick });
+      // ── 1h. Left Top 5 (was 4th or 5th, now outside)
+      if (entry.rank > 5 && prev.rank <= 5 && prev.rank > 3) {
+        ev('top5_exit', '📉', pick([
+          `${nick} iese din Top 5 — locul ${entry.rank} acum.`,
+          `${nick} pierde Top 5. Locul ${entry.rank}.`,
+        ], nick, entry.rank), 6, { nickname:nick });
       }
     });
 
@@ -694,7 +693,7 @@ export function generateActivityFeed({
   // Rules:
   //   • Never 3 consecutive items of same type
   //   • Types 'exact' and 'points'/'best_round' each capped at 2 in feed
-  //   • Drama types (lead/fall/rank_up/top3/battle/qualify) get priority slots
+  //   • Drama types (lead/fall/rank_up/top3/top5/battle/chase/gap) get priority slots
   // ═══════════════════════════════════════════════════════════════
   const seen = new Set();
   const deduped = events
@@ -702,8 +701,8 @@ export function generateActivityFeed({
     .sort((a, b) => (b.priority - a.priority) || (b.ts - a.ts));
 
   // Drama types that should dominate the feed
-  const DRAMA_TYPES = new Set(['lead','fall','top3','top3_exit','rank_up','rank_down',
-                                'qualify','disqualify','battle','chase','gap','streak',
+  const DRAMA_TYPES = new Set(['lead','fall','top3','top3_exit','top5','top5_exit','rank_up','rank_down',
+                                'battle','chase','gap','streak',
                                 'drama','tension','domination','milestone']);
   // Stat types that should be limited
   const STAT_TYPES  = new Set(['exact','near','points','best_round','stat','upset','upset2','fun']);
