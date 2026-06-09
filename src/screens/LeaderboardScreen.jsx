@@ -1,7 +1,6 @@
 // ─── src/screens/LeaderboardScreen.jsx ───────────────────────────────────────
 import { useMemo } from 'react';
 import {
-  QUALIFY_PCT,
   CURRENT_STAGE,
   buildLeaderboard,
   buildMatches,
@@ -56,8 +55,6 @@ export default function LeaderboardScreen({
 
   const { sorted, finishedCount, error } = data;
   const total = sorted.length;
-  const cutoff = Math.max(1, Math.ceil(total * QUALIFY_PCT));
-  const eliminated = Math.max(0, total - cutoff);
 
   const my = sorted.find(p => p.nickname === currentNickname)
     || { rank: '?', points: 0, exactScores: 0, lastMatchPts: null, qualified: true };
@@ -93,7 +90,7 @@ export default function LeaderboardScreen({
       <div style={{ display: 'flex', gap: 6, marginTop: 12, marginBottom: 14 }}>
         {[
           { label: 'Jucători', value: total },
-          { label: 'Eliminați', value: eliminated },
+          { label: 'Top 3', value: Math.min(total, 3) },
           { label: 'Meciuri ✓', value: finishedCount },
           { label: 'Etapă', value: CURRENT_STAGE, wide: true },
         ].map((s, i) => (
@@ -126,9 +123,7 @@ export default function LeaderboardScreen({
                 <div style={{ fontSize: 36, fontWeight: 900, color: '#FFD700', fontFamily: "'DM Mono',monospace", lineHeight: 1 }}>{my.points}</div>
                 <div style={{ fontSize: 9, color: 'rgba(212,175,55,0.3)', letterSpacing: '0.06em' }}>PUNCTE</div>
                 {my.lastMatchPts !== null && <div style={{ fontSize: 11, color: '#00E5A0', marginTop: 3, fontWeight: 700 }}>+{my.lastMatchPts} ultimul meci</div>}
-                <div style={{ fontSize: 10, marginTop: 4, color: my.qualified ? '#00E5A0' : '#FF6B6B', fontWeight: 700 }}>
-                  {my.qualified ? '✓ Calificat' : '✗ Eliminat'}
-                </div>
+
               </div>
             </div>
             {rivalry && (
@@ -159,13 +154,12 @@ export default function LeaderboardScreen({
       {sorted.map((e, i) => {
         const isMe = e.nickname === currentNickname;
         const mov = getMovement(e.nickname, e.rank);
-        const isQLine = i === cutoff - 1;
         const pStyle = getPredictionStyle(e.exactScores, e.points, e.exactScores);
         const ring = getAvatarRing(pStyle);
 
         return (
           <div key={e.nickname || i}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', borderRadius: 14, marginBottom: 6, background: isMe ? 'rgba(212,175,55,0.07)' : !e.qualified ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.035)', border: `1px solid ${isMe ? 'rgba(212,175,55,0.22)' : !e.qualified ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.06)'}`, opacity: !e.qualified ? 0.6 : 1, animation: `staggerIn 0.35s ${Math.min(i,10)*0.04}s both` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', borderRadius: 14, marginBottom: 6, background: isMe ? 'rgba(212,175,55,0.07)' : 'rgba(255,255,255,0.035)', border: `1px solid ${isMe ? 'rgba(212,175,55,0.22)' : 'rgba(255,255,255,0.06)'}`, animation: `staggerIn 0.35s ${Math.min(i,10)*0.04}s both` }}>
               <div style={{ width: 24, textAlign: 'center', fontSize: i < 3 ? 18 : 11, color: i < 3 ? '#fff' : 'rgba(255,255,255,0.25)', fontWeight: 700, flexShrink: 0 }}>
                 {i < 3 ? medals[i] : e.rank}
               </div>
@@ -178,9 +172,8 @@ export default function LeaderboardScreen({
               </div>
 
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: isMe ? '#FFD700' : !e.qualified ? 'rgba(255,255,255,0.3)' : '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: isMe ? '#FFD700' : '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {e.nickname}
-                  {!e.qualified && <span style={{ fontSize: 9, color: '#FF6B6B', marginLeft: 5 }}>ELIMINAT</span>}
                 </div>
                 {(() => {
                   const form = getPlayerForm(e.nickname, e.exactScores, mov);
@@ -203,15 +196,7 @@ export default function LeaderboardScreen({
               </div>
             </div>
 
-            {isQLine && i < sorted.length - 1 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 10px', opacity: 0.7 }}>
-                <div style={{ flex: 1, height: 1, background: 'rgba(239,68,68,0.25)' }}/>
-                <div style={{ fontSize: 9, color: '#FF6B6B', fontWeight: 700, letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>
-                  ✂ TOP {Math.round(QUALIFY_PCT*100)}% SE CALIFICĂ
-                </div>
-                <div style={{ flex: 1, height: 1, background: 'rgba(239,68,68,0.25)' }}/>
-              </div>
-            )}
+
           </div>
         );
       })}
