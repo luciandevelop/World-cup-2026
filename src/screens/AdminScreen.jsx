@@ -269,9 +269,9 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
 
       {/* Group filter */}
       <div style={{ display:'flex', gap:4, overflowX:'auto', marginBottom:6 }}>
-        {['all', ...ALL_GROUPS].map(g => (
+        {['all', ...ALL_GROUPS, 'AMICALE'].map(g => (
           <button key={g} onClick={() => setGroupF(g)} style={{ flexShrink:0, padding:'4px 9px', borderRadius:20, background:groupF===g?'rgba(239,68,68,0.15)':'rgba(255,255,255,0.03)', border:`1px solid ${groupF===g?'rgba(239,68,68,0.28)':'rgba(255,255,255,0.07)'}`, color:groupF===g?'#EF4444':'rgba(255,255,255,0.38)', fontSize:10, fontWeight:700, cursor:'pointer' }}>
-            {g === 'all' ? 'Toate' : `Gr.${g}`}
+            {g === 'all' ? 'Toate' : g === 'AMICALE' ? '🏟 Amicale' : `Gr.${g}`}
           </button>
         ))}
       </div>

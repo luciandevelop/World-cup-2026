@@ -775,8 +775,8 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
 
   // Build per-group match lists — uses finishedResults so isFinished/isLive/isLocked are live
   const liveGroupedMatches = useMemo(() => {
-    const live = buildMatches(finishedResults);
-    return ALL_GROUPS.reduce((acc, g) => {
+    const live = buildMatches(finishedResults, { includeTests: true });
+    return [...ALL_GROUPS, 'AMICALE'].reduce((acc, g) => {
       acc[g] = live.filter(m => m.group === g);
       return acc;
     }, {});
@@ -786,7 +786,7 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
   const groupedMatches = liveGroupedMatches;
 
   // All live matches (flat array, for friendMatches/myPred filtering)
-  const allLiveMatches = useMemo(() => buildMatches(finishedResults), [finishedResults]);
+  const allLiveMatches = useMemo(() => buildMatches(finishedResults, { includeTests: true }), [finishedResults]);
 
   // BUG-2 fix: friendMatches includes locked matches (spec: visible after 30-min lock)
   const myPredMatches = allLiveMatches.filter(m => predictions[m.id]);
@@ -840,7 +840,7 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
     );
   };
 
-  const visibleGroups = groupFilter === "toate" ? ALL_GROUPS : [groupFilter];
+  const visibleGroups = groupFilter === "toate" ? [...ALL_GROUPS, "AMICALE"] : [groupFilter];
 
   return (
     <>
@@ -939,8 +939,16 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
           </div>
         )}
 
-        {/* Group sections */}
-        {(tab === "toate" || tab === "mele") && visibleGroups.map(g => renderGroupSection(g))}
+        {/* Group sections — chronological when no group selected */}
+        {(tab === "toate" || tab === "mele") && groupFilter === "toate" && (() => {
+          // Flat list sorted by kickoff time
+          const allM = visibleGroups.flatMap(g => groupedMatches[g] || []);
+          const sorted = [...allM].sort((a, b) => new Date(a.time) - new Date(b.time));
+          const filtered = tab === "mele" ? sorted.filter(m => predictions[m.id]) : sorted;
+          if (filtered.length === 0) return null;
+          return filtered.map(m => <MatchCard key={m.id} match={m} prediction={predictions[m.id]} onPredict={onPredict} onDetail={setDetailMatch}/>);
+        })()}
+        {(tab === "toate" || tab === "mele") && groupFilter !== "toate" && visibleGroups.map(g => renderGroupSection(g))}
 
         {/* Friends tab — shows predictions of all users for locked/finished matches */}
         {tab === "prieteni" && visibleGroups.map(g => renderGroupSection(g))}
