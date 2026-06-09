@@ -37,8 +37,8 @@ export function buildMatches(finishedResults = FINISHED_RESULTS, { includeTests 
       isLocked,
       isFinished,
       isLive,
-      realScoreA:     isFinished ? Number(result.realScoreA) : null,
-      realScoreB:     isFinished ? Number(result.realScoreB) : null,
+      realScoreA:     (isFinished || isLive) && result?.realScoreA != null ? Number(result.realScoreA) : null,
+      realScoreB:     (isFinished || isLive) && result?.realScoreB != null ? Number(result.realScoreB) : null,
       // Canonical admin result stores homePossession/awayPossession — use home side as realPossession
       realPossession: result?.homePossession  ?? result?.realPossession ?? null,
       realPossessionAway: result?.awayPossession ?? null,
@@ -187,7 +187,7 @@ export function calcPoints(pred, match) {
 //   userPreds      — { matchId(Number): pred }
 //   finishedResults — the canonical wc2026_admin_results object
 // Returns: { points, exactScores, lastMatchPts }
-export function calculateUserScore(userPreds, finishedResults = {}, specialPts = 0) {
+export function calculateUserScore(userPreds, finishedResults = {}) {
   const fm = buildMatches(finishedResults, { includeTests: true }).filter(m => m.isFinished);
   let points = 0, exactScores = 0, lastMatchPts = null, lastMatchId = null;
   fm.forEach(match => {
@@ -202,49 +202,30 @@ export function calculateUserScore(userPreds, finishedResults = {}, specialPts =
       lastMatchId  = match.id;
     }
   });
-  return { points: points + specialPts, matchPoints: points, specialPoints: specialPts, exactScores, lastMatchPts, finishedCount: fm.length };
+  return { points, exactScores, lastMatchPts, finishedCount: fm.length };
 }
 
 // ─── LEADERBOARD ──────────────────────────────────────────────────────────────
 export const QUALIFY_PCT   = 0.70;
 export const CURRENT_STAGE = "Faza grupelor";
 
-// calcSpecialPts: standalone, used by both App.jsx and buildLeaderboard
-export function calcSpecialPts(userSpecialPred, specialResults) {
-  if (!userSpecialPred || !specialResults) return 0;
-  let pts = 0;
-  if (specialResults.winner && userSpecialPred.winner === specialResults.winner) pts += 500;
-  if (specialResults.semifinalists && userSpecialPred.semifinalists) {
-    const correct = (userSpecialPred.semifinalists || []).filter(t =>
-      (specialResults.semifinalists || []).includes(t)
-    );
-    pts += correct.length * 200;
-  }
-  if (specialResults.topScorerCountry && userSpecialPred.topScorerCountry === specialResults.topScorerCountry) pts += 300;
-  return pts;
-}
-
-// allSpecialPredsByNick: { nickname: specialPredObject } — optional
-// specialResults: { winner, semifinalists, topScorerCountry } — optional
-export function buildLeaderboard(allPlayerPreds, currentUser, finishedMatches = null, allSpecialPredsByNick = {}, specialResults = null) {
+export function buildLeaderboard(allPlayerPreds, currentUser, finishedMatches = null) {
   const fm = finishedMatches || buildMatches({}, { includeTests: true }).filter(m => m.isFinished);
-  const nicknames = new Set([currentUser, ...Object.keys(allPlayerPreds), ...Object.keys(allSpecialPredsByNick)]);
+  const nicknames = new Set([currentUser, ...Object.keys(allPlayerPreds)]);
 
   const players = Array.from(nicknames).map(nick => {
     const preds = allPlayerPreds[nick] || {};
-    let matchPoints = 0, exactScores = 0, lastMatchPts = null, lastMatchId = null;
+    let totalPoints = 0, exactScores = 0, lastMatchPts = null, lastMatchId = null;
     fm.forEach(match => {
       const pred = preds[match.id];
       if (!pred) return;
       const b = calcBreakdown(pred, match);
       if (!b) return;
-      matchPoints += b.total;
+      totalPoints += b.total;
       if (b.exactScore > 0) exactScores++;
       if (lastMatchId === null || match.id > lastMatchId) { lastMatchPts = b.total; lastMatchId = match.id; }
     });
-    const specialPoints = calcSpecialPts(allSpecialPredsByNick[nick] || null, specialResults);
-    const totalPoints = matchPoints + specialPoints;
-    return { nickname:nick, points:totalPoints, matchPoints, specialPoints, exactScores, lastMatchPts };
+    return { nickname:nick, points:totalPoints, exactScores, lastMatchPts };
   });
 
   players.sort((a, b) => b.points - a.points || a.nickname.localeCompare(b.nickname));
