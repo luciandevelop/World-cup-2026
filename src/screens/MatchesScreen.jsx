@@ -1,3 +1,166 @@
+import {
+  isSpecialLocked, specialLockCountdown, WC_TEAMS,
+  loadSpecialPrediction, saveSpecialPrediction, loadSpecialResults, calcSpecialPoints
+} from '../services/specialEventsService.js';
+
+
+// ─── EVENIMENTE SPECIALE ──────────────────────────────────────────────────────
+function SpecialEventsPanel({ user, specialResultsExt = null, allSpecialPredsExt = {} }) {
+  const [pred, setPred]       = React.useState(null);
+  const [results, setResults] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving]   = React.useState(false);
+  const [msg, setMsg]         = React.useState('');
+  const [draft, setDraft]     = React.useState({ winner: '', semifinalists: [], topScorerCountry: '' });
+  const locked = isSpecialLocked();
+  const countdown = specialLockCountdown();
+
+  React.useEffect(() => {
+    if (!user?.uid) { setLoading(false); return; }
+    // Use external props if provided (from App.jsx state), else fetch
+    const fetchPred = allSpecialPredsExt[user.uid]
+      ? Promise.resolve(allSpecialPredsExt[user.uid])
+      : loadSpecialPrediction(user.uid);
+    const fetchRes = specialResultsExt !== null
+      ? Promise.resolve(specialResultsExt)
+      : loadSpecialResults();
+    Promise.all([fetchPred, fetchRes]).then(([p, r]) => {
+      if (p) { setPred(p); setDraft({ winner: p.winner||'', semifinalists: p.semifinalists||[], topScorerCountry: p.topScorerCountry||'' }); }
+      if (r) setResults(r);
+      setLoading(false);
+    });
+  }, [user?.uid, specialResultsExt, allSpecialPredsExt]);
+
+  const toggleSemi = (name) => {
+    if (locked) return;
+    setDraft(d => {
+      const arr = d.semifinalists || [];
+      if (arr.includes(name)) return { ...d, semifinalists: arr.filter(x => x !== name) };
+      if (arr.length >= 4) return d;
+      return { ...d, semifinalists: [...arr, name] };
+    });
+  };
+
+  const handleSave = async () => {
+    if (locked) return;
+    if (!draft.winner) { setMsg('Alege câștigătoarea!'); return; }
+    if (draft.semifinalists.length !== 4) { setMsg('Alege exact 4 semifinaliste!'); return; }
+    if (!draft.topScorerCountry) { setMsg('Alege țara golgheterului!'); return; }
+    setSaving(true); setMsg('');
+    const res = await saveSpecialPrediction(user.uid, draft);
+    setSaving(false);
+    if (res.success) { setPred(draft); setMsg('✅ Salvat!'); }
+    else setMsg('Eroare: ' + res.error);
+  };
+
+  const myPts = results ? calcSpecialPoints(pred, results) : null;
+
+  if (loading) return <div style={{ padding:16, textAlign:'center', color:'rgba(255,255,255,0.3)', fontSize:12 }}>Se încarcă...</div>;
+
+  return (
+    <div style={{ marginBottom:16, background:'rgba(255,215,0,0.04)', border:'1px solid rgba(255,215,0,0.15)', borderRadius:14, overflow:'hidden' }}>
+      {/* Header */}
+      <div style={{ padding:'12px 14px 8px', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <div>
+          <div style={{ fontSize:13, fontWeight:800, color:'#FFD700', letterSpacing:'0.03em' }}>⭐ Evenimente Speciale</div>
+          <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', marginTop:2 }}>Până la 13 iun, 23:00 RO</div>
+        </div>
+        <div style={{ textAlign:'right' }}>
+          {locked
+            ? <span style={{ fontSize:10, color:'rgba(255,68,68,0.8)', fontWeight:700 }}>🔒 BLOCAT</span>
+            : <span style={{ fontSize:10, color:'rgba(245,158,11,0.8)', fontWeight:700 }}>🔓 {countdown} rămas</span>
+          }
+          {myPts !== null && <div style={{ fontSize:12, fontWeight:800, color:'#FFD700', marginTop:2 }}>{myPts} pts</div>}
+        </div>
+      </div>
+
+      <div style={{ padding:'10px 14px 14px' }}>
+        {/* A: Winner */}
+        <div style={{ marginBottom:12 }}>
+          <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)', fontWeight:700, marginBottom:6, textTransform:'uppercase', letterSpacing:'0.08em' }}>
+            🏆 Câștigătoarea Cupei Mondiale <span style={{ color:'#FFD700' }}>500 pts</span>
+          </div>
+          {locked && pred?.winner
+            ? <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>{WC_TEAMS.find(t=>t.name===pred.winner)?.flag} {pred.winner}</div>
+            : !locked && (
+              <select
+                value={draft.winner}
+                onChange={e => setDraft(d => ({ ...d, winner: e.target.value }))}
+                style={{ width:'100%', padding:'8px 10px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:8, color:'#fff', fontSize:13, outline:'none' }}
+              >
+                <option value="">— Alege echipa —</option>
+                {WC_TEAMS.map(t => <option key={t.name} value={t.name}>{t.flag} {t.name}</option>)}
+              </select>
+            )
+          }
+          {results?.winner && <div style={{ fontSize:11, color:'rgba(0,229,160,0.8)', marginTop:4 }}>✓ Răspuns: {results.winner} {pred?.winner === results.winner ? '· +500pts' : ''}</div>}
+        </div>
+
+        {/* B: Semifinalists */}
+        <div style={{ marginBottom:12 }}>
+          <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)', fontWeight:700, marginBottom:6, textTransform:'uppercase', letterSpacing:'0.08em' }}>
+            🥈 Semifinaliste (alege 4) <span style={{ color:'#FFD700' }}>200 pts / echipă</span>
+          </div>
+          {locked && pred?.semifinalists?.length
+            ? <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                {pred.semifinalists.map(t => <span key={t} style={{ padding:'3px 8px', background:'rgba(255,255,255,0.08)', borderRadius:6, fontSize:12, color:'rgba(255,255,255,0.8)' }}>{WC_TEAMS.find(x=>x.name===t)?.flag} {t}</span>)}
+              </div>
+            : !locked && (
+              <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                {WC_TEAMS.map(t => {
+                  const sel = draft.semifinalists.includes(t.name);
+                  const full = draft.semifinalists.length >= 4 && !sel;
+                  return (
+                    <button key={t.name} onClick={() => toggleSemi(t.name)} disabled={full}
+                      style={{ padding:'3px 8px', background: sel ? 'rgba(0,229,160,0.2)' : 'rgba(255,255,255,0.05)', border:`1px solid ${sel ? 'rgba(0,229,160,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius:6, fontSize:11, color: full ? 'rgba(255,255,255,0.2)' : '#fff', cursor: full ? 'default' : 'pointer' }}>
+                      {t.flag} {t.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )
+          }
+          {results?.semifinalists && (
+            <div style={{ fontSize:11, color:'rgba(0,229,160,0.8)', marginTop:4 }}>✓ Răspuns: {results.semifinalists.join(', ')}</div>
+          )}
+        </div>
+
+        {/* C: Top scorer country */}
+        <div style={{ marginBottom:12 }}>
+          <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)', fontWeight:700, marginBottom:6, textTransform:'uppercase', letterSpacing:'0.08em' }}>
+            ⚽ Țara golgheterului <span style={{ color:'#FFD700' }}>300 pts</span>
+          </div>
+          {locked && pred?.topScorerCountry
+            ? <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>{WC_TEAMS.find(t=>t.name===pred.topScorerCountry)?.flag} {pred.topScorerCountry}</div>
+            : !locked && (
+              <select
+                value={draft.topScorerCountry}
+                onChange={e => setDraft(d => ({ ...d, topScorerCountry: e.target.value }))}
+                style={{ width:'100%', padding:'8px 10px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:8, color:'#fff', fontSize:13, outline:'none' }}
+              >
+                <option value="">— Alege țara —</option>
+                {WC_TEAMS.map(t => <option key={t.name} value={t.name}>{t.flag} {t.name}</option>)}
+              </select>
+            )
+          }
+          {results?.topScorerCountry && <div style={{ fontSize:11, color:'rgba(0,229,160,0.8)', marginTop:4 }}>✓ Răspuns: {results.topScorerCountry} {pred?.topScorerCountry === results.topScorerCountry ? '· +300pts' : ''}</div>}
+        </div>
+
+        {/* Save button */}
+        {!locked && (
+          <div>
+            {msg && <div style={{ fontSize:11, color: msg.startsWith('✅') ? 'rgba(0,229,160,0.8)' : '#EF4444', marginBottom:6 }}>{msg}</div>}
+            <button onClick={handleSave} disabled={saving}
+              style={{ width:'100%', padding:'10px', background:'rgba(255,215,0,0.12)', border:'1px solid rgba(255,215,0,0.3)', borderRadius:10, color:'#FFD700', fontSize:13, fontWeight:800, cursor:'pointer' }}>
+              {saving ? 'Se salvează...' : '💾 Salvează predicțiile speciale'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── FRIEND PREDICTIONS PANEL ────────────────────────────────────────────────
 // Shows after match locks. Before lock, predictions are hidden.
 function FriendPredictionsPanel({ matches, allPredictions, allUsers, myPredictions }) {
@@ -45,9 +208,18 @@ function FriendPredictionsPanel({ matches, allPredictions, allUsers, myPredictio
                     <span style={{ fontSize:12, color:"rgba(255,255,255,0.6)", fontWeight:600 }}>
                       {isMe ? "⭐ " : ""}{u.nickname}
                     </span>
-                    <span style={{ fontSize:14, fontWeight:800, color:"#fff", fontFamily:"'DM Mono',monospace" }}>
-                      {pred.scoreA} – {pred.scoreB}
-                    </span>
+                    <div style={{ textAlign:"right" }}>
+                      <div style={{ fontSize:14, fontWeight:800, color:"#fff", fontFamily:"'DM Mono',monospace" }}>
+                        {pred.scoreA} – {pred.scoreB}
+                      </div>
+                      {(pred.possession != null || pred.corners != null) && (
+                        <div style={{ fontSize:10, color:"rgba(255,255,255,0.35)", fontFamily:"'DM Mono',monospace", marginTop:1 }}>
+                          {pred.possession != null ? `pos ${pred.possession}-${100-pred.possession}` : ""}
+                          {pred.possession != null && pred.corners != null ? " · " : ""}
+                          {pred.corners != null ? `col ${pred.corners}` : ""}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               }).filter(Boolean)}
@@ -752,7 +924,7 @@ function MatchDetailModal({ match, prediction, onClose, onPredict }) {
   );
 }
 
-export default function MatchesScreen({ predictions, onPredict, finishedResults, groupOverrides, allPredictions = {}, allUsers = {}, activityFeed = [] }) {
+export default function MatchesScreen({ predictions, onPredict, finishedResults, groupOverrides, allPredictions = {}, allUsers = {}, activityFeed = [], user = null, specialResults = null, allSpecialPreds = {} }) {
   const [tab, setTab]              = useState("toate"); // "toate" | "mele" | "prieteni"
   const [detailMatch, setDetailMatch] = useState(null);
 
@@ -897,6 +1069,9 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
 
       {/* Content */}
       <div style={{ padding:"12px 12px 0" }}>
+
+        {/* Evenimente Speciale — shown in tab "toate" only, before groups */}
+        {tab === "toate" && groupFilter === "toate" && <SpecialEventsPanel user={user} specialResultsExt={specialResults} allSpecialPredsExt={allSpecialPreds}/>}
 
         {/* Live feed */}
         {tab === "toate" && <LiveFeed events={activityFeed || []}/>}
