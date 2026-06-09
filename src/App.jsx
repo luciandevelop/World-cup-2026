@@ -7,7 +7,6 @@ import CSS from './styles/globalCSS.js';
 import {
   MATCHES, buildMatches, calcBreakdown, calcPoints, buildLeaderboard, calculateUserScore,
   ADMIN_EMAILS, ADMIN_EMAILS_RUNTIME, QUALIFY_PCT, generateActivityFeed, matchLockState,
-  calcSpecialPts,
 } from './data/gameData.js';
 import { getAvatarById, getDefaultAvatarForNick, AVATARS } from './data/avatars.js';
 import { LoginScreen, NicknameScreen } from './screens/AuthScreens.jsx';
@@ -30,7 +29,7 @@ import {
 } from './services/firestoreService.js';
 import { FIREBASE_CONFIGURED, firebaseGetRedirectResult } from './services/firebase.js';
 import {
-  loadAllSpecialPredictions, loadSpecialResults,
+  loadAllSpecialPredictions, loadSpecialResults, calcSpecialPoints,
 } from './services/specialEventsService.js';
 
 export const APP_VERSION = 'v8';
@@ -309,7 +308,7 @@ export default function App() {
   // Single source of truth for current user's score
   const myPredsByNumber = Object.fromEntries(Object.entries(predictions).map(([id,p])=>[Number(id),p]));
   const mySpecialPred   = user?.uid ? (allSpecialPreds[user.uid] || null) : null;
-  const mySpecialPts    = calcSpecialPts(mySpecialPred, specialResults);
+  const mySpecialPts    = calcSpecialPoints(mySpecialPred, specialResults);
   const myScore         = calculateUserScore(myPredsByNumber, finishedResults, mySpecialPts);
   const totalPts        = myScore.points;
 
@@ -326,7 +325,6 @@ export default function App() {
   if (user?.nickname) {
     predsByNick[user.nickname] = Object.fromEntries(Object.entries(predictions).map(([id,p])=>[Number(id),p]));
   }
-  // Map uid -> nickname for special predictions
   const allSpecialPredsByNick = Object.entries(allSpecialPreds).reduce((acc, [uid, pred]) => {
     const nick = allUsers[uid]?.nickname || (uid === user?.uid ? user?.nickname : null);
     if (nick) acc[nick] = pred;
@@ -407,9 +405,7 @@ export default function App() {
       loadSpecialResults().then(r => { if (r) setSpecialResults(r); });
       return;
     }
-    // Reload overrides any time admin saves (they may have changed)
     setGroupOverrides(loadGroupOverrides());
-    // Always reload results after admin save — realtime subscription may lag
     const results = await loadMatchResults();
     setFinishedResults(results);
   }, []);
