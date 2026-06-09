@@ -428,3 +428,43 @@ export async function resetTestData() {
   });
   return { success: true };
 }
+
+// ─── SPECIAL EVENTS ───────────────────────────────────────────────────────────
+export async function loadAllSpecialPredictionsFS() {
+  if (!FIREBASE_CONFIGURED) return {};
+  try {
+    const { getDocs: gd, collection: col } = await import('firebase/firestore');
+    const snap = await gd(col(db, 'specialPredictions'));
+    const out = {};
+    snap.forEach(d => { out[d.id] = d.data(); });
+    return out;
+  } catch(e) { console.error('loadAllSpecialPredictionsFS:', e); return {}; }
+}
+
+export async function loadSpecialResultsFS() {
+  if (!FIREBASE_CONFIGURED) {
+    try { return JSON.parse(localStorage.getItem('wc2026_special_results') || 'null'); } catch { return null; }
+  }
+  try {
+    const { getDoc: gd, doc: docFn } = await import('firebase/firestore');
+    const snap = await gd(docFn(db, 'specialResults', 'main'));
+    return snap.exists() ? snap.data() : null;
+  } catch(e) { console.error('loadSpecialResultsFS:', e); return null; }
+}
+
+export async function resetSpecialDataFS() {
+  if (!FIREBASE_CONFIGURED) {
+    Object.keys(localStorage).filter(k => k.startsWith('wc2026_special_')).forEach(k => localStorage.removeItem(k));
+    localStorage.removeItem('wc2026_special_results');
+    return { success: true };
+  }
+  try {
+    const { getDocs: gd, collection: col, doc: docFn, writeBatch: wb } = await import('firebase/firestore');
+    const snap = await gd(col(db, 'specialPredictions'));
+    const batch = wb(db);
+    snap.forEach(d => batch.delete(d.ref));
+    batch.delete(docFn(db, 'specialResults', 'main'));
+    await batch.commit();
+    return { success: true };
+  } catch(e) { return { success: false, error: e.message }; }
+}
