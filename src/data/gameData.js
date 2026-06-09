@@ -209,23 +209,41 @@ export function calculateUserScore(userPreds, finishedResults = {}) {
 export const QUALIFY_PCT   = 0.70;
 export const CURRENT_STAGE = "Faza grupelor";
 
-export function buildLeaderboard(allPlayerPreds, currentUser, finishedMatches = null) {
+// calcSpecialPts — standalone so App.jsx can also call it
+export function calcSpecialPtsStandalone(userSpecialPred, specialResults) {
+  if (!userSpecialPred || !specialResults) return 0;
+  let pts = 0;
+  if (specialResults.winner && userSpecialPred.winner === specialResults.winner) pts += 500;
+  if (specialResults.semifinalists && userSpecialPred.semifinalists) {
+    const correct = (userSpecialPred.semifinalists || []).filter(t => (specialResults.semifinalists || []).includes(t));
+    pts += correct.length * 200;
+  }
+  if (specialResults.topScorerCountry && userSpecialPred.topScorerCountry === specialResults.topScorerCountry) pts += 300;
+  return pts;
+}
+
+// allSpecialPredsByNick: { nickname: specialPredObject }
+// specialResults: { winner, semifinalists, topScorerCountry }
+export function buildLeaderboard(allPlayerPreds, currentUser, finishedMatches = null, allSpecialPredsByNick = {}, specialResults = null) {
   const fm = finishedMatches || buildMatches({}, { includeTests: true }).filter(m => m.isFinished);
-  const nicknames = new Set([currentUser, ...Object.keys(allPlayerPreds)]);
+  const nicknames = new Set([currentUser, ...Object.keys(allPlayerPreds), ...Object.keys(allSpecialPredsByNick)]);
 
   const players = Array.from(nicknames).map(nick => {
     const preds = allPlayerPreds[nick] || {};
-    let totalPoints = 0, exactScores = 0, lastMatchPts = null, lastMatchId = null;
+    let matchPoints = 0, exactScores = 0, lastMatchPts = null, lastMatchId = null;
     fm.forEach(match => {
       const pred = preds[match.id];
       if (!pred) return;
       const b = calcBreakdown(pred, match);
       if (!b) return;
-      totalPoints += b.total;
+      matchPoints += b.total;
       if (b.exactScore > 0) exactScores++;
       if (lastMatchId === null || match.id > lastMatchId) { lastMatchPts = b.total; lastMatchId = match.id; }
     });
-    return { nickname:nick, points:totalPoints, exactScores, lastMatchPts };
+    const specialPred = allSpecialPredsByNick[nick] || null;
+    const specialPoints = calcSpecialPtsStandalone(specialPred, specialResults);
+    const totalPoints = matchPoints + specialPoints;
+    return { nickname:nick, points:totalPoints, matchPoints, specialPoints, exactScores, lastMatchPts };
   });
 
   players.sort((a, b) => b.points - a.points || a.nickname.localeCompare(b.nickname));
