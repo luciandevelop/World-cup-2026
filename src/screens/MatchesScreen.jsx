@@ -182,7 +182,7 @@ function TestMatchesPanel({ testMatches, predictions, onPredict, finishedResults
 // Tabs: "Toate" | "Predicțiile Mele" | "Predicțiile Prietenilor"
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   MATCHES, GROUPS, TEST_MATCHES,
   POPULAR_PICKS, MOST_PREDICTED, LIVE_FEED_EVENTS, TYPE_COLOR,
@@ -769,14 +769,14 @@ function MatchDetailModal({ match, prediction, onClose, onPredict }) {
 
 // ─── EVENIMENTE SPECIALE ──────────────────────────────────────────────────────
 function SpecialEventsPanel({ user, specialResults, allSpecialPreds }) {
-  const [pred, setPred]     = React.useState(null);
-  const [saving, setSaving] = React.useState(false);
-  const [msg, setMsg]       = React.useState('');
-  const [draft, setDraft]   = React.useState({ winner:'', semifinalists:[], topScorerCountry:'' });
+  const [pred, setPred]     = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg]       = useState('');
+  const [draft, setDraft]   = useState({ winner:'', semifinalists:[], topScorerCountry:'' });
   const locked   = isSpecialLocked();
   const countdown = specialLockCountdown();
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!user?.uid) return;
     const ext = allSpecialPreds?.[user.uid];
     if (ext) {
