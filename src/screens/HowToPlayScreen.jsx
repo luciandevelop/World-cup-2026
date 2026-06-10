@@ -50,7 +50,7 @@ function HowToPlayScreen() {
       <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8 }}>
         {[
           { icon:"⚽", label:"Scor exact",  desc:"Ghicești 2–1?" },
-          { icon:"📊", label:"Posesie",     desc:"20 – 80%" },
+          { icon:"🟨", label:"Cartonașe",   desc:"0 – 20" },
           { icon:"🚩", label:"Cornere",     desc:"Total meci" },
         ].map((c,i)=>(
           <div key={i} style={{ background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,padding:"12px 10px",textAlign:"center" }}>
@@ -102,7 +102,7 @@ function HowToPlayScreen() {
       {/* Possession + Corners side by side */}
       <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8 }}>
         {[
-          { label:"Posesie", rows:[{l:"Exact",pts:"+15",c:"#00E5A0"},{l:"±1–2%",pts:"+10",c:"#4A9EFF"},{l:"±3–5%",pts:"+5",c:"#4A9EFF"},{l:">5%",pts:"0",c:"#2a2a2a"}] },
+          { label:"Cartonașe", rows:[{l:"Exact",pts:"+15",c:"#00E5A0"},{l:"±1",pts:"+14",c:"#4A9EFF"},{l:"±2",pts:"+13",c:"#4A9EFF"},{l:">5 dif.",pts:"0",c:"#2a2a2a"}] },
           { label:"Cornere", rows:[{l:"Exact",pts:"+15",c:"#00E5A0"},{l:"±1",pts:"+10",c:"#4A9EFF"},{l:"±2",pts:"+5",c:"#4A9EFF"},{l:"±3",pts:"+2",c:"#555"},{l:">3",pts:"0",c:"#2a2a2a"}] },
         ].map((col,ci)=>(
           <div key={ci} style={{ background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.05)",borderRadius:12,padding:"10px 12px" }}>
@@ -121,7 +121,7 @@ function HowToPlayScreen() {
       <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"13px 18px",background:"linear-gradient(135deg,rgba(255,215,0,0.09),rgba(255,215,0,0.04))",border:"1px solid rgba(255,215,0,0.2)",borderRadius:13,boxShadow:"0 0 20px rgba(255,215,0,0.04)" }}>
         <div>
           <div style={{ fontSize:12,color:"#FFD700",fontWeight:800,marginBottom:1 }}>Perfect Prediction</div>
-          <div style={{ fontSize:10,color:"#FFD70055" }}>scor + posesie + cornere — toate exacte</div>
+          <div style={{ fontSize:10,color:"#FFD70055" }}>scor + cartonașe + cornere — toate exacte</div>
         </div>
         <div style={{ fontSize:22,fontWeight:900,color:"#FFD700",fontFamily:"'DM Mono',monospace",filter:"drop-shadow(0 0 8px rgba(255,215,0,0.4))" }}>200</div>
       </div>

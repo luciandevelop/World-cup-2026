@@ -167,8 +167,10 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
     const isFT = status === 'ft';
 
     // Parse optional stats — store null if empty
+    // possA now stores total cards (displayed as "Cartonașe totale")
+    // Stored in homePossession field for scoring compatibility (pred.possession vs match.realPossession)
     const hPoss = possA !== '' ? Number(possA) : null;
-    const aPoss = possB !== '' ? Number(possB) : null;
+    const aPoss = null; // awayPossession no longer used
     const hCorn = cornA !== '' ? Math.max(0, parseInt(cornA, 10)) : null;
     const aCorn = cornB !== '' ? Math.max(0, parseInt(cornB, 10)) : null;
 
@@ -373,31 +375,24 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
             </div>
           </div>
 
-          {/* Per-team possession + corners (FT only, optional) */}
+          {/* Cartonașe + cornere (FT only, optional) */}
           {status === 'ft' && (
             <div style={{ marginBottom:10 }}>
               <div style={{ fontSize:10, color:'rgba(255,255,255,0.25)', letterSpacing:'0.08em', textTransform:'uppercase', fontWeight:600, marginBottom:8 }}>Stats opționale</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
                 <div>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:4 }}>{sel.flagA} Posesie %</div>
-                  <input type="number" min="0" max="100" value={possA} onChange={e=>setPossA(e.target.value)} placeholder="ex: 55" style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:13, fontFamily:"'DM Mono',monospace", outline:'none', boxSizing:'border-box' }}/>
-                </div>
-                <div>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:4 }}>{sel.flagB} Posesie %</div>
-                  <input type="number" min="0" max="100" value={possB} onChange={e=>setPossB(e.target.value)} placeholder="ex: 45" style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:13, fontFamily:"'DM Mono',monospace", outline:'none', boxSizing:'border-box' }}/>
+                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:4 }}>Cartonașe totale</div>
+                  <input type="number" min="0" max="20" value={possA} onChange={e=>setPossA(e.target.value)} placeholder="ex: 4" style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:13, fontFamily:"'DM Mono',monospace", outline:'none', boxSizing:'border-box' }}/>
                 </div>
                 <div>
                   <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:4 }}>{sel.flagA} Cornere</div>
                   <input type="number" min="0" max="30" value={cornA} onChange={e=>setCornA(e.target.value)} placeholder="ex: 6" style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:13, fontFamily:"'DM Mono',monospace", outline:'none', boxSizing:'border-box' }}/>
                 </div>
-                <div>
+                <div style={{ gridColumn:'span 1' }}>
                   <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:4 }}>{sel.flagB} Cornere</div>
                   <input type="number" min="0" max="30" value={cornB} onChange={e=>setCornB(e.target.value)} placeholder="ex: 3" style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:13, fontFamily:"'DM Mono',monospace", outline:'none', boxSizing:'border-box' }}/>
                 </div>
               </div>
-              {possA !== '' && possB !== '' && Math.abs(Number(possA)+Number(possB)-100) > 1 && (
-                <div style={{ fontSize:10, color:'#F59E0B', marginBottom:4 }}>⚠️ Posesia trebuie să totalizeze 100% ({Number(possA)+Number(possB)}%)</div>
-              )}
             </div>
           )}
 
@@ -570,7 +565,7 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
                             {b.exactScore > 0  && <span style={{ color:'#00E5A0' }}>+{b.exactScore} exact</span>}
                             {b.correctRes > 0  && <span style={{ color:'#4A9EFF' }}>+{b.correctRes} 1X2</span>}
                             {b.totalGoals > 0  && <span style={{ color:'#FFD700' }}>+{b.totalGoals} totalGM</span>}
-                            {b.possession > 0  && <span style={{ color:'#9B59B6' }}>+{b.possession} pos(diff:{b._debug.possessionDiff})</span>}
+                            {b.possession > 0  && <span style={{ color:'#9B59B6' }}>+{b.possession} cart(diff:{b._debug.possessionDiff})</span>}
                             {b.corners > 0     && <span style={{ color:'#FF9800' }}>+{b.corners} corn(diff:{b._debug.cornerDiff})</span>}
                           </div>
                         </div>

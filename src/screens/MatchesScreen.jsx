@@ -56,7 +56,7 @@ function FriendPredictionsPanel({ matches, allPredictions, allUsers, myPredictio
                       </div>
                       {(pred.possession != null || pred.corners != null) && (
                         <div style={{ fontSize:10, color:"rgba(255,255,255,0.35)", fontFamily:"'DM Mono',monospace" }}>
-                          {pred.possession != null ? `pos ${pred.possession}-${100-pred.possession}` : ""}
+                          {pred.possession != null ? `🟨 ${pred.possession} cart` : ""}
                           {pred.possession != null && pred.corners != null ? " · " : ""}
                           {pred.corners != null ? `col ${pred.corners}` : ""}
                         </div>
@@ -217,7 +217,7 @@ function ScoreBreakdown({ pred, match }) {
     { label:"Scor exact",      pts:b.exactScore, max:100 },
     { label:"Rezultat corect", pts:b.correctRes,  max:50  },
     { label:"Total goluri",    pts:b.totalGoals,  max:20  },
-    { label:"Posesie",         pts:b.possession,  max:15  },
+    { label:"Cartonașe",       pts:b.possession,  max:15  },
     { label:"Cornere",         pts:b.corners,     max:15  },
   ];
   return (
@@ -381,7 +381,7 @@ function MatchCard({ match, prediction, onPredict, onDetail }) {
         )}
         {isEditable && hasPred && (
           <div style={{ marginTop:10, padding:"7px 12px", background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-            <span style={{ fontSize:11, color:"rgba(255,255,255,0.35)" }}>Predicția ta: {prediction.scoreA}–{prediction.scoreB} · {prediction.possession}% · {prediction.corners}🔄</span>
+            <span style={{ fontSize:11, color:"rgba(255,255,255,0.35)" }}>Predicția ta: {prediction.scoreA}–{prediction.scoreB} · {prediction.possession} cart · {prediction.corners}🔄</span>
             <span style={{ fontSize:10, color:"rgba(0,229,160,0.5)", fontWeight:700 }}>Editează</span>
           </div>
         )}
@@ -739,7 +739,7 @@ function MatchDetailModal({ match, prediction, onClose, onPredict }) {
                   {match.flagA} {prediction.scoreA} - {prediction.scoreB} {match.flagB}
                 </div>
                 <div style={{ display:'flex', justifyContent:'center', gap:16 }}>
-                  <span style={{ fontSize:12, color:'rgba(255,255,255,0.4)' }}>Posesie: {prediction.possession}%</span>
+                  <span style={{ fontSize:12, color:'rgba(255,255,255,0.4)' }}>Cartonașe: {prediction.possession}</span>
                   <span style={{ fontSize:12, color:'rgba(255,255,255,0.4)' }}>Cornere: {prediction.corners}</span>
                 </div>
               </div>
