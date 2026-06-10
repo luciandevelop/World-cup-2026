@@ -14,7 +14,9 @@ export default function PredictionModal({ match, existing, onSave, onClose }) {
   const [sB,   setSB]   = useState(existing?.scoreB   ?? 1);
   const [poss, setPoss] = useState(existing?.possession ?? 4);
   const [corn, setCorn] = useState(existing?.corners   ?? 9);
-  const [saved, setSaved] = useState(false);
+  const [saved,   setSaved]   = useState(false);
+  const [saving,  setSaving]  = useState(false);
+  const [errMsg,  setErrMsg]  = useState('');
 
   if (!match) return null;
 
@@ -26,11 +28,19 @@ export default function PredictionModal({ match, existing, onSave, onClose }) {
 
   const result = sA > sB ? match.teamA : sA < sB ? match.teamB : 'Egal';
 
-  const handleSave = () => {
-    if (!isEditable) return;
-    onSave(match.id, { scoreA: sA, scoreB: sB, possession: poss, corners: corn });
-    setSaved(true);
-    setTimeout(onClose, 700);
+  const handleSave = async () => {
+    if (!isEditable || saving) return;
+    setSaving(true);
+    setErrMsg('');
+    try {
+      await onSave(match.id, { scoreA: sA, scoreB: sB, possession: poss, corners: corn });
+      setSaved(true);
+      setTimeout(onClose, 600);
+    } catch (e) {
+      setErrMsg(e?.message || 'Eroare la salvare. Încearcă din nou.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -144,13 +154,20 @@ export default function PredictionModal({ match, existing, onSave, onClose }) {
 
         {/* Save button */}
         {isEditable && (
-          <button
-            onClick={handleSave}
-            disabled={saved}
-            style={{ width:'100%',padding:15,background:saved?'rgba(0,229,160,0.3)':'linear-gradient(135deg,#00E5A0,#00C27A)',border:'none',borderRadius:13,color:'#060C09',fontSize:16,fontWeight:900,cursor:saved?'default':'pointer',fontFamily:"'Bebas Neue',sans-serif",letterSpacing:'0.08em',transition:'all 0.2s',boxShadow:saved?'none':'0 6px 20px rgba(0,229,160,0.22)' }}
-          >
-            {saved ? '✓ Salvat!' : 'SALVEAZĂ PREDICȚIA →'}
-          </button>
+          <>
+            {errMsg && (
+              <div style={{ marginBottom:10,padding:'10px 14px',background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:10,color:'#EF4444',fontSize:12,fontWeight:600 }}>
+                ⚠️ {errMsg}
+              </div>
+            )}
+            <button
+              onClick={handleSave}
+              disabled={saving || saved}
+              style={{ width:'100%',padding:15,background:saved?'rgba(0,229,160,0.3)':'linear-gradient(135deg,#00E5A0,#00C27A)',border:'none',borderRadius:13,color:'#060C09',fontSize:16,fontWeight:900,cursor:(saving||saved)?'default':'pointer',fontFamily:"'Bebas Neue',sans-serif",letterSpacing:'0.08em',transition:'all 0.2s',boxShadow:saved?'none':'0 6px 20px rgba(0,229,160,0.22)',opacity:saving?0.7:1 }}
+            >
+              {saving ? 'SE SALVEAZĂ...' : saved ? '✓ Salvat!' : 'SALVEAZĂ PREDICȚIA →'}
+            </button>
+          </>
         )}
       </div>
     </div>
