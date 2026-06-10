@@ -22,11 +22,21 @@ export default function LeaderboardScreen({
   predictions = {},
   allPredictions = {},
   finishedResults = {},
+  allUsers = {},
 }) {
   const currentNickname =
     typeof currentUser === 'string'
       ? currentUser
       : (currentUser?.nickname || currentUser?.displayName || currentUser?.email || '');
+
+  // Build nickname→avatarId map from allUsers for accurate avatar display
+  const avatarByNick = useMemo(() => {
+    const map = {};
+    Object.values(allUsers).forEach(u => {
+      if (u?.nickname && u?.avatarId) map[u.nickname] = u.avatarId;
+    });
+    return map;
+  }, [allUsers]);
 
   const data = useMemo(() => {
     try {
@@ -108,7 +118,7 @@ export default function LeaderboardScreen({
           <div style={{ background: 'linear-gradient(135deg,rgba(212,175,55,0.1),rgba(212,175,55,0.04))', border: '1px solid rgba(212,175,55,0.18)', borderRadius: 18, padding: '16px 18px', marginBottom: 14, animation: 'fadeUp 0.3s ease both' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <FootballAvatar nickname={currentNickname} size={48}/>
+                <FootballAvatar nickname={currentNickname} avatarId={avatarByNick[currentNickname]} size={48}/>
                 <div>
                   <div style={{ fontSize: 9, color: 'rgba(212,175,55,0.4)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 2 }}>Tu ești</div>
                   <div style={{ fontSize: 32, fontWeight: 900, color: '#FFD700', fontFamily: "'DM Mono',monospace", lineHeight: 1 }}>#{my.rank}</div>
@@ -166,7 +176,7 @@ export default function LeaderboardScreen({
 
               <div style={{ position: 'relative', flexShrink: 0 }}>
                 <div style={{ padding: 2, borderRadius: '50%', background: ring, display: 'inline-flex' }}>
-                  <FootballAvatar nickname={e.nickname} size={34}/>
+                  <FootballAvatar nickname={e.nickname} avatarId={avatarByNick[e.nickname]} size={34}/>
                 </div>
                 {isMe && <div style={{ position: 'absolute', bottom: -1, right: -1, width: 10, height: 10, borderRadius: '50%', background: '#FFD700', border: '2px solid #0A0E14' }}/>} 
               </div>
