@@ -1048,6 +1048,7 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
     try { return JSON.parse(localStorage.getItem('wc2026_lineups') || '{}'); } catch { return {}; }
   })();
   const [collapsedGroups, setCollapsedGroups] = useState(new Set());
+  const [finishedOpen, setFinishedOpen] = useState(false); // collapsed finished section
   const [groupFilter, setGroupFilter] = useState("toate");
 
   const toggleGroup = (g) => {
@@ -1101,17 +1102,23 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
     [finishedResults]
   );
 
-  const renderGroupSection = (g) => {
-    const matches = tab === "mele"
+  const renderGroupSection = (g, fOpen, setFOpen) => {
+    const allMatches = tab === "mele"
       ? groupedMatches[g].filter(m => predictions[m.id])
       : tab === "prieteni"
       ? groupedMatches[g].filter(m => m.isFinished || m.isLive || m.isLocked)
       : groupedMatches[g];
 
-    if (matches.length === 0) return null;
+    if (allMatches.length === 0) return null;
     const teams = GROUP_TEAMS[g] || [];
-    const predCount = matches.filter(m => predictions[m.id]).length;
+    const predCount = allMatches.filter(m => predictions[m.id]).length;
     const collapsed = collapsedGroups.has(g);
+
+    // Split upcoming vs finished (prieteni shows all without split)
+    const upcoming = (tab === "prieteni") ? allMatches : allMatches.filter(m => !m.isFinished);
+    const finished = (tab === "prieteni") ? [] : allMatches.filter(m => m.isFinished)
+                       .sort((a, b) => new Date(b.time) - new Date(a.time));
+    const useSplit = fOpen !== undefined && finished.length > 0;
 
     return (
       <div key={g} style={{ marginBottom:12 }}>
@@ -1120,15 +1127,37 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
           teams={teams}
           collapsed={collapsed}
           onToggle={() => toggleGroup(g)}
-          matchCount={matches.length}
+          matchCount={allMatches.length}
           predCount={predCount}
         />
         {!collapsed && (
           <div style={{ background:"rgba(255,255,255,0.01)", border:"1px solid rgba(255,255,255,0.06)", borderTop:"none", borderRadius:"0 0 12px 12px", padding:"10px 10px 4px" }}>
             {tab === "toate" && <GroupStandings group={g} finishedResults={finishedResults} overrideOrder={groupOverrides?.[g] || null}/>}
-            {matches.map(m => (
-              <MatchCard key={m.id} match={m} prediction={predictions[m.id]} onPredict={onPredict} onDetail={setDetailMatch}/>
-            ))}
+            {useSplit ? (
+              <>
+                {upcoming.map(m => (
+                  <MatchCard key={m.id} match={m} prediction={predictions[m.id]} onPredict={onPredict} onDetail={setDetailMatch}/>
+                ))}
+                {finished.length > 0 && (
+                  <div style={{ marginTop:4, marginBottom:4 }}>
+                    <button
+                      onClick={() => setFOpen(o => !o)}
+                      style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 10px', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, cursor:'pointer', color:'rgba(255,255,255,0.4)', fontSize:11, fontWeight:700 }}
+                    >
+                      <span>⏱ Finalizate ({finished.length})</span>
+                      <span>{fOpen ? '▲' : '▼'}</span>
+                    </button>
+                    {fOpen && finished.map(m => (
+                      <MatchCard key={m.id} match={m} prediction={predictions[m.id]} onPredict={onPredict} onDetail={setDetailMatch}/>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              allMatches.map(m => (
+                <MatchCard key={m.id} match={m} prediction={predictions[m.id]} onPredict={onPredict} onDetail={setDetailMatch}/>
+              ))
+            )}
           </div>
         )}
       </div>
@@ -1246,18 +1275,44 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
 
         {/* Group sections — chronological when no group selected */}
         {(tab === "toate" || tab === "mele") && groupFilter === "toate" && (() => {
-          // Flat list sorted by kickoff time
           const allM = visibleGroups.flatMap(g => groupedMatches[g] || []);
           const sorted = [...allM].sort((a, b) => new Date(a.time) - new Date(b.time));
           const filtered = tab === "mele" ? sorted.filter(m => predictions[m.id]) : sorted;
           if (filtered.length === 0) return null;
           // Exclude the hero card match from the list so it doesn't appear twice
-          const listMatches = (tab === "toate" && groupFilter === "toate" && nextMatchId)
+          const withoutHero = (tab === "toate" && nextMatchId)
             ? filtered.filter(m => m.id !== nextMatchId)
             : filtered;
-          return listMatches.map(m => <MatchCard key={m.id} match={m} prediction={predictions[m.id]} onPredict={onPredict} onDetail={setDetailMatch}/>);
+          const upcoming  = withoutHero.filter(m => !m.isFinished);
+          const finished  = withoutHero.filter(m => m.isFinished)
+                              .sort((a, b) => new Date(b.time) - new Date(a.time)); // reverse chron
+          return (
+            <>
+              {upcoming.map(m => (
+                <MatchCard key={m.id} match={m} prediction={predictions[m.id]} onPredict={onPredict} onDetail={setDetailMatch}/>
+              ))}
+              {finished.length > 0 && (
+                <div style={{ marginTop:8, marginBottom:8 }}>
+                  <button
+                    onClick={() => setFinishedOpen(o => !o)}
+                    style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 14px', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:12, cursor:'pointer', color:'rgba(255,255,255,0.45)', fontSize:12, fontWeight:700 }}
+                  >
+                    <span>⏱ Meciuri finalizate ({finished.length})</span>
+                    <span style={{ fontSize:11 }}>{finishedOpen ? '▲' : '▼'}</span>
+                  </button>
+                  {finishedOpen && (
+                    <div style={{ marginTop:4 }}>
+                      {finished.map(m => (
+                        <MatchCard key={m.id} match={m} prediction={predictions[m.id]} onPredict={onPredict} onDetail={setDetailMatch}/>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          );
         })()}
-        {(tab === "toate" || tab === "mele") && groupFilter !== "toate" && visibleGroups.map(g => renderGroupSection(g))}
+        {(tab === "toate" || tab === "mele") && groupFilter !== "toate" && visibleGroups.map(g => renderGroupSection(g, finishedOpen, setFinishedOpen))}
 
         {/* Friends tab — shows predictions of all users for locked/finished matches */}
         {tab === "prieteni" && visibleGroups.map(g => renderGroupSection(g))}
