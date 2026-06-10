@@ -149,10 +149,11 @@ export function calcBreakdown(pred, match) {
   // 3. Correct total goals: +20
   const totalGoals = (pA + pB === rA + rB) ? 20 : 0;
 
-  // 4. Possession accuracy: max(0, 15 - abs(predicted - real))
+  // 4. Cartonașe accuracy: stepped scoring (exact=15, ±1=10, ±2=5, >2=0)
   let possession = 0;
   if (pPoss != null && rP != null) {
-    possession = Math.max(0, 15 - Math.abs(pPoss - rP));
+    const diff = Math.abs(pPoss - rP);
+    possession = diff === 0 ? 15 : diff === 1 ? 10 : diff === 2 ? 5 : 0;
   }
 
   // 5. Corners accuracy: max(0, 15 - abs(predictedTotal - realTotal))
