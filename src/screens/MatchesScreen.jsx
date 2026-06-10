@@ -1141,8 +1141,22 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
     const predCount = allMatches.filter(m => predictions[m.id]).length;
     const collapsed = collapsedGroups.has(g);
 
-    // Split upcoming vs finished (prieteni shows all without split)
-    const upcoming = (tab === "prieteni") ? allMatches : allMatches.filter(m => !m.isFinished);
+    // Split upcoming vs finished
+    // prieteni: sort by status (live>locked>finished newest first), no split accordion
+    const sortFriend = (arr) => [...arr].sort((a, b) => {
+      const order = (m) => {
+        const s = matchLockState(m).state;
+        if (s === 'live')   return 0;
+        if (s === 'soon')   return 1;
+        if (s === 'locked') return 2;
+        if (m.isFinished)   return 3;
+        return 4;
+      };
+      const oa = order(a), ob = order(b);
+      if (oa !== ob) return oa - ob;
+      return (a.isFinished ? -1 : 1) * (new Date(a.time) - new Date(b.time));
+    });
+    const upcoming = (tab === "prieteni") ? sortFriend(allMatches) : allMatches.filter(m => !m.isFinished);
     const finished = (tab === "prieteni") ? [] : allMatches.filter(m => m.isFinished)
                        .sort((a, b) => new Date(b.time) - new Date(a.time));
     const useSplit = fOpen !== undefined && finished.length > 0;
