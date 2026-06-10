@@ -76,13 +76,23 @@ const AV_CATS = [
 ];
 
 // ─── AVATAR CHANGE MODAL ──────────────────────────────────────────────────────
-function AvatarChangeModal({ currentId, onSelect, onClose }) {
+function AvatarChangeModal({ currentId, takenAvatarIds = new Set(), onSelect, onClose }) {
   const [sel, setSel] = useState(currentId);
+  const [err, setErr] = useState('');
   const [cat, setCat] = useState('all');
   const av  = AVATARS.find(a => a.id === sel) || AVATARS[0];
   const rc  = av?.rarity ? RARITY_CFG[av.rarity] : null;
   const catObj = AV_CATS.find(c => c.id === cat);
   const visible = cat === 'all' ? AVATARS : AVATARS.filter(catObj?.filter || (()=>true));
+
+  const handleSave = () => {
+    if (takenAvatarIds.has(sel) && sel !== currentId) {
+      setErr('Acest avatar este deja folosit de un alt jucător.');
+      return;
+    }
+    setErr('');
+    onSelect(sel);
+  };
 
   return (
     <div style={{ position:'fixed',inset:0,zIndex:90,background:'rgba(0,0,0,0.85)',backdropFilter:'blur(8px)',display:'flex',flexDirection:'column',justifyContent:'flex-end',animation:'fadeIn 0.15s' }} onClick={e=>e.target===e.currentTarget&&onClose()}>
@@ -94,6 +104,9 @@ function AvatarChangeModal({ currentId, onSelect, onClose }) {
             <div style={{ fontSize:14,fontWeight:800,color:'#fff',display:'flex',alignItems:'center',gap:6 }}>
               {av.name}
               {rc?.label && <span style={{ fontSize:9,padding:'2px 7px',borderRadius:10,background:rc.bg,color:rc.color,fontWeight:700 }}>{rc.label}</span>}
+              {takenAvatarIds.has(sel) && sel !== currentId && (
+                <span style={{ fontSize:9,padding:'2px 7px',borderRadius:10,background:'rgba(239,68,68,0.15)',color:'#EF4444',fontWeight:700 }}>🔒 Ocupat</span>
+              )}
             </div>
             <div style={{ fontSize:10,color:'rgba(255,255,255,0.3)' }}>{av.desc}</div>
           </div>
@@ -109,17 +122,36 @@ function AvatarChangeModal({ currentId, onSelect, onClose }) {
         {/* Grid */}
         <div style={{ display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:6,marginBottom:14,maxHeight:200,overflowY:'auto' }}>
           {visible.map(a => {
-            const isSel = sel===a.id;
+            const isSel  = sel === a.id;
+            const isMine = a.id === currentId;
+            const isTaken = takenAvatarIds.has(a.id) && !isMine;
             const arc = a.rarity ? RARITY_CFG[a.rarity] : null;
             return (
-              <div key={a.id} onClick={()=>setSel(a.id)} title={a.name} style={{ width:'100%',aspectRatio:'1',borderRadius:11,background:a.bg,border:`2px solid ${isSel?a.accent:'rgba(255,255,255,0.06)'}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:21,cursor:'pointer',boxShadow:isSel?`0 0 12px ${a.accent}55`:a.shine?`0 0 5px ${a.accent}22`:'none',transition:'all 0.12s',position:'relative',padding:0 }}>
+              <div
+                key={a.id}
+                onClick={() => { if (!isTaken) { setSel(a.id); setErr(''); } }}
+                title={isTaken ? 'Ocupat de alt jucător' : a.name}
+                style={{ width:'100%',aspectRatio:'1',borderRadius:11,background:a.bg,
+                  border:`2px solid ${isSel ? a.accent : isTaken ? 'rgba(239,68,68,0.25)' : 'rgba(255,255,255,0.06)'}`,
+                  display:'flex',alignItems:'center',justifyContent:'center',fontSize:21,
+                  cursor:isTaken?'default':'pointer',
+                  opacity:isTaken?0.35:1,
+                  boxShadow:isSel?`0 0 12px ${a.accent}55`:a.shine?`0 0 5px ${a.accent}22`:'none',
+                  transition:'all 0.12s',position:'relative',padding:0 }}
+              >
                 <FootballAvatar avatarId={a.id} nickname={a.name} size={36} style={{border:'none',boxShadow:'none'}}/>
-                {arc?.label && <div style={{ position:'absolute',bottom:0,right:0,width:8,height:8,borderRadius:'50%',background:arc.color,border:'1px solid rgba(0,0,0,0.6)' }}/>}
+                {isTaken && <div style={{ position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14 }}>🔒</div>}
+                {!isTaken && arc?.label && <div style={{ position:'absolute',bottom:0,right:0,width:8,height:8,borderRadius:'50%',background:arc.color,border:'1px solid rgba(0,0,0,0.6)' }}/>}
               </div>
             );
           })}
         </div>
-        <button onClick={()=>onSelect(sel)} style={{ width:'100%',padding:13,background:'linear-gradient(135deg,#00E5A0,#00C27A)',border:'none',borderRadius:12,color:'#060C09',fontSize:15,fontWeight:900,cursor:'pointer',fontFamily:"'Bebas Neue',sans-serif",letterSpacing:'0.08em' }}>
+        {err && <div style={{ fontSize:11,color:'#EF4444',marginBottom:8,textAlign:'center' }}>⚠️ {err}</div>}
+        <button
+          onClick={handleSave}
+          disabled={takenAvatarIds.has(sel) && sel !== currentId}
+          style={{ width:'100%',padding:13,background:(takenAvatarIds.has(sel)&&sel!==currentId)?'rgba(255,255,255,0.06)':'linear-gradient(135deg,#00E5A0,#00C27A)',border:'none',borderRadius:12,color:(takenAvatarIds.has(sel)&&sel!==currentId)?'rgba(255,255,255,0.3)':'#060C09',fontSize:15,fontWeight:900,cursor:(takenAvatarIds.has(sel)&&sel!==currentId)?'default':'pointer',fontFamily:"'Bebas Neue',sans-serif",letterSpacing:'0.08em' }}
+        >
           Salvează avatarul
         </button>
       </div>
@@ -442,10 +474,22 @@ export default function App() {
 
   const handleAvatarChange = async (avatarId) => {
     if (!user?.uid) return;
+    // Server-side uniqueness check: re-read allUsers to catch race conditions
+    const takenByOther = Object.entries(allUsers).some(
+      ([uid, u]) => uid !== user.uid && u.avatarId === avatarId
+    );
+    if (takenByOther) {
+      alert('Acest avatar a fost selectat de altcineva. Alege altul.');
+      return;
+    }
     const updated = { ...user, avatarId };
     await saveUserProfile(user.uid, { avatarId });
     setUser(updated);
     persistSession(updated);
+    // Refresh allUsers so other players see the change immediately
+    const [allPredsSnapshot, allUsersSnapshot] = await Promise.all([loadAllPredictions(), loadAllUsers()]);
+    setAllPredictions(allPredsSnapshot);
+    setAllUsers(allUsersSnapshot);
     setShowAvatarPicker(false);
   };
 
@@ -562,7 +606,17 @@ export default function App() {
         <ProfileDrawer user={user} totalPts={totalPts} matchPts={myScore.matchPoints||0} specialPts={mySpecialPts} myRank={myRank} streak={streak} onClose={()=>setShowProfile(false)} onLogout={handleLogout} onAdmin={()=>{setAdminMode(true);setShowProfile(false);}} onAvatarChange={()=>{setShowProfile(false);setShowAvatarPicker(true);}}/>
       )}
       {showAvatarPicker && (
-        <AvatarChangeModal currentId={user?.avatarId} onSelect={handleAvatarChange} onClose={()=>setShowAvatarPicker(false)}/>
+        <AvatarChangeModal
+          currentId={user?.avatarId}
+          takenAvatarIds={new Set(
+            Object.entries(allUsers)
+              .filter(([uid]) => uid !== user?.uid)
+              .map(([, u]) => u.avatarId)
+              .filter(Boolean)
+          )}
+          onSelect={handleAvatarChange}
+          onClose={()=>setShowAvatarPicker(false)}
+        />
       )}
 
     </div></>
