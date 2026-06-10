@@ -1364,7 +1364,6 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
         {(tab === "toate" || tab === "mele") && groupFilter !== "toate" && visibleGroups.map(g => renderGroupSection(g, finishedOpen, setFinishedOpen))}
 
         {/* Friends tab — shows predictions of all users for locked/finished matches */}
-        {tab === "prieteni" && visibleGroups.map(g => renderGroupSection(g))}
         {tab === "prieteni" && friendMatches.length > 0 && (
           <FriendPredictionsPanel
             matches={friendMatches}
