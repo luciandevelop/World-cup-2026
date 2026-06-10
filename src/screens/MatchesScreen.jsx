@@ -1071,6 +1071,9 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
   // Alias used by all rendering logic below
   const groupedMatches = liveGroupedMatches;
 
+  // All live matches (flat array, for friendMatches/myPred filtering)
+  const allLiveMatches = useMemo(() => buildMatches(finishedResults, { includeTests: true }), [finishedResults]);
+
   // Next match for the hero card (open → soon → live), all visible matches incl. test
   const nextMatch = useMemo(() => {
     const byState = (state) => allLiveMatches
@@ -1079,9 +1082,6 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
     return byState('open') || byState('soon') || byState('live') || null;
   }, [allLiveMatches]);
   const nextMatchId = nextMatch?.id ?? null;
-
-  // All live matches (flat array, for friendMatches/myPred filtering)
-  const allLiveMatches = useMemo(() => buildMatches(finishedResults, { includeTests: true }), [finishedResults]);
 
   // BUG-2 fix: friendMatches includes locked matches (spec: visible after 30-min lock)
   const myPredMatches = allLiveMatches.filter(m => predictions[m.id]);
