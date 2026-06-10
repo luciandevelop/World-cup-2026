@@ -350,24 +350,27 @@ export default function App() {
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleSavePrediction = async (id, pred) => {
-    // BUG-4 fix: enforce lock on save — prevents stale clients from submitting
+    // Lock check: allow 'open' and 'soon' (modal already validates isEditable)
     const targetMatch = liveMatches.find(m => m.id === Number(id));
     if (targetMatch) {
       const lockInfo = matchLockState(targetMatch);
-      if (lockInfo.state !== 'open') {
-        console.warn('[Lock] Prediction rejected for locked match:', id, lockInfo.state);
-        return;
+      if (lockInfo.state !== 'open' && lockInfo.state !== 'soon') {
+        throw new Error('Meciul este blocat. Predicția nu a fost salvată.');
       }
     }
-    const next = { ...predictions, [id]: pred };
-    setPredictions(next);
-    // Save to Firestore (or localStorage) — syncs to all users via realtime listener
-    if (user?.uid) {
-      await savePrediction(user.uid, id, pred);
-      const [allPredsSnapshot, allUsersSnapshot] = await Promise.all([loadAllPredictions(), loadAllUsers()]);
-      setAllPredictions(allPredsSnapshot);
-      setAllUsers(allUsersSnapshot);
-    }
+    if (!user?.uid) throw new Error('Trebuie să fii autentificat pentru a salva predicția.');
+
+    // Persist to Firestore first — throw on failure so modal can show the error
+    await savePrediction(user.uid, id, pred);
+
+    // Only update local state after Firestore confirms success
+    setPredictions(prev => ({ ...prev, [id]: pred }));
+
+    // Refresh global predictions so leaderboard and friends view update
+    const [allPredsSnapshot, allUsersSnapshot] = await Promise.all([loadAllPredictions(), loadAllUsers()]);
+    setAllPredictions(allPredsSnapshot);
+    setAllUsers(allUsersSnapshot);
+
     const m = liveMatches.find(m => m.id === Number(id));
     if (m?.isFinished) {
       const b = calcBreakdown(pred, m);
