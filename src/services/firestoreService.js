@@ -76,7 +76,7 @@ export async function saveUserProfile(uid, profile) {
   // here as defence-in-depth so the write doesn't even attempt the forbidden field.
   const { isAdmin: _stripped, ...safeProfile } = profile || {};
 
-  const data = {
+  const dataRaw = {
     uid,
     ...safeProfile,
     nicknameLower: safeProfile?.nickname
@@ -84,6 +84,8 @@ export async function saveUserProfile(uid, profile) {
       : (safeProfile?.nicknameLower ?? undefined),
     updatedAt: now,
   };
+  // Strip undefined values — Firestore updateDoc rejects them
+  const data = Object.fromEntries(Object.entries(dataRaw).filter(([, v]) => v !== undefined));
 
   if (FIREBASE_CONFIGURED) {
     const ref  = doc(db, 'users', uid);
