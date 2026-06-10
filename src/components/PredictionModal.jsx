@@ -12,7 +12,7 @@ import { formatKickoffRO, matchLockState, calcBreakdown } from '../data/gameData
 export default function PredictionModal({ match, existing, onSave, onClose }) {
   const [sA,   setSA]   = useState(existing?.scoreA   ?? 1);
   const [sB,   setSB]   = useState(existing?.scoreB   ?? 1);
-  const [poss, setPoss] = useState(existing?.possession ?? 50);
+  const [poss, setPoss] = useState(existing?.possession ?? 4);
   const [corn, setCorn] = useState(existing?.corners   ?? 9);
   const [saved, setSaved] = useState(false);
 
@@ -105,7 +105,7 @@ export default function PredictionModal({ match, existing, onSave, onClose }) {
           </div>
         </div>
 
-        {/* Possession + Corners */}
+        {/* Cartonașe + Cornere */}
         <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:14 }}>
           <div style={{ background:'rgba(255,255,255,0.03)',borderRadius:12,padding:'12px 10px',border:'1px solid rgba(255,255,255,0.05)' }}>
             <StepInput
@@ -116,8 +116,6 @@ export default function PredictionModal({ match, existing, onSave, onClose }) {
           <div style={{ background:'rgba(255,255,255,0.03)',borderRadius:12,padding:'12px 10px',border:'1px solid rgba(255,255,255,0.05)' }}>
             <PossessionInput
               value={poss} onChange={isEditable ? setPoss : () => {}}
-              teamA={match.teamA} teamB={match.teamB}
-              flagA={match.flagA} flagB={match.flagB}
             />
           </div>
         </div>
@@ -129,7 +127,7 @@ export default function PredictionModal({ match, existing, onSave, onClose }) {
             {[
               { label:'Scor exact', pts: breakdown.exactScore   ? 100 : 0 },
               { label:'Câștigător', pts: breakdown.correctWinner ? 30  : 0 },
-              { label:'Posesie',    pts: breakdown.possessionPts || 0 },
+              { label:'Cartonașe', pts: breakdown.possessionPts || 0 },
               { label:'Cornere',    pts: breakdown.cornersPts    || 0 },
             ].map(r => r.pts > 0 && (
               <div key={r.label} style={{ display:'flex',justifyContent:'space-between',marginBottom:3 }}>
