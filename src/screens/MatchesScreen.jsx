@@ -25,7 +25,21 @@ function FriendPredictionsPanel({ matches, allPredictions, allUsers, myPredictio
       <div style={{ fontSize:10, color:"rgba(255,255,255,0.25)", letterSpacing:"0.14em", textTransform:"uppercase", fontWeight:700, marginBottom:10, padding:"0 4px" }}>
         Predicțiile prietenilor — meciuri blocate
       </div>
-      {matches.slice(0,10).map(match => {
+      {[...matches].sort((a, b) => {
+          const order = (m) => {
+            const s = matchLockState(m).state;
+            if (s === 'live')     return 0;
+            if (s === 'soon')     return 1;
+            if (s === 'locked')   return 2;
+            if (m.isFinished)     return 3;
+            return 4; // open / upcoming
+          };
+          const oa = order(a), ob = order(b);
+          if (oa !== ob) return oa - ob;
+          // within finished: newest first; within others: soonest first
+          const mul = a.isFinished ? -1 : 1;
+          return mul * (new Date(a.time) - new Date(b.time));
+        }).slice(0,15).map(match => {
         const lockInfo = matchLockState(match);
         const isVisible = lockInfo.state !== "open";
         if (!isVisible) return null;
@@ -58,7 +72,7 @@ function FriendPredictionsPanel({ matches, allPredictions, allUsers, myPredictio
                         <div style={{ fontSize:10, color:"rgba(255,255,255,0.35)", fontFamily:"'DM Mono',monospace" }}>
                           {pred.possession != null ? `🟨 ${pred.possession} cart` : ""}
                           {pred.possession != null && pred.corners != null ? " · " : ""}
-                          {pred.corners != null ? `col ${pred.corners}` : ""}
+                          {pred.corners != null ? `cor ${pred.corners}` : ""}
                         </div>
                       )}
                     </div>
