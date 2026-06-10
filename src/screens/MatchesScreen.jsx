@@ -1135,11 +1135,9 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
             {tab === "toate" && <GroupStandings group={g} finishedResults={finishedResults} overrideOrder={groupOverrides?.[g] || null}/>}
             {useSplit ? (
               <>
-                {upcoming.map(m => (
-                  <MatchCard key={m.id} match={m} prediction={predictions[m.id]} onPredict={onPredict} onDetail={setDetailMatch}/>
-                ))}
+                {/* Finished accordion at the top of the group body */}
                 {finished.length > 0 && (
-                  <div style={{ marginTop:4, marginBottom:4 }}>
+                  <div style={{ marginBottom:6 }}>
                     <button
                       onClick={() => setFOpen(o => !o)}
                       style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 10px', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, cursor:'pointer', color:'rgba(255,255,255,0.4)', fontSize:11, fontWeight:700 }}
@@ -1152,6 +1150,9 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
                     ))}
                   </div>
                 )}
+                {upcoming.map(m => (
+                  <MatchCard key={m.id} match={m} prediction={predictions[m.id]} onPredict={onPredict} onDetail={setDetailMatch}/>
+                ))}
               </>
             ) : (
               allMatches.map(m => (
@@ -1231,6 +1232,33 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
           />
         )}
 
+        {/* ── Finished matches accordion — right under hero card ── */}
+        {tab === "toate" && groupFilter === "toate" && (() => {
+          const allM = visibleGroups.flatMap(g => groupedMatches[g] || []);
+          const finished = allM
+            .filter(m => m.isFinished && m.id !== nextMatchId)
+            .sort((a, b) => new Date(b.time) - new Date(a.time));
+          if (finished.length === 0) return null;
+          return (
+            <div style={{ marginBottom:12 }}>
+              <button
+                onClick={() => setFinishedOpen(o => !o)}
+                style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 14px', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:12, cursor:'pointer', color:'rgba(255,255,255,0.45)', fontSize:12, fontWeight:700 }}
+              >
+                <span>⏱ Meciuri finalizate ({finished.length})</span>
+                <span style={{ fontSize:11 }}>{finishedOpen ? '▲' : '▼'}</span>
+              </button>
+              {finishedOpen && (
+                <div style={{ marginTop:4 }}>
+                  {finished.map(m => (
+                    <MatchCard key={m.id} match={m} prediction={predictions[m.id]} onPredict={onPredict} onDetail={setDetailMatch}/>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Live feed */}
         {tab === "toate" && groupFilter === "toate" && <SpecialEventsPanel user={user} specialResults={specialResults} allSpecialPreds={allSpecialPreds}/>}
         {tab === "toate" && <LiveFeed events={activityFeed || []}/>}
@@ -1273,44 +1301,23 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
           </div>
         )}
 
-        {/* Group sections — chronological when no group selected */}
+        {/* Group sections — upcoming only (finished shown in accordion above) */}
         {(tab === "toate" || tab === "mele") && groupFilter === "toate" && (() => {
           const allM = visibleGroups.flatMap(g => groupedMatches[g] || []);
           const sorted = [...allM].sort((a, b) => new Date(a.time) - new Date(b.time));
           const filtered = tab === "mele" ? sorted.filter(m => predictions[m.id]) : sorted;
           if (filtered.length === 0) return null;
-          // Exclude the hero card match from the list so it doesn't appear twice
           const withoutHero = (tab === "toate" && nextMatchId)
             ? filtered.filter(m => m.id !== nextMatchId)
             : filtered;
-          const upcoming  = withoutHero.filter(m => !m.isFinished);
-          const finished  = withoutHero.filter(m => m.isFinished)
-                              .sort((a, b) => new Date(b.time) - new Date(a.time)); // reverse chron
-          return (
-            <>
-              {upcoming.map(m => (
-                <MatchCard key={m.id} match={m} prediction={predictions[m.id]} onPredict={onPredict} onDetail={setDetailMatch}/>
-              ))}
-              {finished.length > 0 && (
-                <div style={{ marginTop:8, marginBottom:8 }}>
-                  <button
-                    onClick={() => setFinishedOpen(o => !o)}
-                    style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 14px', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:12, cursor:'pointer', color:'rgba(255,255,255,0.45)', fontSize:12, fontWeight:700 }}
-                  >
-                    <span>⏱ Meciuri finalizate ({finished.length})</span>
-                    <span style={{ fontSize:11 }}>{finishedOpen ? '▲' : '▼'}</span>
-                  </button>
-                  {finishedOpen && (
-                    <div style={{ marginTop:4 }}>
-                      {finished.map(m => (
-                        <MatchCard key={m.id} match={m} prediction={predictions[m.id]} onPredict={onPredict} onDetail={setDetailMatch}/>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          );
+          // Only upcoming — finished are shown in the accordion above the feed
+          const upcoming = tab === "mele"
+            ? withoutHero  // "Ale mele" shows all predictions incl. finished
+            : withoutHero.filter(m => !m.isFinished);
+          if (upcoming.length === 0) return null;
+          return upcoming.map(m => (
+            <MatchCard key={m.id} match={m} prediction={predictions[m.id]} onPredict={onPredict} onDetail={setDetailMatch}/>
+          ));
         })()}
         {(tab === "toate" || tab === "mele") && groupFilter !== "toate" && visibleGroups.map(g => renderGroupSection(g, finishedOpen, setFinishedOpen))}
 
