@@ -894,17 +894,12 @@ function NextMatchCard({ matches, predictions, onPredict }) {
     return () => clearInterval(t);
   }, []);
 
-  // Find next match by priority: open → soon → live
+  // Find next match: live > soon > locked > open (finished never shown here)
   const next = React.useMemo(() => {
-    const open = matches.filter(m => matchLockState(m).state === 'open')
+    const byState = (state) => matches
+      .filter(m => !m.isFinished && matchLockState(m).state === state)
       .sort((a,b) => new Date(a.time)-new Date(b.time))[0];
-    if (open) return open;
-    const soon = matches.filter(m => matchLockState(m).state === 'soon')
-      .sort((a,b) => new Date(a.time)-new Date(b.time))[0];
-    if (soon) return soon;
-    const live = matches.filter(m => matchLockState(m).state === 'live')
-      .sort((a,b) => new Date(a.time)-new Date(b.time))[0];
-    return live || null;
+    return byState('live') || byState('soon') || byState('locked') || byState('open') || null;
   }, [matches, now]);
 
   if (!next) return null;
@@ -1075,12 +1070,13 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
   // All live matches (flat array, for friendMatches/myPred filtering)
   const allLiveMatches = useMemo(() => buildMatches(finishedResults, { includeTests: true }), [finishedResults]);
 
-  // Next match for the hero card (open → soon → live), all visible matches incl. test
+  // Next match for the hero card: live > soon > locked > open
+  // FINISHED matches never appear here — only non-finished ones
   const nextMatch = useMemo(() => {
     const byState = (state) => allLiveMatches
-      .filter(m => matchLockState(m).state === state)
+      .filter(m => !m.isFinished && matchLockState(m).state === state)
       .sort((a,b) => new Date(a.time)-new Date(b.time))[0];
-    return byState('open') || byState('soon') || byState('live') || null;
+    return byState('live') || byState('soon') || byState('locked') || byState('open') || null;
   }, [allLiveMatches]);
   const nextMatchId = nextMatch?.id ?? null;
 
@@ -1310,7 +1306,8 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
           const withoutHero = (tab === "toate" && nextMatchId)
             ? filtered.filter(m => m.id !== nextMatchId)
             : filtered;
-          // Only upcoming — finished are shown in the accordion above the feed
+          // Upcoming = not finished (live/soon/locked/open all stay in the list)
+          // Finished matches are shown in the accordion above the feed
           const upcoming = tab === "mele"
             ? withoutHero  // "Ale mele" shows all predictions incl. finished
             : withoutHero.filter(m => !m.isFinished);
