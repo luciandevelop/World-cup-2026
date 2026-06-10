@@ -156,17 +156,20 @@ export function calcBreakdown(pred, match) {
     possession = diff === 0 ? 15 : diff === 1 ? 10 : diff === 2 ? 5 : 0;
   }
 
-  // 5. Corners accuracy: max(0, 15 - abs(predictedTotal - realTotal))
+  // 5. Corners accuracy: stepped (exact=15, ±1=10, ±2=5, ±3=2, >3=0)
   let corners = 0;
   if (pC != null && rC != null) {
-    corners = Math.max(0, 15 - Math.abs(pC - rC));
+    const dK = Math.abs(pC - rC);
+    corners = dK === 0 ? 15 : dK === 1 ? 10 : dK === 2 ? 5 : dK === 3 ? 2 : 0;
   }
 
-  const total = exactScore + correctRes + totalGoals + possession + corners;
+  // Perfect prediction: exact score + exact cards + exact corners = 200 total (not additive bonus)
+  const isPerfect = exactScore === 100 && possession === 15 && corners === 15;
+  const total = isPerfect ? 200 : exactScore + correctRes + totalGoals + possession + corners;
 
   return {
     exactScore, correctRes, totalGoals, possession, corners, total,
-    isPerfect: exactScore === 100 && possession === 15 && corners === 15,
+    isPerfect,
     // Debug breakdown strings
     _debug: {
       rA, rB, pA, pB, realRes, predRes,
