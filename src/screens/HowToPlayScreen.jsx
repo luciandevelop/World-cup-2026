@@ -102,7 +102,7 @@ function HowToPlayScreen() {
       {/* Possession + Corners side by side */}
       <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8 }}>
         {[
-          { label:"Cartonașe", rows:[{l:"Exact",pts:"+15",c:"#00E5A0"},{l:"±1",pts:"+14",c:"#4A9EFF"},{l:"±2",pts:"+13",c:"#4A9EFF"},{l:">5 dif.",pts:"0",c:"#2a2a2a"}] },
+          { label:"Cartonașe", rows:[{l:"Exact",pts:"+15",c:"#00E5A0"},{l:"±1",pts:"+10",c:"#4A9EFF"},{l:"±2",pts:"+5",c:"#4A9EFF"},{l:">2 dif.",pts:"0",c:"#2a2a2a"}] },
           { label:"Cornere", rows:[{l:"Exact",pts:"+15",c:"#00E5A0"},{l:"±1",pts:"+10",c:"#4A9EFF"},{l:"±2",pts:"+5",c:"#4A9EFF"},{l:"±3",pts:"+2",c:"#555"},{l:">3",pts:"0",c:"#2a2a2a"}] },
         ].map((col,ci)=>(
           <div key={ci} style={{ background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.05)",borderRadius:12,padding:"10px 12px" }}>
