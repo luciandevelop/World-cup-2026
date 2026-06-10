@@ -4,13 +4,41 @@ import {
 } from '../services/specialEventsService.js';
 
 // ─── FRIEND PREDICTIONS PANEL ────────────────────────────────────────────────
-// Shows after match locks. Before lock, predictions are hidden.
+// Shows after match locks. First match expanded by default, others collapsed.
 function FriendPredictionsPanel({ matches, allPredictions, allUsers, myPredictions }) {
   if (!matches.length) return null;
 
   const userList = Object.entries(allUsers).map(([uid, u]) => ({
     uid, nickname: u.nickname, avatarId: u.avatarId,
   })).filter(u => u.nickname);
+
+  // Sort: live > soon > locked > finished-newest-first (same as friendMatches definition)
+  const sorted = [...matches].sort((a, b) => {
+    const order = (m) => {
+      const s = matchLockState(m).state;
+      if (s === 'live')   return 0;
+      if (s === 'soon')   return 1;
+      if (s === 'locked') return 2;
+      if (m.isFinished)   return 3;
+      return 4;
+    };
+    const oa = order(a), ob = order(b);
+    if (oa !== ob) return oa - ob;
+    return (a.isFinished ? -1 : 1) * (new Date(a.time) - new Date(b.time));
+  }).filter(m => matchLockState(m).state !== "open").slice(0, 20);
+
+  // First visible match ID — expanded by default
+  const firstId = sorted[0]?.id ?? null;
+
+  // expandedIds: Set of match IDs currently expanded
+  // Initialised with firstId so only the top match is open on load
+  const [expandedIds, setExpandedIds] = useState(() => new Set(firstId != null ? [firstId] : []));
+
+  const toggle = (id) => setExpandedIds(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
 
   if (userList.length === 0) {
     return (
@@ -25,67 +53,78 @@ function FriendPredictionsPanel({ matches, allPredictions, allUsers, myPredictio
       <div style={{ fontSize:10, color:"rgba(255,255,255,0.25)", letterSpacing:"0.14em", textTransform:"uppercase", fontWeight:700, marginBottom:10, padding:"0 4px" }}>
         Predicțiile prietenilor — meciuri blocate
       </div>
-      {[...matches].sort((a, b) => {
-          const order = (m) => {
-            const s = matchLockState(m).state;
-            if (s === 'live')     return 0;
-            if (s === 'soon')     return 1;
-            if (s === 'locked')   return 2;
-            if (m.isFinished)     return 3;
-            return 4; // open / upcoming
-          };
-          const oa = order(a), ob = order(b);
-          if (oa !== ob) return oa - ob;
-          // within finished: newest first; within others: soonest first
-          const mul = a.isFinished ? -1 : 1;
-          return mul * (new Date(a.time) - new Date(b.time));
-        }).slice(0,15).map(match => {
-        const lockInfo = matchLockState(match);
-        const isVisible = lockInfo.state !== "open";
-        if (!isVisible) return null;
+      {sorted.map(match => {
+        const lockInfo    = matchLockState(match);
+        const isExpanded  = expandedIds.has(match.id);
+        const predCount   = userList.filter(u => (allPredictions[u.uid] || {})[match.id]).length;
+        const stateColor  = lockInfo.state === 'live' ? '#EF4444' : lockInfo.state === 'locked' ? 'rgba(255,255,255,0.25)' : '#F59E0B';
 
         return (
-          <div key={match.id} style={{ marginBottom:10, background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:12, overflow:"hidden" }}>
-            <div style={{ padding:"8px 12px 6px", borderBottom:"1px solid rgba(255,255,255,0.05)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <span style={{ fontSize:12, fontWeight:700, color:"rgba(255,255,255,0.7)" }}>
-                {match.flagA} {match.teamA} vs {match.teamB} {match.flagB}
-              </span>
-              <span style={{ fontSize:10, color:"rgba(255,255,255,0.3)" }}>{formatKickoffRO(match.time)}</span>
+          <div key={match.id} style={{ marginBottom:8, border:"1px solid rgba(255,255,255,0.07)", borderRadius:12, overflow:"hidden", background:"rgba(255,255,255,0.02)" }}>
+            {/* ── Tappable header ── */}
+            <div
+              onClick={() => toggle(match.id)}
+              style={{ padding:"10px 12px", display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", userSelect:"none" }}
+            >
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:"rgba(255,255,255,0.8)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                  {match.flagA} {match.teamA} vs {match.teamB} {match.flagB}
+                </div>
+                <div style={{ fontSize:10, color:"rgba(255,255,255,0.3)", marginTop:2, display:"flex", gap:8 }}>
+                  <span>{formatKickoffRO(match.time)}</span>
+                  {predCount > 0 && <span style={{ color:"rgba(255,255,255,0.2)" }}>· {predCount} predicții</span>}
+                </div>
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0, marginLeft:8 }}>
+                {match.isFinished && match.realScoreA != null && (
+                  <span style={{ fontSize:13, fontWeight:900, color:"#FFD700", fontFamily:"'DM Mono',monospace" }}>
+                    {match.realScoreA}–{match.realScoreB}
+                  </span>
+                )}
+                {lockInfo.state === 'live' && (
+                  <span style={{ fontSize:9, fontWeight:800, color:'#EF4444' }}>● LIVE</span>
+                )}
+                <span style={{ fontSize:12, color:stateColor }}>{isExpanded ? "▲" : "▼"}</span>
+              </div>
             </div>
-            <div style={{ padding:"6px 8px 4px" }}>
-              {userList.map(u => {
-                const pred = (allPredictions[u.uid] || {})[match.id];
-                if (!pred) return null;
-                const isMe = myPredictions[match.id] &&
-                  Number(myPredictions[match.id].scoreA) === Number(pred.scoreA) &&
-                  Number(myPredictions[match.id].scoreB) === Number(pred.scoreB);
-                return (
-                  <div key={u.uid} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"5px 6px", borderRadius:8, background: isMe ? "rgba(0,229,160,0.06)" : "transparent" }}>
-                    <span style={{ fontSize:12, color:"rgba(255,255,255,0.6)", fontWeight:600 }}>
-                      {isMe ? "⭐ " : ""}{u.nickname}
-                    </span>
-                    <div style={{ textAlign:"right" }}>
-                      <div style={{ fontSize:14, fontWeight:800, color:"#fff", fontFamily:"'DM Mono',monospace" }}>
-                        {pred.scoreA} – {pred.scoreB}
-                      </div>
-                      {(pred.possession != null || pred.corners != null) && (
-                        <div style={{ fontSize:10, color:"rgba(255,255,255,0.35)", fontFamily:"'DM Mono',monospace" }}>
-                          {pred.possession != null ? `🟨 ${pred.possession} cart` : ""}
-                          {pred.possession != null && pred.corners != null ? " · " : ""}
-                          {pred.corners != null ? `cor ${pred.corners}` : ""}
+
+            {/* ── Expanded predictions ── */}
+            {isExpanded && (
+              <div style={{ borderTop:"1px solid rgba(255,255,255,0.05)", padding:"6px 8px 8px" }}>
+                {userList.map(u => {
+                  const pred = (allPredictions[u.uid] || {})[match.id];
+                  if (!pred) return null;
+                  const isMe = myPredictions[match.id] &&
+                    Number(myPredictions[match.id].scoreA) === Number(pred.scoreA) &&
+                    Number(myPredictions[match.id].scoreB) === Number(pred.scoreB);
+                  return (
+                    <div key={u.uid} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"5px 6px", borderRadius:8, background: isMe ? "rgba(0,229,160,0.06)" : "transparent" }}>
+                      <span style={{ fontSize:12, color:"rgba(255,255,255,0.6)", fontWeight:600 }}>
+                        {isMe ? "⭐ " : ""}{u.nickname}
+                      </span>
+                      <div style={{ textAlign:"right" }}>
+                        <div style={{ fontSize:14, fontWeight:800, color:"#fff", fontFamily:"'DM Mono',monospace" }}>
+                          {pred.scoreA} – {pred.scoreB}
                         </div>
-                      )}
+                        {(pred.possession != null || pred.corners != null) && (
+                          <div style={{ fontSize:10, color:"rgba(255,255,255,0.35)", fontFamily:"'DM Mono',monospace" }}>
+                            {pred.possession != null ? `🟨 ${pred.possession} cart` : ""}
+                            {pred.possession != null && pred.corners != null ? " · " : ""}
+                            {pred.corners != null ? `cor ${pred.corners}` : ""}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              }).filter(Boolean)}
-              {userList.every(u => !(allPredictions[u.uid] || {})[match.id]) && (
-                <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", padding:"4px 6px" }}>Nicio predicție pentru acest meci.</div>
-              )}
-            </div>
+                  );
+                }).filter(Boolean)}
+                {userList.every(u => !(allPredictions[u.uid] || {})[match.id]) && (
+                  <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", padding:"4px 6px" }}>Nicio predicție pentru acest meci.</div>
+                )}
+              </div>
+            )}
           </div>
         );
-      }).filter(Boolean)}
+      })}
     </div>
   );
 }
