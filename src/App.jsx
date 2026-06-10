@@ -51,7 +51,7 @@ function PerfectHitOverlay({ pts, onDone }) {
         </div>
         <div style={{ fontSize:9,color:'rgba(212,175,55,0.5)',letterSpacing:'0.22em',textTransform:'uppercase',marginBottom:6,fontWeight:700 }}>Predicție Perfectă</div>
         <div style={{ fontSize:52,fontWeight:900,color:'#fff',fontFamily:"'Bebas Neue',sans-serif",letterSpacing:'0.04em',lineHeight:1,marginBottom:6 }}>+{pts} PTS</div>
-        <div style={{ fontSize:12,color:'rgba(255,255,255,0.3)',marginBottom:20 }}>Scor · posesie · cornere — toate exacte</div>
+        <div style={{ fontSize:12,color:'rgba(255,255,255,0.3)',marginBottom:20 }}>Scor · cartonașe · cornere — toate exacte</div>
         <div style={{ fontSize:10,color:'rgba(255,255,255,0.15)' }}>atinge pentru a închide</div>
       </div>
     </div>
