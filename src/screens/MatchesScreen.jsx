@@ -182,7 +182,7 @@ function TestMatchesPanel({ testMatches, predictions, onPredict, finishedResults
 // Tabs: "Toate" | "Predicțiile Mele" | "Predicțiile Prietenilor"
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   MATCHES, GROUPS, TEST_MATCHES,
   POPULAR_PICKS, MOST_PREDICTED, LIVE_FEED_EVENTS, TYPE_COLOR,
@@ -883,6 +883,161 @@ function SpecialEventsPanel({ user, specialResults, allSpecialPreds }) {
   );
 }
 
+
+// ─── URMĂTORUL MECI CARD ──────────────────────────────────────────────────────
+// Shows the next actionable match at the top of the screen.
+// Priority: open > soon > live. Excluded from the list below.
+function NextMatchCard({ matches, predictions, onPredict }) {
+  const [now, setNow] = React.useState(Date.now());
+  React.useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Find next match by priority: open → soon → live
+  const next = React.useMemo(() => {
+    const open = matches.filter(m => matchLockState(m).state === 'open')
+      .sort((a,b) => new Date(a.time)-new Date(b.time))[0];
+    if (open) return open;
+    const soon = matches.filter(m => matchLockState(m).state === 'soon')
+      .sort((a,b) => new Date(a.time)-new Date(b.time))[0];
+    if (soon) return soon;
+    const live = matches.filter(m => matchLockState(m).state === 'live')
+      .sort((a,b) => new Date(a.time)-new Date(b.time))[0];
+    return live || null;
+  }, [matches, now]);
+
+  if (!next) return null;
+
+  const lockInfo   = matchLockState(next);
+  const pred       = predictions[next.id];
+  const isEditable = lockInfo.state === 'open' || lockInfo.state === 'soon';
+  const isLive     = lockInfo.state === 'live';
+
+  // Countdown until lock (ms)
+  const lockAt    = new Date(next.time).getTime() - (30 * 60 * 1000);
+  const msToLock  = lockAt - now;
+  const countdown = msToLock > 0 ? (() => {
+    const totalSec = Math.floor(msToLock / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h > 0) return `${h}h ${m.toString().padStart(2,'0')}m`;
+    if (m > 0) return `${m}m ${s.toString().padStart(2,'0')}s`;
+    return `${s}s`;
+  })() : null;
+
+  const kickoffStr = new Date(next.time).toLocaleString('ro-RO', {
+    timeZone: 'Europe/Bucharest',
+    weekday: 'short', day: 'numeric', month: 'short',
+    hour: '2-digit', minute: '2-digit',
+  });
+
+  const accentColor = isLive ? '#EF4444' : lockInfo.state === 'soon' ? '#F59E0B' : '#00E5A0';
+  const borderColor = isLive ? 'rgba(239,68,68,0.35)' : lockInfo.state === 'soon' ? 'rgba(245,158,11,0.35)' : 'rgba(0,229,160,0.25)';
+  const bgGlow      = isLive ? 'rgba(239,68,68,0.06)' : lockInfo.state === 'soon' ? 'rgba(245,158,11,0.06)' : 'rgba(0,229,160,0.04)';
+
+  return (
+    <div style={{ marginBottom:16, borderRadius:18, overflow:'hidden', border:`1px solid ${borderColor}`, background:`linear-gradient(160deg, ${bgGlow}, rgba(255,255,255,0.01))`, position:'relative' }}>
+
+      {/* Top glow stripe */}
+      <div style={{ height:2, background:`linear-gradient(90deg,transparent,${accentColor},transparent)` }}/>
+
+      {/* Header row */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px 8px' }}>
+        <div style={{ fontSize:10, fontWeight:800, color:accentColor, letterSpacing:'0.12em', textTransform:'uppercase' }}>
+          {isLive ? '⬤ Live acum' : '🔥 Următorul meci'}
+        </div>
+        <StatusPill state={lockInfo.state}/>
+      </div>
+
+      {/* Teams */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'4px 20px 12px' }}>
+        {/* Team A */}
+        <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+          <span style={{ fontSize:40, lineHeight:1 }}>{next.flagA}</span>
+          <span style={{ fontSize:14, fontWeight:800, color:'#fff', textAlign:'center' }}>{next.teamA}</span>
+        </div>
+
+        {/* Center */}
+        <div style={{ flex:'0 0 auto', textAlign:'center', padding:'0 8px' }}>
+          {isLive ? (
+            <div style={{ fontSize:28, fontWeight:900, color:'#EF4444', fontFamily:"'DM Mono',monospace", letterSpacing:'0.06em' }}>
+              {next.realScoreA ?? 0} – {next.realScoreB ?? 0}
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize:13, color:'rgba(255,255,255,0.3)', fontWeight:700, letterSpacing:'0.08em' }}>VS</div>
+              <div style={{ fontSize:13, color:'rgba(255,255,255,0.6)', fontWeight:700, marginTop:4, fontFamily:"'DM Mono',monospace" }}>
+                {new Date(next.time).toLocaleTimeString('ro-RO',{timeZone:'Europe/Bucharest',hour:'2-digit',minute:'2-digit'})}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Team B */}
+        <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+          <span style={{ fontSize:40, lineHeight:1 }}>{next.flagB}</span>
+          <span style={{ fontSize:14, fontWeight:800, color:'#fff', textAlign:'center' }}>{next.teamB}</span>
+        </div>
+      </div>
+
+      {/* Date + venue */}
+      <div style={{ display:'flex', justifyContent:'center', gap:12, padding:'0 16px 10px', flexWrap:'wrap' }}>
+        <span style={{ fontSize:11, color:'rgba(255,255,255,0.35)' }}>🗓 {kickoffStr} RO</span>
+        {next.venue && <span style={{ fontSize:11, color:'rgba(255,255,255,0.25)' }}>📍 {next.venue}</span>}
+      </div>
+
+      {/* Countdown strip */}
+      {countdown && !isLive && (
+        <div style={{ margin:'0 16px 10px', padding:'6px 12px', background:'rgba(255,255,255,0.04)', borderRadius:8, display:'flex', justifyContent:'space-between', alignItems:'center', border:'1px solid rgba(255,255,255,0.06)' }}>
+          <span style={{ fontSize:11, color:'rgba(255,255,255,0.35)' }}>Se blochează în</span>
+          <span style={{ fontSize:13, fontWeight:800, color:accentColor, fontFamily:"'DM Mono',monospace" }}>{countdown}</span>
+        </div>
+      )}
+
+      {/* Existing prediction */}
+      {pred && !next.isFinished && (
+        <div style={{ margin:'0 16px 10px', padding:'6px 12px', background:'rgba(0,229,160,0.05)', borderRadius:8, border:'1px solid rgba(0,229,160,0.15)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <span style={{ fontSize:11, color:'rgba(0,229,160,0.7)' }}>✓ Predicția ta: {pred.scoreA}–{pred.scoreB}</span>
+          {isEditable && <span style={{ fontSize:10, color:'rgba(0,229,160,0.5)', fontWeight:700 }}>Editează</span>}
+        </div>
+      )}
+
+      {/* CTA button */}
+      {isEditable && (
+        <div style={{ padding:'0 16px 16px' }}>
+          <button
+            onClick={() => onPredict(next)}
+            style={{
+              width:'100%', padding:'14px 20px',
+              background: pred
+                ? 'rgba(255,255,255,0.06)'
+                : 'linear-gradient(135deg,#00E5A0,#00C27A)',
+              border: pred ? '1px solid rgba(255,255,255,0.1)' : 'none',
+              borderRadius:12,
+              color: pred ? 'rgba(255,255,255,0.7)' : '#060C09',
+              fontSize:15, fontWeight:900, cursor:'pointer',
+              fontFamily:"'Bebas Neue',sans-serif", letterSpacing:'0.1em',
+              boxShadow: pred ? 'none' : '0 6px 24px rgba(0,229,160,0.25)',
+              transition:'all 0.18s',
+            }}
+          >
+            {pred ? '✏️ EDITEAZĂ PREDICȚIA' : '🎯 FĂ PREDICȚIA'}
+          </button>
+        </div>
+      )}
+      {isLive && !isEditable && (
+        <div style={{ padding:'0 16px 16px' }}>
+          <div style={{ padding:'10px', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.18)', borderRadius:12, textAlign:'center' }}>
+            <span style={{ fontSize:12, color:'rgba(239,68,68,0.8)', fontWeight:700 }}>🔒 Predicțiile sunt blocate</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MatchesScreen({ predictions, onPredict, finishedResults, groupOverrides, allPredictions = {}, allUsers = {}, activityFeed = [], user = null, specialResults = null, allSpecialPreds = {} }) {
   const [tab, setTab]              = useState("toate"); // "toate" | "mele" | "prieteni"
   const [detailMatch, setDetailMatch] = useState(null);
@@ -915,6 +1070,15 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
 
   // Alias used by all rendering logic below
   const groupedMatches = liveGroupedMatches;
+
+  // Next match for the hero card (open → soon → live), all visible matches incl. test
+  const nextMatch = useMemo(() => {
+    const byState = (state) => allLiveMatches
+      .filter(m => matchLockState(m).state === state)
+      .sort((a,b) => new Date(a.time)-new Date(b.time))[0];
+    return byState('open') || byState('soon') || byState('live') || null;
+  }, [allLiveMatches]);
+  const nextMatchId = nextMatch?.id ?? null;
 
   // All live matches (flat array, for friendMatches/myPred filtering)
   const allLiveMatches = useMemo(() => buildMatches(finishedResults, { includeTests: true }), [finishedResults]);
@@ -1029,6 +1193,15 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
       {/* Content */}
       <div style={{ padding:"12px 12px 0" }}>
 
+        {/* ── Următorul meci hero card — Toate tab + no group filter only ── */}
+        {tab === "toate" && groupFilter === "toate" && nextMatch && (
+          <NextMatchCard
+            matches={allLiveMatches}
+            predictions={predictions}
+            onPredict={onPredict}
+          />
+        )}
+
         {/* Live feed */}
         {tab === "toate" && groupFilter === "toate" && <SpecialEventsPanel user={user} specialResults={specialResults} allSpecialPreds={allSpecialPreds}/>}
         {tab === "toate" && <LiveFeed events={activityFeed || []}/>}
@@ -1078,7 +1251,11 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
           const sorted = [...allM].sort((a, b) => new Date(a.time) - new Date(b.time));
           const filtered = tab === "mele" ? sorted.filter(m => predictions[m.id]) : sorted;
           if (filtered.length === 0) return null;
-          return filtered.map(m => <MatchCard key={m.id} match={m} prediction={predictions[m.id]} onPredict={onPredict} onDetail={setDetailMatch}/>);
+          // Exclude the hero card match from the list so it doesn't appear twice
+          const listMatches = (tab === "toate" && groupFilter === "toate" && nextMatchId)
+            ? filtered.filter(m => m.id !== nextMatchId)
+            : filtered;
+          return listMatches.map(m => <MatchCard key={m.id} match={m} prediction={predictions[m.id]} onPredict={onPredict} onDetail={setDetailMatch}/>);
         })()}
         {(tab === "toate" || tab === "mele") && groupFilter !== "toate" && visibleGroups.map(g => renderGroupSection(g))}
 
