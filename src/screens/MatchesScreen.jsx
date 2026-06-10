@@ -1096,7 +1096,24 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
 
   // BUG-2 fix: friendMatches includes locked matches (spec: visible after 30-min lock)
   const myPredMatches = allLiveMatches.filter(m => predictions[m.id]);
-  const friendMatches = allLiveMatches.filter(m => m.isFinished || m.isLive || m.isLocked);
+  const friendMatches = useMemo(() => {
+    const sortOrder = (m) => {
+      const s = matchLockState(m).state;
+      if (s === 'live')   return 0;
+      if (s === 'soon')   return 1;
+      if (s === 'locked') return 2;
+      if (m.isFinished)   return 3;
+      return 4;
+    };
+    return allLiveMatches
+      .filter(m => m.isFinished || m.isLive || m.isLocked)
+      .sort((a, b) => {
+        const oa = sortOrder(a), ob = sortOrder(b);
+        if (oa !== ob) return oa - ob;
+        // finished: newest first; others: soonest first
+        return (a.isFinished ? -1 : 1) * (new Date(a.time) - new Date(b.time));
+      });
+  }, [allLiveMatches]);
 
   const tabs = [
     { id:"toate",    label:"Toate",       count: MATCHES.length },
