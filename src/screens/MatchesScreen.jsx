@@ -237,7 +237,7 @@ function TestMatchesPanel({ testMatches, predictions, onPredict, finishedResults
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  MATCHES, GROUPS, TEST_MATCHES,
+  MATCHES, GROUPS,
   POPULAR_PICKS, MOST_PREDICTED, LIVE_FEED_EVENTS, TYPE_COLOR,
   calcBreakdown, calcPoints, matchLockState, formatKickoffRO, getGroupLabel,
   buildMatches,
@@ -1110,8 +1110,8 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
 
   // Build per-group match lists — uses finishedResults so isFinished/isLive/isLocked are live
   const liveGroupedMatches = useMemo(() => {
-    const live = buildMatches(finishedResults, { includeTests: true });
-    return [...ALL_GROUPS, 'AMICALE'].reduce((acc, g) => {
+    const live = buildMatches(finishedResults); // official WC only
+    return [...ALL_GROUPS].reduce((acc, g) => {
       acc[g] = live.filter(m => m.group === g);
       return acc;
     }, {});
@@ -1121,7 +1121,7 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
   const groupedMatches = liveGroupedMatches;
 
   // All live matches (flat array, for friendMatches/myPred filtering)
-  const allLiveMatches = useMemo(() => buildMatches(finishedResults, { includeTests: true }), [finishedResults]);
+  const allLiveMatches = useMemo(() => buildMatches(finishedResults), [finishedResults]); // official WC only
 
   // Next match for the hero card: live > soon > locked > open
   // FINISHED matches never appear here — only non-finished ones
@@ -1158,15 +1158,11 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
     { id:"toate",    label:"Toate",       count: MATCHES.length },
     { id:"mele",     label:"Ale mele",    count: myPredMatches.length },
     { id:"prieteni", label:"Prieteni",    count: friendMatches.length },
-    { id:"test",     label:"🧪 Test",     count: TEST_MATCHES.length },
+    // Test tab removed for production
   ];
 
   // Test matches enriched with live result data (same as buildMatches but for test IDs)
-  const testMatchesLive = useMemo(() =>
-    buildMatches(finishedResults, { includeTests: true })
-      .filter(m => m.isTest),
-    [finishedResults]
-  );
+  // testMatchesLive removed for production
 
   const renderGroupSection = (g, fOpen, setFOpen) => {
     const allMatches = tab === "mele"
@@ -1245,7 +1241,7 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
     );
   };
 
-  const visibleGroups = groupFilter === "toate" ? [...ALL_GROUPS, "AMICALE"] : [groupFilter];
+  const visibleGroups = groupFilter === "toate" ? [...ALL_GROUPS] : [groupFilter]; // AMICALE removed
 
   return (
     <>
@@ -1412,17 +1408,7 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
           />
         )}
 
-        {/* Test matches tab */}
-        {tab === "test" && (
-          <TestMatchesPanel
-            testMatches={testMatchesLive}
-            predictions={predictions}
-            onPredict={onPredict}
-            finishedResults={finishedResults}
-            allPredictions={allPredictions}
-            allUsers={allUsers}
-          />
-        )}
+        {/* Test matches tab removed for production */}
 
       </div>
     </div>

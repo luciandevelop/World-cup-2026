@@ -218,7 +218,7 @@ export default function LeaderboardScreen({
   const data = useMemo(() => {
     try {
       const safeFinishedResults = finishedResults || {};
-      const liveMatches = buildMatches(safeFinishedResults, { includeTests: true });
+      const liveMatches = buildMatches(safeFinishedResults); // official WC only
       const finishedMatches = liveMatches.filter(m => m && m.isFinished);
       const finishedCount = finishedMatches.length;
 
@@ -419,7 +419,7 @@ export default function LeaderboardScreen({
               return normalised;
             })()
           }
-          finishedMatches={buildMatches(finishedResults, { includeTests: true }).filter(m => m.isFinished)}
+          finishedMatches={buildMatches(finishedResults).filter(m => m.isFinished)}
           onClose={() => setSelectedPlayer(null)}
         />
       );

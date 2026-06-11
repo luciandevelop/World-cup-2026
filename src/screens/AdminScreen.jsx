@@ -11,7 +11,7 @@ import {
   formatKickoffRO, buildGroupStandings, buildQualifiedTeams, buildMatches, calcBreakdown,
 } from '../data/gameData.js';
 import { ALL_GROUPS } from '../data/matches.js';
-import { saveMatchResult, resetTestData, REALTIME_MODE } from '../services/firestoreService.js';
+import { saveMatchResult, REALTIME_MODE } from '../services/firestoreService.js'; // resetTestData removed
 import { saveSpecialResults, resetSpecialData, WC_TEAMS } from '../services/specialEventsService.js';
 
 // localStorage key for admin-set results (shared across all users on same device)
@@ -278,9 +278,9 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
 
       {/* Group filter */}
       <div style={{ display:'flex', gap:4, overflowX:'auto', marginBottom:6 }}>
-        {['all', ...ALL_GROUPS, 'AMICALE'].map(g => (
+        {['all', ...ALL_GROUPS].map(g => (
           <button key={g} onClick={() => setGroupF(g)} style={{ flexShrink:0, padding:'4px 9px', borderRadius:20, background:groupF===g?'rgba(239,68,68,0.15)':'rgba(255,255,255,0.03)', border:`1px solid ${groupF===g?'rgba(239,68,68,0.28)':'rgba(255,255,255,0.07)'}`, color:groupF===g?'#EF4444':'rgba(255,255,255,0.38)', fontSize:10, fontWeight:700, cursor:'pointer' }}>
-            {g === 'all' ? 'Toate' : g === 'AMICALE' ? '🏟 Amicale' : `Gr.${g}`}
+            {g === 'all' ? 'Toate' : `Gr.${g}`}
           </button>
         ))}
       </div>
@@ -629,32 +629,7 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
         </button>
       </div>
 
-      {/* Reset clasament amicale */}
-      <div style={{ marginTop:10 }}>
-        <button
-          onClick={async () => {
-            if (!window.confirm('Ești sigur? Se șterg toate predicțiile și rezultatele din meciurile amicale (ID 901-910). Punctele din test se resetează. Competiția reală începe de la 0.')) return;
-            try {
-              await resetTestData();
-              await resetSpecialData();
-              localStorage.removeItem('wc2026_admin_results');
-              onMatchUpdate?.({ _action:'reset' });
-              setSel(null);
-              setSpecialRes({ winner:'', semifinalists:[], topScorerCountry:'' });
-              setSpecialMsg('');
-              alert('Resetare completă! Toți jucătorii pornesc de la 0.');
-            } catch(e) {
-              alert('Eroare la reset: ' + e.message);
-            }
-          }}
-          style={{ width:'100%', padding:'12px 8px', background:'rgba(255,100,0,0.08)', border:'2px solid rgba(255,100,0,0.3)', borderRadius:12, color:'#FF6400', fontSize:12, fontWeight:800, cursor:'pointer', letterSpacing:'0.05em' }}
-        >
-          🏆 Reset clasament amicale — Start Cupă Mondială de la 0
-        </button>
-        <div style={{ fontSize:10, color:'rgba(255,255,255,0.2)', textAlign:'center', marginTop:5 }}>
-          Șterge predicțiile + punctele din meciurile amicale. Nu șterge userii sau meciurile reale.
-        </div>
-      </div>
+      {/* Reset amicale button removed — test phase complete */}
 
       {/* Qualification overview */}
       <QualificationPanel finishedResults={finishedResults}/>
