@@ -335,7 +335,7 @@ export default function App() {
   }, []);
 
   // ── Computed state ────────────────────────────────────────────────────────
-  const liveMatches = buildMatches(finishedResults, { includeTests: true });
+  const liveMatches = buildMatches(finishedResults); // official WC only
 
   // Single source of truth for current user's score
   const myPredsByNumber = Object.fromEntries(Object.entries(predictions).map(([id,p])=>[Number(id),p]));
