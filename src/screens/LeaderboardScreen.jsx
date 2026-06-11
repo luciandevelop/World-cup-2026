@@ -273,6 +273,7 @@ export default function LeaderboardScreen({
   }
 
   return (
+    <>
     <div style={{ padding: '0 14px' }}>
       <div style={{ display: 'flex', gap: 6, marginTop: 12, marginBottom: 14 }}>
         {[
@@ -424,5 +425,6 @@ export default function LeaderboardScreen({
         />
       );
     })()}
+    </>
   );
 }
