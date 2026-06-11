@@ -3,7 +3,7 @@
 // All pure JS — no React imports.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { ALL_MATCHES, ALL_GROUPS, getGroupLabel, TEST_MATCHES } from './matches.js';
+import { ALL_MATCHES, ALL_GROUPS, getGroupLabel } from './matches.js';
 export { getGroupLabel };
 
 // ─── MATCH STATUS OVERRIDES ───────────────────────────────────────────────────
@@ -54,9 +54,9 @@ export function buildMatches(finishedResults = FINISHED_RESULTS, { includeTests 
   });
 }
 
-export const MATCHES = buildMatches(undefined, { includeTests: true });
+export const MATCHES = buildMatches(); // official WC matches only
 export const GROUPS  = ALL_GROUPS;
-export { TEST_MATCHES };
+// TEST_MATCHES removed from production exports
 
 // ─── TIME FORMATTING ──────────────────────────────────────────────────────────
 // Format ISO string to Romanian local time (Europe/Bucharest = EEST/EET)
@@ -192,7 +192,7 @@ export function calcPoints(pred, match) {
 //   finishedResults — the canonical wc2026_admin_results object
 // Returns: { points, exactScores, lastMatchPts }
 export function calculateUserScore(userPreds, finishedResults = {}) {
-  const fm = buildMatches(finishedResults, { includeTests: true }).filter(m => m.isFinished);
+  const fm = buildMatches(finishedResults).filter(m => m.isFinished); // official WC only
   let points = 0, exactScores = 0, lastMatchPts = null, lastMatchId = null;
   fm.forEach(match => {
     const pred = userPreds[match.id] || userPreds[String(match.id)];
@@ -215,7 +215,7 @@ export const QUALIFY_PCT   = 1.0;   // kept for import compatibility; not used f
 export const CURRENT_STAGE = "Faza grupelor";
 
 export function buildLeaderboard(allPlayerPreds, currentUser, finishedMatches = null) {
-  const fm = finishedMatches || buildMatches({}, { includeTests: true }).filter(m => m.isFinished);
+  const fm = finishedMatches || buildMatches({}).filter(m => m.isFinished); // official WC only
   const nicknames = new Set([currentUser, ...Object.keys(allPlayerPreds)]);
 
   const players = Array.from(nicknames).map(nick => {
