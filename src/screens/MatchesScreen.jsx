@@ -1077,6 +1077,36 @@ function NextMatchCard({ matches, predictions, onPredict }) {
         {next.venue && <span style={{ fontSize:11, color:'rgba(255,255,255,0.25)' }}>📍 {next.venue}</span>}
       </div>
 
+      {/* Live details — minute, scorers, cards, corners — shown only when live */}
+      {isLive && (next.liveMinute !== null && next.liveMinute !== undefined || next.homeScorers || next.awayScorers || next.goalScorers || next.liveCards || next.liveCorners) && (
+        <div style={{ margin:'0 16px 10px', padding:'8px 12px', background:'rgba(239,68,68,0.07)', border:'1px solid rgba(239,68,68,0.18)', borderRadius:10, display:'flex', flexDirection:'column', gap:5 }}>
+          {next.liveMinute !== null && next.liveMinute !== undefined && next.liveMinute !== '' && (
+            <div style={{ fontSize:13, fontWeight:800, color:'#EF4444', fontFamily:"'DM Mono',monospace" }}>
+              🔴 {next.liveMinute}'
+            </div>
+          )}
+          {(next.homeScorers || next.awayScorers) ? (
+            <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.4)', fontWeight:700, letterSpacing:'0.05em', textTransform:'uppercase' }}>⚽ Marcatori</div>
+              {next.homeScorers && (
+                <div style={{ fontSize:12, color:'rgba(255,255,255,0.8)' }}>{next.flagA} {next.teamA}: {next.homeScorers}</div>
+              )}
+              {next.awayScorers && (
+                <div style={{ fontSize:12, color:'rgba(255,255,255,0.8)' }}>{next.flagB} {next.teamB}: {next.awayScorers}</div>
+              )}
+            </div>
+          ) : next.goalScorers ? (
+            <div style={{ fontSize:12, color:'rgba(255,255,255,0.75)' }}>⚽ {next.goalScorers}</div>
+          ) : null}
+          {next.liveCards && (
+            <div style={{ fontSize:12, color:'rgba(255,255,255,0.6)' }}>🟨 Cartonașe: {next.liveCards}</div>
+          )}
+          {next.liveCorners && (
+            <div style={{ fontSize:12, color:'rgba(255,255,255,0.6)' }}>🚩 Cornere: {next.liveCorners}</div>
+          )}
+        </div>
+      )}
+
       {/* Countdown strip */}
       {countdown && !isLive && (
         <div style={{ margin:'0 16px 10px', padding:'6px 12px', background:'rgba(255,255,255,0.04)', borderRadius:8, display:'flex', justifyContent:'space-between', alignItems:'center', border:'1px solid rgba(255,255,255,0.06)' }}>
