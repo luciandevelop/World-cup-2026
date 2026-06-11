@@ -420,6 +420,32 @@ function MatchCard({ match, prediction, onPredict, onDetail }) {
           </div>
         </div>
 
+        {/* Live details: minute, scorers, cards, corners */}
+        {match.isLive && (match.liveMinute !== null && match.liveMinute !== undefined || match.goalScorers || match.liveCards || match.liveCorners) && (
+          <div style={{ marginTop:8, padding:'7px 10px', background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)', borderRadius:8, display:'flex', flexDirection:'column', gap:4 }}>
+            {match.liveMinute !== null && match.liveMinute !== undefined && match.liveMinute !== '' && (
+              <div style={{ fontSize:12, fontWeight:800, color:'#EF4444', fontFamily:"'DM Mono',monospace" }}>
+                🔴 LIVE {match.liveMinute}'
+              </div>
+            )}
+            {match.goalScorers && (
+              <div style={{ fontSize:11, color:'rgba(255,255,255,0.7)' }}>
+                ⚽ {match.goalScorers}
+              </div>
+            )}
+            {match.liveCards && (
+              <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)' }}>
+                🟨 Cartonașe: {match.liveCards}
+              </div>
+            )}
+            {match.liveCorners && (
+              <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)' }}>
+                🚩 Cornere: {match.liveCorners}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Venue / date */}
         <div style={{ marginTop:10, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <span style={{ fontSize:10, color:"rgba(255,255,255,0.2)" }}>{formatKickoffRO(match.time)}</span>

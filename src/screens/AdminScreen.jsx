@@ -117,6 +117,9 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
   const [cornB,   setCornB]  = useState('');
   const [minute,  setMinute] = useState(0);
   const [status,  setStatus] = useState('ft');
+  const [goalScorers, setGoalScorers] = useState('');
+  const [liveCards,   setLiveCards]   = useState('');
+  const [liveCorners, setLiveCorners] = useState('');
   const [saved,   setSaved]  = useState(false);
   const [groupF,  setGroupF] = useState('all');
   const [statusF, setStatusF]= useState('all');
@@ -160,6 +163,9 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
     setCornB(fr?.awayCorners    != null ? String(fr.awayCorners)    : '');
     setMinute(fr?.liveMinute ?? 0);
     setStatus(fr?.liveStatus ?? (m.isFinished ? 'ft' : m.isLive ? 'live' : 'scheduled'));
+    setGoalScorers(fr?.goalScorers ?? '');
+    setLiveCards(fr?.liveCards     ?? '');
+    setLiveCorners(fr?.liveCorners ?? '');
   };
 
   const saveResult = async () => {
@@ -188,6 +194,9 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
       liveScoreA:      Number(sA),
       liveScoreB:      Number(sB),
       liveMinute:      minute,
+      goalScorers:     goalScorers.trim() || null,
+      liveCards:       liveCards.trim()   || null,
+      liveCorners:     liveCorners.trim() || null,
       liveStatus:      status,
       homePossession:  hPoss,
       awayPossession:  aPoss,
@@ -361,6 +370,45 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
               </div>
             </div>
           )}
+
+          {/* Live details — optional free-text fields */}
+          <div style={{ marginBottom:12 }}>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.25)', letterSpacing:'0.08em', textTransform:'uppercase', fontWeight:600, marginBottom:8 }}>Detalii live opționale</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              <div>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:3 }}>⚽ Marcatori (ex: Jimenez 14' Alvarez 62')</div>
+                <input
+                  type="text"
+                  value={goalScorers}
+                  onChange={e => setGoalScorers(e.target.value)}
+                  placeholder="Jimenez 14' Alvarez 62'"
+                  style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:12, outline:'none', boxSizing:'border-box' }}
+                />
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                <div>
+                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:3 }}>🟨 Cartonașe (ex: 2-1)</div>
+                  <input
+                    type="text"
+                    value={liveCards}
+                    onChange={e => setLiveCards(e.target.value)}
+                    placeholder="2-1"
+                    style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:12, outline:'none', boxSizing:'border-box' }}
+                  />
+                </div>
+                <div>
+                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:3 }}>🚩 Cornere (ex: 5-3)</div>
+                  <input
+                    type="text"
+                    value={liveCorners}
+                    onChange={e => setLiveCorners(e.target.value)}
+                    placeholder="5-3"
+                    style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:12, outline:'none', boxSizing:'border-box' }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Score */}
           <div style={{ display:'flex', gap:12, justifyContent:'center', marginBottom:12 }}>
