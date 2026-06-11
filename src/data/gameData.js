@@ -352,12 +352,101 @@ export const MOST_PREDICTED = {
 
 export const LIVE_FEED_EVENTS = [];
 
-// ─── SMART ACTIVITY FEED ─────────────────────────────────────────────────────
-// Drama-first feed: 70%+ player competition, ~20% Romanian-flavoured humour.
-// Priority order: position changes > battles > streaks > exact > match stats.
-// Never shows 3 consecutive items of type 'exact' or 'points'.
-// event shape: { id, type, icon, text, ts, priority, uid?, nickname? }
+// ─── ACTIVITY FEED v3 ───────────────────────────────────────────────────────
+// Self-contained. Only READS already-computed data. Zero writes, zero Firestore.
+//
+// Safety rules:
+//   - Official WC matches (id 1-72): all event types allowed
+//   - Test/Amicale (id 901+): prediction banter, exact scores, ranking drama ONLY
+//   - Country/star facts: only verified:true entries, only on WC matches
+//   - Ranking drama: data-driven, requires prevLeaderboard delta proof
+//   - No fabricated "again / third time" wording
+//
+// event shape: { id, type, icon, text, ts, priority }
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ── Alias map: normalise display names to canonical WC key ───────────────────
+const _ALIASES = {
+  "Țările de Jos":"Olanda","Netherlands":"Olanda","Holland":"Olanda",
+  "Franța":"Franta","France":"Franta",
+  "Curaçao":"Curacao",
+  "Coasta de Fildeș":"Coasta de Fildes","Ivory Coast":"Coasta de Fildes",
+  "Cape Verde":"Capul Verde",
+  "DR Congo":"RD Congo","Congo DR":"RD Congo","Congo RD":"RD Congo",
+  "Bosnia & Herzegovina":"Bosnia","Bosnia & Herțegovina":"Bosnia",
+};
+const _normalise = (n) => _ALIASES[n] ?? n;
+
+// ── Official WC 2026 team set (48 qualified) ─────────────────────────────────
+const _OFFICIAL = new Set([
+  "Africa de Sud","Algeria","Anglia","Arabia Saudita","Argentina","Australia",
+  "Austria","Belgia","Bosnia","Brazilia","Canada","Capul Verde","Cehia",
+  "Coasta de Fildes","Columbia","Coreea de Sud","Croatia","Curacao","Ecuador",
+  "Egipt","Elvetia","Franta","Germania","Ghana","Haiti","Iordania","Irak","Iran",
+  "Japonia","Maroc","Mexic","Norvegia","Noua Zeelanda","Olanda","Panama",
+  "Paraguay","Portugalia","Qatar","RD Congo","SUA","Scotia","Senegal","Spania",
+  "Suedia","Tunisia","Turcia","Uruguay","Uzbekistan",
+]);
+const _isOfficial = (name) => _OFFICIAL.has(_normalise(name));
+const _isWCMatch  = (m)    => m && m.id >= 1 && m.id <= 72;
+
+// ── Verified country facts (only facts stated with confidence) ───────────────
+const _FACTS = {
+  "Franta":        ["Franța a câștigat Cupa Mondială în 1998 și 2018. Două titluri, zero modestie.",
+                    "Finala Mondialului 1998: Franța 3–0 Brazilia. Zidane a marcat de două ori cu capul."],
+  "Argentina":     ["Argentina a câștigat Cupa Mondială în 1978, 1986 și 2022.",
+                    "Mâna lui Dumnezeu, 1986: Maradona a înscris cu mâna și nimeni n-a văzut. Sau toți au văzut."],
+  "Brazilia":      ["Brazilia are 5 titluri mondiale — record absolut. Presiunea e parte din tricou.",
+                    "Maracanazo 1950: Brazilia a pierdut finala acasă cu Uruguay. Traumă națională."],
+  "Germania":      ["Germania are 4 titluri mondiale. La Mondialul 2014 a bătut Brazilia cu 7–1 în semifinale.",
+                    "Reinheitsgebot — legea purității berii germane — datează din 1516. Disciplina e în ADN."],
+  "Anglia":        ["Anglia a câștigat un singur titlu mondial, în 1966, pe teren propriu. De atunci, speranță eternă.",
+                    "The Football Association, prima federație de fotbal din lume, fondată în Anglia în 1863."],
+  "Spania":        ["Spania a câștigat Mondialul 2010 și Euro 2008, 2012, 2024.",
+                    "Tiki-taka — sistemul de joc bazat pe posesie — a fost perfecționat de Spania între 2008–2012."],
+  "Maroc":         ["Maroc a fost prima echipă africană în semifinalele unui Mondial — Qatar 2022.",
+                    "Maroc a eliminat Spania și Portugalia la Mondialul 2022."],
+  "Japonia":       ["Japonia a eliminat Germania și Spania la grupele Mondialului 2022.",
+                    "Japonia are trenuri cu medie de întârziere de sub un minut. Aceeași disciplină, la fotbal."],
+  "Mexic":         ["Mexic co-organizează Mondialul 2026 și nu a trecut niciodată de sferturi.",
+                    "Mexico City are aproximativ 22 milioane de locuitori în zona metropolitană."],
+  "SUA":           ["SUA organizează Mondialul 2026 și în 1994 a înregistrat cea mai mare medie de spectatori per meci.",
+                    "SUA este a treia cea mai mare țară din lume ca suprafață."],
+  "Portugalia":    ["Portugalia a câștigat Euro 2016 și Nations League 2019.",
+                    "Portugalia a terminat pe locul 3 la Mondialul 1966, cu Eusébio marcând 9 goluri."],
+  "Uruguay":       ["Uruguay a câștigat primele două Cupe Mondiale, în 1930 și 1950.",
+                    "Uruguay a câștigat Mondialul 1950 bătând Brazilia pe Maracanã în fața a ~200.000 de spectatori."],
+  "Croatia":       ["Croatia a terminat pe locul 2 la Mondialul 2018 și pe locul 3 în 2022.",
+                    "Cravata este o invenție croată — soldații croați o purtau în secolul al XVII-lea."],
+  "Uzbekistan":    ["Uzbekistan este una din cele două țări complet înconjurate de alte state fără ieșire la mare.",
+                    "Samarkand, din Uzbekistan, a fost unul din centrele principale ale Drumului Mătăsii."],
+  "Norvegia":      ["Norvegia s-a calificat la Mondialul 2026 — prima participare din 1998.",
+                    "Fiordurile norvegiene sunt Patrimoniu UNESCO — spectaculoase pe hartă, periculoase în predicții."],
+  "Olanda":        ["Olanda a terminat pe locul 2 la Mondialul 2010 și a inventat fotbalul total cu Johan Cruyff.",
+                    "Olanda are mai mulți bicicliști decât oameni. La fotbal, tot viteza contează."],
+  "Elvetia":       ["Elveția a eliminat Franța la Euro 2021 în optimi, câștigând la penaltii.",
+                    "Elveția are 4 limbi oficiale și produce ~10 kg de ciocolată per capita anual."],
+  "Senegal":       ["Senegal a câștigat Cupa Africii pe Națiuni în 2021 și 2022.",
+                    "Senegal a ajuns în sferturile Mondialului 2002 — cel mai bun rezultat african la acea ediție."],
+  "Coreea de Sud": ["Coreea de Sud a ajuns în semifinalele Mondialului 2002, co-organizat cu Japonia.",
+                    "Seul are aproximativ 25 milioane de locuitori în zona metropolitană."],
+  "Canada":        ["Canada co-organizează Mondialul 2026 și s-a calificat după 36 de ani de absență.",
+                    "Canada este a doua cea mai mare țară din lume ca suprafață."],
+};
+
+// ── Verified star players (no TODO_VERIFY) ───────────────────────────────────
+const _STARS = {
+  "Franta":    "Kylian Mbappé",
+  "Argentina": "Lionel Messi",
+  "Brazilia":  "Vinicius Jr.",
+  "Anglia":    "Jude Bellingham",
+  "Maroc":     "Achraf Hakimi",
+  "Portugalia":"Cristiano Ronaldo",
+  "Norvegia":  "Erling Haaland",
+  "Egipt":     "Mohamed Salah",
+  "Senegal":   "Sadio Mané",
+  "SUA":       "Christian Pulisic",
+};
 
 export function generateActivityFeed({
   leaderboard     = [],
@@ -369,38 +458,39 @@ export function generateActivityFeed({
 } = {}) {
   const events = [];
   let seq = 0;
-  const ev = (type, icon, text, priority = 5, extras = {}) =>
-    events.push({ id:`feed_${Date.now()}_${seq++}`, type, icon, text, ts:Date.now(), priority, ...extras });
+  const ev = (type, icon, text, priority = 5) =>
+    events.push({ id:`feed_${Date.now()}_${seq++}`, type, icon, text, ts:Date.now(), priority });
 
   const nickOf = (uid) => allUsers[uid]?.nickname || uid;
   const n      = leaderboard.length;
 
-  // Stable pick: choose from arr deterministically using seed values
+  // Deterministic pick — stable across re-renders, no flickering
   const pick = (arr, ...seeds) => {
-    const h = Math.abs(seeds.reduce((a, s) => ((a * 31) + (String(s).charCodeAt(0) | 0)) | 0, 7));
+    const h = Math.abs(seeds.reduce((a, s) => ((a * 31) + (String(s).charCodeAt(0)|0))|0, 7));
     return arr[h % arr.length];
   };
 
-  // Build prediction stats for one finished match
+  // Prediction rows for one finished match (read-only, no scoring changes)
   const matchPreds = (matchId, match) => {
     const out = [];
     Object.entries(allPredictions).forEach(([uid, preds]) => {
       const p = preds[matchId] || preds[String(matchId)];
       if (!p) return;
       const pts = calcPoints(p, match) || 0;
-      const pA  = Number(p.scoreA), pB = Number(p.scoreB);
-      const rA  = Number(match.realScoreA), rB = Number(match.realScoreB);
+      const pA = Number(p.scoreA), pB = Number(p.scoreB);
+      const rA = Number(match.realScoreA), rB = Number(match.realScoreB);
       const exact = pA === rA && pB === rB;
       const realRes = rA > rB ? '1' : rA < rB ? '2' : 'X';
       const predRes = pA > pB ? '1' : pA < pB ? '2' : 'X';
-      out.push({ uid, nick:nickOf(uid), pts, exact, correctResult: realRes === predRes, pA, pB });
+      const pCards  = p.possession != null ? Number(p.possession) : null;
+      out.push({ uid, nick:nickOf(uid), pts, exact, correctResult:realRes===predRes, pA, pB, pCards });
     });
     return out;
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // BLOCK 1 — LEADERBOARD DRAMA (priority 9–12, the backbone)
-  // 70%+ of feed comes from here.
+  // BLOCK 1 — LEADERBOARD DRAMA (data-driven, requires prevLeaderboard)
+  // Every event requires a real delta. No fabricated history.
   // ═══════════════════════════════════════════════════════════════
   const hasPrev = prevLeaderboard.length > 0;
 
@@ -408,121 +498,117 @@ export function generateActivityFeed({
     leaderboard.forEach(entry => {
       const prev = prevLeaderboard.find(p => p.nickname === entry.nickname);
       if (!prev) return;
-      const delta = prev.rank - entry.rank;   // positive = climbed
+      const delta = prev.rank - entry.rank; // positive = climbed
       const nick  = entry.nickname;
 
-      // ── 1a. New leader — highest drama, multiple humorous variants
+      // New leader
       if (entry.rank === 1 && prev.rank > 1) {
         const displaced = prevLeaderboard.find(p => p.rank === 1);
         const d = displaced?.nickname || '?';
         ev('lead', '🏆', pick([
           `${nick} l-a depășit pe ${d} și a urcat pe locul 1!`,
-          `${nick} preia conducerea! ${d} pierde tronul.`,
           `🍾 ${nick} a pus șampania la rece. ${d} coboară.`,
           `Schimbare la vârf: ${nick} detronează pe ${d}.`,
-          `${nick} joacă Football Manager în viața reală. Locul 1 e al lui!`,
-        ], nick, d), 12, { nickname:nick });
+          `${nick} preia conducerea! ${d} pierde tronul.`,
+          `👑 ${nick} pe locul 1. ${d} recalculează totul.`,
+        ], nick, d), 12);
       }
 
-      // ── 1b. Lost the lead
+      // Lost the lead
       if (prev.rank === 1 && entry.rank > 1) {
         ev('fall', '😬', pick([
           `${nick} pierde primul loc — locul ${entry.rank} acum.`,
           `🚑 ${nick} cere verificarea VAR după ce a ieșit de pe locul 1.`,
-          `${nick} coboară de pe tron. Locul ${entry.rank} nu era în plan.`,
           `👀 ${nick} se uită în oglindă și vede locul ${entry.rank}.`,
           `Schimbare la vârf! ${nick} nu mai e lider.`,
-        ], nick, entry.rank), 11, { nickname:nick });
+          `🫣 ${nick} coboară de pe tron. Locul ${entry.rank} nu era în plan.`,
+        ], nick, entry.rank), 11);
       }
 
-      // ── 1c. Entered Top 3
+      // Entered Top 3
       if (entry.rank <= 3 && prev.rank > 3) {
         ev('top3', '🚀', pick([
-          `${nick} intră în Top 3 pentru prima dată!`,
-          `🏃 ${nick} revine de nicăieri și forțează podiumul — locul ${entry.rank}!`,
+          `${nick} intră în Top 3!`,
+          `🏃 ${nick} forțează podiumul — locul ${entry.rank}!`,
           `${nick} urcă pe podium. Locul ${entry.rank}!`,
-          `${nick} forțează intrarea în lupta pentru medalii.`,
-        ], nick), 10, { nickname:nick });
+        ], nick), 10);
       }
 
-      // ── 1d. Fell out of Top 3
+      // Left Top 3
       if (entry.rank > 3 && prev.rank <= 3) {
         ev('top3_exit', '💀', pick([
           `${nick} iese din Top 3 — locul ${entry.rank} acum.`,
-          `🚑 ${nick} cere verificarea VAR după ce a ieșit din Top 3.`,
-          `${nick} a fost pe podium. Locul ${entry.rank} e o altă poveste.`,
+          `🚑 ${nick} cere VAR după ce a ieșit din Top 3.`,
           `👀 ${nick} se uită în oglindă și vede locul ${entry.rank}.`,
-        ], nick, entry.rank), 10, { nickname:nick });
+        ], nick, entry.rank), 10);
       }
 
-      // ── 1e. Big climb (2+ positions)
+      // Climbed 2+ positions
       if (delta >= 2 && entry.rank > 1) {
         ev('rank_up', '📈', pick([
           `${nick} urcă ${delta} locuri — locul ${entry.rank} acum!`,
-          `🏃 ${nick} revine în cursă și urcă ${delta} poziții!`,
-          `${nick} avansează ${delta} locuri. Pericolul se apropie de top.`,
+          `🏃 ${nick} urcă ${delta} poziții. Pericolul se apropie de top.`,
           `${nick} face saltul de ${delta} locuri — periculos pentru rivali!`,
-        ], nick, delta), 9, { nickname:nick });
+        ], nick, delta), 9);
       }
 
-      // ── 1f. Big drop (2+ positions)
+      // Dropped 2+ positions
       if (delta <= -2) {
         ev('rank_down', '📉', pick([
           `${nick} coboară ${Math.abs(delta)} locuri — locul ${entry.rank} acum.`,
           `😬 ${nick} pierde ${Math.abs(delta)} poziții după ultimul meci.`,
-          `${nick} are nevoie urgentă de puncte. Locul ${entry.rank}.`,
-        ], nick, delta), 8, { nickname:nick });
+          `${nick} are nevoie de puncte. Locul ${entry.rank}.`,
+        ], nick, delta), 8);
       }
 
-      // ── 1g. Entered Top 5 (climbing into 4th or 5th place)
+      // Entered Top 5
       if (entry.rank <= 5 && entry.rank > 3 && prev.rank > 5) {
         ev('top5', '📈', pick([
           `${nick} intră în Top 5 — locul ${entry.rank}!`,
           `${nick} urcă în Top 5. Locul ${entry.rank} acum.`,
-        ], nick), 7, { nickname:nick });
+        ], nick), 7);
       }
 
-      // ── 1h. Left Top 5 (was 4th or 5th, now outside)
+      // Left Top 5
       if (entry.rank > 5 && prev.rank <= 5 && prev.rank > 3) {
         ev('top5_exit', '📉', pick([
           `${nick} iese din Top 5 — locul ${entry.rank} acum.`,
           `${nick} pierde Top 5. Locul ${entry.rank}.`,
-        ], nick, entry.rank), 6, { nickname:nick });
+        ], nick, entry.rank), 6);
       }
     });
 
-    // ── 1i. Leader extends gap (domination or widening)
+    // Leader extends gap
     const L = leaderboard[0], S = leaderboard[1];
     const pL = prevLeaderboard[0], pS = prevLeaderboard[1];
     if (L && S && pL && pS) {
       const gap = L.points - S.points, prevGap = pL.points - pS.points;
       if (gap > prevGap && gap >= 15) {
         ev('gap', '👑', pick([
-          `${L.nickname} își mărește avantajul la ${gap} puncte față de ${S.nickname}.`,
-          `👑 ${L.nickname} și-a mai luat distanță — ${gap} puncte față de ${S.nickname}.`,
-          `${L.nickname} fuge de pluton. Avantaj: ${gap} pts.`,
+          `${L.nickname} fuge de pluton — ${gap} puncte față de ${S.nickname}.`,
+          `👑 ${L.nickname} și-a mai luat distanță. ${gap} pts față de ${S.nickname}.`,
+          `${L.nickname} extinde avantajul la ${gap} puncte.`,
         ], L.nickname, gap), 8);
       }
-      // Leader is being chased hard — gap narrowed
       if (gap < prevGap && gap <= 15 && gap > 0) {
         ev('chase', '🔥', pick([
-          `${S.nickname} se apropie periculos! Doar ${gap} puncte până la lider.`,
-          `⚔️ ${L.nickname} și ${S.nickname} sunt despărțiți de ${gap} puncte — mai puțin decât costă o shaorma.`,
+          `${S.nickname} se apropie! Doar ${gap} puncte până la lider.`,
+          `⚔️ ${L.nickname} și ${S.nickname} separați de ${gap} puncte — mai puțin decât costă o shaorma.`,
           `${S.nickname} reduce din avans. Diferența: ${gap} pts.`,
         ], S.nickname, gap), 9);
       }
     }
 
-    // ── 1j. Tight battle(s) between adjacent players (≤8 pts apart)
+    // Tight battles ≤8 pts
     let battleAdded = 0;
     for (let i = 1; i < Math.min(leaderboard.length, 6) && battleAdded < 2; i++) {
       const a = leaderboard[i-1], b = leaderboard[i];
       const diff = a.points - b.points;
       if (diff <= 8 && diff >= 0) {
         ev('battle', '⚔️', pick([
-          `Luptă strânsă: ${a.nickname} (loc ${a.rank}) vs ${b.nickname} (loc ${b.rank}) — doar ${diff} pts diferență!`,
-          `⚔️ ${a.nickname} și ${b.nickname} sunt despărțiți de ${diff} puncte — orice e posibil!`,
-          `${diff} puncte îi despart pe ${a.nickname} și ${b.nickname}. Un singur meci schimbă totul.`,
+          `${a.nickname} și ${b.nickname} separați de ${diff} puncte. Un meci schimbă totul.`,
+          `⚔️ ${a.nickname} vs ${b.nickname}: ${diff} pts diferență — orice e posibil!`,
+          `${diff} puncte îi despart pe ${a.nickname} și ${b.nickname}. Tensiune maximă.`,
         ], a.nickname, b.nickname, diff), 8);
         battleAdded++;
       }
@@ -530,34 +616,33 @@ export function generateActivityFeed({
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // BLOCK 2 — LEADERBOARD STANDING STORIES (no prev needed)
+  // BLOCK 2 — LEADERBOARD STANDING (no prev needed)
   // ═══════════════════════════════════════════════════════════════
   if (n >= 2) {
     const leader = leaderboard[0];
     const last   = leaderboard[n - 1];
+    const second = leaderboard[1];
 
-    // ── 2a. Exact score streaks — player performance narrative
+    // Exact score counts — data-driven, no "again" wording
     leaderboard.forEach(entry => {
       const es = entry.exactScores || 0;
       if (es >= 5) {
         ev('streak', '🔥', pick([
-          `${entry.nickname} are ${es} scoruri exacte — joacă altceva față de restul!`,
-          `🔥 ${entry.nickname} joacă Football Manager în viața reală. ${es} scoruri exacte!`,
-          `${entry.nickname}: ${es} scoruri exacte. Cineva face analytics serios.`,
-        ], entry.nickname, es), 9, { nickname:entry.nickname });
+          `${entry.nickname} are ${es} scoruri exacte — joacă pe altă planșetă.`,
+          `🔥 ${entry.nickname}: ${es} scoruri exacte. Cineva face analytics serios.`,
+        ], entry.nickname, es), 9);
       } else if (es >= 3) {
         ev('streak', '🔥', pick([
           `${entry.nickname} are ${es} scoruri exacte — formă excelentă!`,
           `${es} scoruri exacte pentru ${entry.nickname}. Nu e noroc, e sistem.`,
-        ], entry.nickname, es), 7, { nickname:entry.nickname });
+        ], entry.nickname, es), 7);
       } else if (es >= 2) {
-        ev('streak', '🔥', `${entry.nickname} a mai nimerit un scor exact — ${es} total.`, 5, { nickname:entry.nickname });
+        ev('streak', '🔥', `${entry.nickname} are ${es} scoruri exacte totale.`, 5);
       }
     });
 
-    // ── 2b. Leader near a milestone
-    const milestones = [50, 100, 150, 200, 250, 300, 400, 500];
-    milestones.forEach(m => {
+    // Leader near milestone
+    [50, 100, 150, 200, 250, 300, 400, 500].forEach(m => {
       const diff = m - leader.points;
       if (diff > 0 && diff <= 15) {
         ev('milestone', '🔥', pick([
@@ -567,41 +652,25 @@ export function generateActivityFeed({
       }
     });
 
-    // ── 2c. Top 4+ all compressed → tension headline
+    // Compressed top
     const top = leaderboard.slice(0, Math.min(5, n));
     const spread = top[0].points - top[top.length - 1].points;
     if (spread <= 25 && top.length >= 4) {
       ev('tension', '📊', pick([
         `Lupta pentru Top ${top.length} se încinge — doar ${spread} puncte despart totul!`,
         `📊 ${spread} puncte între locurile 1 și ${top.length}. Un singur meci poate schimba tot.`,
-        `Clasamentul e o bombă cu ceas. ${spread} puncte despart primii ${top.length}.`,
       ], spread, top.length), 7);
     }
 
-    // ── 2d. Domination — leader has 2× the points of 2nd
-    const second = leaderboard[1];
+    // Domination
     if (second && second.points > 0 && leader.points >= second.points * 2 && leader.points >= 100) {
       ev('domination', '👑', pick([
         `${leader.nickname} domină clasamentul — ${leader.points} pts, dublul lui ${second.nickname}.`,
         `${leader.nickname} e pe altă planetă față de restul. ${leader.points} puncte totale.`,
-      ], leader.nickname), 7, { nickname:leader.nickname });
+      ], leader.nickname), 7);
     }
 
-    // ── 2e. Last place humour (light, friendly)
-    if (n >= 4 && last.points === 0) {
-      ev('fun', '😅', pick([
-        `${last.nickname} are 0 puncte. Turneul abia a început — sau nu?`,
-        `🫣 ${last.nickname} caută telecomanda. 0 puncte deocamdată.`,
-        `${last.nickname} mai are timp să se întoarcă. Teoretic.`,
-      ], last.nickname), 3, { nickname:last.nickname });
-    } else if (n >= 4 && last.points > 0 && last.points < leaderboard[0].points * 0.2) {
-      ev('fun', '😬', pick([
-        `${last.nickname} vede lumina de la capătul tunelului — sau e un tren?`,
-        `${last.nickname} luptă singur la coada clasamentului.`,
-      ], last.nickname), 3, { nickname:last.nickname });
-    }
-
-    // ── 2f. Close podium — all within 20 pts
+    // Close podium
     if (n >= 3) {
       const third = leaderboard[2];
       if (leader.points - third.points <= 20 && leader.points > 0) {
@@ -611,19 +680,31 @@ export function generateActivityFeed({
         ], leader.nickname, third.nickname), 7);
       }
     }
+
+    // Last place
+    if (n >= 4 && last.points === 0) {
+      ev('fun', '😅', pick([
+        `${last.nickname} are 0 puncte. Turneul abia a început — sau nu?`,
+        `🫣 ${last.nickname} caută telecomanda. 0 puncte deocamdată.`,
+      ], last.nickname), 3);
+    } else if (n >= 4 && last.points > 0 && last.points < leaderboard[0].points * 0.2) {
+      ev('fun', '😬', pick([
+        `${last.nickname} vede lumina de la capătul tunelului — sau e un tren?`,
+        `${last.nickname} luptă singur la coada clasamentului.`,
+      ], last.nickname), 3);
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // BLOCK 3 — MATCH EVENTS (lower priority — max 30% of feed)
-  // Exact scores and top points capped to 1 each per render.
+  // BLOCK 3 — MATCH EVENTS
+  // All match types: exact scores, near-misses, upset, banter.
+  // Country/star facts: official WC matches (id 1-72) + official team ONLY.
+  // Test/Amicale matches: no country facts, no star snippets.
   // ═══════════════════════════════════════════════════════════════
   const justFinished = Object.values(finishedResults).filter(r =>
-    r.liveStatus === 'ft' &&
-    r.realScoreA !== null && r.realScoreA !== undefined &&
-    r.realScoreB !== null && r.realScoreB !== undefined
+    r.liveStatus === 'ft' && r.realScoreA != null && r.realScoreB != null
   );
 
-  // Track one best-round winner across all matches
   let globalTopUid = null, globalTopPts = 0, globalTopMatch = null;
 
   justFinished.forEach(result => {
@@ -633,6 +714,7 @@ export function generateActivityFeed({
     const sA       = Number(result.realScoreA ?? result.homeScore ?? 0);
     const sB       = Number(result.realScoreB ?? result.awayScore ?? 0);
     const scoreStr = `${sA}–${sB}`;
+    const isWC     = _isWCMatch(match);
     const preds    = matchPreds(match.id, { ...match, isFinished:true, realScoreA:sA, realScoreB:sB });
     const exact    = preds.filter(p => p.exact);
     const correct  = preds.filter(p => p.correctResult);
@@ -640,36 +722,57 @@ export function generateActivityFeed({
     const topEntry = sorted[0];
     const total    = preds.length;
 
-    // Track global best
     if (topEntry && topEntry.pts > globalTopPts) {
       globalTopPts = topEntry.pts; globalTopUid = topEntry.uid; globalTopMatch = match;
     }
 
-    // ── 3a. Exact score — single event per match, lower priority than drama
+    // ── Exact score (all match types) — rich templates ───────────────────────
     if (exact.length === 1) {
       ev('exact', '🎯', pick([
-        `${exact[0].nick} a ghicit scorul exact: ${scoreStr} la ${mName}.`,
-        `🤏 ${exact[0].nick} a nimerit-o perfect: ${scoreStr}!`,
-        `Scor exact pentru ${exact[0].nick} la ${mName}!`,
-      ], exact[0].nick, match.id), 6, { uid:exact[0].uid });
+        `${exact[0].nick} a lovit scorul exact: ${scoreStr} la ${mName}.`,
+        `🔮 ${exact[0].nick} a pus ${scoreStr} și chiar a ieșit ${scoreStr}. Restul au venit la ghicit porumbei.`,
+        `🧙 ${exact[0].nick} a văzut viitorul la ${mName}: ${scoreStr}.`,
+        `🎯 Scor exact pentru ${exact[0].nick} la ${mName}. Cineva să-i verifice istoricul browserului.`,
+        `${exact[0].nick} a nimerit ${scoreStr} la ${mName}. Se cere control antidoping la inspirație.`,
+        `🏹 ${exact[0].nick} a tras direct în centru: ${scoreStr} la ${mName}.`,
+        `🧠 ${exact[0].nick} a citit meciul perfect: ${scoreStr}. Sau a avut bulan cu diplomă.`,
+      ], exact[0].nick, match.id), 6);
     } else if (exact.length === 2) {
-      ev('exact', '🎯', `${exact[0].nick} și ${exact[1].nick} au prezis exact ${scoreStr} la ${mName}.`, 6);
+      ev('exact', '🎯', pick([
+        `${exact[0].nick} și ${exact[1].nick} au nimerit ${scoreStr} la ${mName}. Solidaritate suspectă.`,
+        `🤝 ${exact[0].nick} și ${exact[1].nick} ambii cu scor exact la ${mName}: ${scoreStr}.`,
+      ], exact[0].nick, match.id), 6);
     } else if (exact.length >= 3) {
       ev('exact', '🎯', `${exact.length} jucători au nimerit ${scoreStr} la ${mName} — incredibil!`, 6);
     }
 
-    // ── 3b. Near-miss — one goal away (humorous)
+    // ── Near-miss by 1 goal ──────────────────────────────────────────────────
     if (exact.length === 0) {
       const near = preds.find(p => Math.abs(p.pA - sA) + Math.abs(p.pB - sB) === 1);
       if (near) {
-        ev('near', '🤏', pick([
-          `${near.nick} a fost la un singur gol de glorie la ${mName}.`,
-          `${near.nick} a ratat scorul exact cu un gol. Aproape!`,
-        ], near.nick, match.id), 5, { uid:near.uid });
+        ev('near', '💔', pick([
+          `${near.nick} a ratat perfecțiunea la ${mName} pentru un singur gol.`,
+          `💔 ${near.nick} la ${mName}: la un gol de scor exact. Doare.`,
+          `🤏 ${near.nick} a fost la un singur gol de glorie la ${mName}.`,
+        ], near.nick, match.id), 5);
       }
     }
 
-    // ── 3c. Upset — nobody got the result right (funny, lower priority)
+    // ── Near-miss by 1 card (when score was exact) ───────────────────────────
+    if (exact.length > 0) {
+      const rCard = match.realPossession != null ? Number(match.realPossession) : null;
+      if (rCard != null) {
+        const nearCard = exact.find(p => p.pCards != null && Math.abs(p.pCards - rCard) === 1);
+        if (nearCard) {
+          ev('near', '🟨', pick([
+            `${nearCard.nick} a lovit scorul exact la ${mName} dar cartonașele l-au costat un cartonaș.`,
+            `🚑 ${nearCard.nick}: scor exact la ${mName}, dar arbitrul i-a stricat cartonașele.`,
+          ], nearCard.nick, match.id), 5);
+        }
+      }
+    }
+
+    // ── Upset — nobody got result right ─────────────────────────────────────
     if (total >= 2 && correct.length === 0) {
       ev('upset', '😱', pick([
         `Surpriza serii: ${mName} ${scoreStr} — nimeni nu a anticipat-o!`,
@@ -678,13 +781,52 @@ export function generateActivityFeed({
       ], match.id, sA, sB), 5);
     }
 
-    // ── 3d. Collective win — everyone got result right
+    // ── Absurd cards (≥15 predicted) ─────────────────────────────────────────
+    preds.forEach(p => {
+      if (p.pCards != null && p.pCards >= 15) {
+        ev('fun', '🚨', pick([
+          `${p.nick} a pus ${p.pCards} cartonașe la ${mName}. Omul nu vede meci, vede război civil.`,
+          `🟨 ${p.nick}: ${p.pCards} cartonașe prezise la ${mName}. Arbitrul acela e extraterestru.`,
+        ], p.nick, match.id), 4);
+      }
+    });
+
+    // ── Zero points ──────────────────────────────────────────────────────────
+    const zeroes = preds.filter(p => p.pts === 0);
+    if (zeroes.length === 1) {
+      ev('miss', '💀', pick([
+        `${zeroes[0].nick} a luat 0 puncte la ${mName}. Nici rezultatul nu l-a ajutat.`,
+        `😶 ${zeroes[0].nick} la ${mName}: 0 puncte. Runda asta, mai bine nu exista.`,
+      ], zeroes[0].uid, match.id), 4);
+    }
+
+    // ── Collective all-correct ────────────────────────────────────────────────
     if (total >= 3 && correct.length === total) {
       ev('stat', '🎉', `Toți jucătorii au prezis corect rezultatul la ${mName}!`, 4);
     }
+
+    // ── Country facts + star snippets — ONLY official WC matches + official teams ──
+    if (isWC) {
+      [match.teamA, match.teamB].forEach((team, idx) => {
+        if (!_isOfficial(team)) return;
+        const canon = _normalise(team);
+        const facts = _FACTS[canon];
+        if (facts?.length) {
+          const fact = pick(facts, match.id + idx * 100);
+          ev('fact', '📖', fact, 3);
+        }
+        const star = _STARS[canon];
+        if (star && idx === 0) {
+          ev('star', '⭐', pick([
+            `De urmărit azi: ${star} pentru ${canon}. Dacă prinde o zi bună, jumătate din predicții se duc.`,
+            `⭐ ${star} joacă pentru ${canon}. Forma lui contează pentru scor.`,
+          ], match.id, canon), 3);
+        }
+      });
+    }
   });
 
-  // ── 3e. One "best of round" summary (only when 2+ matches finished)
+  // ── Best-of-round summary ─────────────────────────────────────────────────
   if (justFinished.length >= 2 && globalTopUid && globalTopPts > 0) {
     ev('best_round', '🏅', pick([
       `Cel mai mare punctaj al etapei: ${globalTopPts} pts — ${nickOf(globalTopUid)} la ${globalTopMatch.teamA} vs ${globalTopMatch.teamB}.`,
@@ -693,56 +835,45 @@ export function generateActivityFeed({
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // FINAL — Deduplicate, enforce mix rules, return top 20
-  // Rules:
-  //   • Never 3 consecutive items of same type
-  //   • Types 'exact' and 'points'/'best_round' each capped at 2 in feed
-  //   • Drama types (lead/fall/rank_up/top3/top5/battle/chase/gap) get priority slots
+  // FINAL — Dedup, sort, enforce mix rules, return top 20
   // ═══════════════════════════════════════════════════════════════
-  const seen = new Set();
+  const seen    = new Set();
   const deduped = events
     .filter(e => { if (seen.has(e.text)) return false; seen.add(e.text); return true; })
     .sort((a, b) => (b.priority - a.priority) || (b.ts - a.ts));
 
-  // Drama types that should dominate the feed
-  const DRAMA_TYPES = new Set(['lead','fall','top3','top3_exit','top5','top5_exit','rank_up','rank_down',
-                                'battle','chase','gap','streak',
-                                'drama','tension','domination','milestone']);
-  // Stat types that should be limited
-  const STAT_TYPES  = new Set(['exact','near','points','best_round','stat','upset','upset2','fun']);
+  const DRAMA_TYPES = new Set(['lead','fall','top3','top3_exit','top5','top5_exit',
+                                'rank_up','rank_down','battle','chase','gap',
+                                'streak','drama','tension','domination','milestone']);
+  const STAT_TYPES  = new Set(['exact','near','points','best_round','stat','upset',
+                                'fun','miss','fact','star']);
 
-  const result = [];
+  const result    = [];
   const typeCount = {};
 
   for (const e of deduped) {
     if (result.length >= 20) break;
-
-    // Hard cap: no more than 2 exact-score events and 2 stat/points events total
-    if (e.type === 'exact' && (typeCount['exact'] || 0) >= 2) continue;
-    if (STAT_TYPES.has(e.type) && !DRAMA_TYPES.has(e.type)) {
-      const statTotal = ['exact','near','points','best_round','stat','upset','upset2','fun']
-        .reduce((s, t) => s + (typeCount[t] || 0), 0);
-      if (statTotal >= 4) continue;  // cap stat events at 4 of 20 slots
+    // Cap stat/filler types at 6 total slots
+    if (STAT_TYPES.has(e.type)) {
+      const statTotal = [...STAT_TYPES].reduce((s, t) => s + (typeCount[t]||0), 0);
+      if (statTotal >= 6) continue;
     }
-
     // No 3 consecutive same type
     const recent2 = result.slice(-2).map(x => x.type);
     if (recent2.length === 2 && recent2[0] === e.type && recent2[1] === e.type) continue;
-
     result.push(e);
-    typeCount[e.type] = (typeCount[e.type] || 0) + 1;
+    typeCount[e.type] = (typeCount[e.type]||0) + 1;
   }
 
-  // Backfill remaining slots from deduped (relaxed rules) if we have room
-  if (result.length < Math.min(20, deduped.length)) {
-    for (const e of deduped) {
-      if (result.length >= 20) break;
-      if (!result.find(x => x.id === e.id)) result.push(e);
-    }
+  // Backfill remaining slots
+  for (const e of deduped) {
+    if (result.length >= 20) break;
+    if (!result.find(x => x.id === e.id)) result.push(e);
   }
 
   return result.slice(0, 20);
 }
+
 
 export const TYPE_COLOR = {
   exact:"#FFD700", rank:"#00E5A0", miss:"#FF6B6B", streak:"#FF9800",
