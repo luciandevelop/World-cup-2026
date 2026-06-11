@@ -117,7 +117,9 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
   const [cornB,   setCornB]  = useState('');
   const [minute,  setMinute] = useState(0);
   const [status,  setStatus] = useState('ft');
-  const [goalScorers, setGoalScorers] = useState('');
+  const [goalScorers,  setGoalScorers]  = useState(''); // legacy — kept for backward compat
+  const [homeScorers,  setHomeScorers]  = useState('');
+  const [awayScorers,  setAwayScorers]  = useState('');
   const [liveCards,   setLiveCards]   = useState('');
   const [liveCorners, setLiveCorners] = useState('');
   const [saved,   setSaved]  = useState(false);
@@ -163,7 +165,9 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
     setCornB(fr?.awayCorners    != null ? String(fr.awayCorners)    : '');
     setMinute(fr?.liveMinute ?? 0);
     setStatus(fr?.liveStatus ?? (m.isFinished ? 'ft' : m.isLive ? 'live' : 'scheduled'));
-    setGoalScorers(fr?.goalScorers ?? '');
+    setGoalScorers(fr?.goalScorers  ?? '');
+    setHomeScorers(fr?.homeScorers  ?? '');
+    setAwayScorers(fr?.awayScorers  ?? '');
     setLiveCards(fr?.liveCards     ?? '');
     setLiveCorners(fr?.liveCorners ?? '');
   };
@@ -194,7 +198,9 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
       liveScoreA:      Number(sA),
       liveScoreB:      Number(sB),
       liveMinute:      minute,
-      goalScorers:     goalScorers.trim() || null,
+      goalScorers:     goalScorers.trim()  || null, // legacy field kept
+      homeScorers:     homeScorers.trim()  || null,
+      awayScorers:     awayScorers.trim()  || null,
       liveCards:       liveCards.trim()   || null,
       liveCorners:     liveCorners.trim() || null,
       liveStatus:      status,
@@ -376,12 +382,22 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
             <div style={{ fontSize:10, color:'rgba(255,255,255,0.25)', letterSpacing:'0.08em', textTransform:'uppercase', fontWeight:600, marginBottom:8 }}>Detalii live opționale</div>
             <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
               <div>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:3 }}>⚽ Marcatori (ex: Jimenez 14' Alvarez 62')</div>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:3 }}>⚽ Marcatori {sel.flagA} {sel.teamA}</div>
                 <input
                   type="text"
-                  value={goalScorers}
-                  onChange={e => setGoalScorers(e.target.value)}
-                  placeholder="Jimenez 14' Alvarez 62'"
+                  value={homeScorers}
+                  onChange={e => setHomeScorers(e.target.value)}
+                  placeholder="Jimenez 14', Alvarez 62'"
+                  style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:12, outline:'none', boxSizing:'border-box' }}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:3 }}>⚽ Marcatori {sel.flagB} {sel.teamB}</div>
+                <input
+                  type="text"
+                  value={awayScorers}
+                  onChange={e => setAwayScorers(e.target.value)}
+                  placeholder="Mokoena 71'"
                   style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:12, outline:'none', boxSizing:'border-box' }}
                 />
               </div>

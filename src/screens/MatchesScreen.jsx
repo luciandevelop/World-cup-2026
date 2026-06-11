@@ -421,18 +421,33 @@ function MatchCard({ match, prediction, onPredict, onDetail }) {
         </div>
 
         {/* Live details: minute, scorers, cards, corners */}
-        {match.isLive && (match.liveMinute !== null && match.liveMinute !== undefined || match.goalScorers || match.liveCards || match.liveCorners) && (
+        {match.isLive && (match.liveMinute !== null && match.liveMinute !== undefined || match.homeScorers || match.awayScorers || match.goalScorers || match.liveCards || match.liveCorners) && (
           <div style={{ marginTop:8, padding:'7px 10px', background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)', borderRadius:8, display:'flex', flexDirection:'column', gap:4 }}>
             {match.liveMinute !== null && match.liveMinute !== undefined && match.liveMinute !== '' && (
               <div style={{ fontSize:12, fontWeight:800, color:'#EF4444', fontFamily:"'DM Mono',monospace" }}>
                 🔴 LIVE {match.liveMinute}'
               </div>
             )}
-            {match.goalScorers && (
+            {/* Per-team scorers (new), fallback to legacy goalScorers */}
+            {(match.homeScorers || match.awayScorers) ? (
+              <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.4)', fontWeight:700, letterSpacing:'0.05em', textTransform:'uppercase', marginBottom:1 }}>⚽ Marcatori</div>
+                {match.homeScorers && (
+                  <div style={{ fontSize:11, color:'rgba(255,255,255,0.75)' }}>
+                    {match.flagA} {match.teamA}: {match.homeScorers}
+                  </div>
+                )}
+                {match.awayScorers && (
+                  <div style={{ fontSize:11, color:'rgba(255,255,255,0.75)' }}>
+                    {match.flagB} {match.teamB}: {match.awayScorers}
+                  </div>
+                )}
+              </div>
+            ) : match.goalScorers ? (
               <div style={{ fontSize:11, color:'rgba(255,255,255,0.7)' }}>
                 ⚽ {match.goalScorers}
               </div>
-            )}
+            ) : null}
             {match.liveCards && (
               <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)' }}>
                 🟨 Cartonașe: {match.liveCards}
