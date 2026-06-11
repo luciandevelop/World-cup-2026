@@ -25,22 +25,20 @@ import {
 } from 'firebase/firestore';
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
+// Env vars take priority; hardcoded values are the fallback for deployments
+// where VITE_FIREBASE_* are not set.
 const firebaseConfig = {
-  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY            || "AIzaSyC5g04ezx_eSgyKzCt7hEa0Oywgvr4g9EM",
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN        || "world-cup-arena-2026.firebaseapp.com",
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID         || "world-cup-arena-2026",
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET     || "world-cup-arena-2026.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "315063964294",
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID             || "1:315063964294:web:b821a042af8ab5e5d23707",
+  measurementId:     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID     || "G-WWYVCZLR80",
 };
 
-// True only when all required env vars are present.
-export const FIREBASE_CONFIGURED = !!(
-  firebaseConfig.apiKey &&
-  firebaseConfig.authDomain &&
-  firebaseConfig.projectId &&
-  firebaseConfig.appId
-);
+// Always configured now — fallback values guarantee this.
+export const FIREBASE_CONFIGURED = true;
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 let app  = null;
