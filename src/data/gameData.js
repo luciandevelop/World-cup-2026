@@ -49,6 +49,9 @@ export function buildMatches(finishedResults = FINISHED_RESULTS, { includeTests 
       realHomeCorners: result?.homeCorners ?? null,
       realAwayCorners: result?.awayCorners ?? null,
       liveMinute:     result?.liveMinute     ?? null,
+      goalScorers:    result?.goalScorers    ?? null,
+      liveCards:      result?.liveCards      ?? null,
+      liveCorners:    result?.liveCorners    ?? null,
       liveStatus:     result?.liveStatus     ?? (isLive ? "live" : isFinished ? "ft" : now >= kickoff - LOCK_BEFORE_MS ? "locked" : "open"),
     };
   });
