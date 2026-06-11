@@ -50,6 +50,8 @@ export function buildMatches(finishedResults = FINISHED_RESULTS, { includeTests 
       realAwayCorners: result?.awayCorners ?? null,
       liveMinute:     result?.liveMinute     ?? null,
       goalScorers:    result?.goalScorers    ?? null,
+      homeScorers:    result?.homeScorers    ?? null,
+      awayScorers:    result?.awayScorers    ?? null,
       liveCards:      result?.liveCards      ?? null,
       liveCorners:    result?.liveCorners    ?? null,
       liveStatus:     result?.liveStatus     ?? (isLive ? "live" : isFinished ? "ft" : now >= kickoff - LOCK_BEFORE_MS ? "locked" : "open"),
