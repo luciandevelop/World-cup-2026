@@ -545,7 +545,7 @@ function LiveFeed({ events = [] }) {
         Activitate recentă
       </div>
       <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-        {feed.slice(0,5).map((e, i) => (
+        {feed.slice(0,10).map((e, i) => (
           <div key={e.id || i} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 12px", background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.04)", borderRadius:10, animation:`staggerIn 0.3s ${i*0.06}s ease both` }}>
             <span style={{ fontSize:16 }}>{e.icon}</span>
             <span style={{ fontSize:12, color:"rgba(255,255,255,0.5)", flex:1 }}>{e.text}</span>
