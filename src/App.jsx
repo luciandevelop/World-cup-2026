@@ -378,7 +378,7 @@ export default function App() {
     allPredictions,
     allUsers,
     matches: liveMatches,
-  }), [leaderboard.length, prevLeaderboard, finishedResults, allPredictions, allUsers]); // eslint-disable-line react-hooks/exhaustive-deps
+  }), [leaderboard, prevLeaderboard, finishedResults, allPredictions, allUsers]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleSavePrediction = async (id, pred) => {
