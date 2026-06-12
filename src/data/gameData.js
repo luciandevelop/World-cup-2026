@@ -1151,7 +1151,9 @@ export function generateActivityFeed({
   // Use matches.isFinished (set by buildMatches) as single source of truth —
   // mirrors exactly what the UI accordion uses. Raw finishedResults is
   // only used to read score/status fields, not to decide "is this finished".
-  const finishedMatches = matches.filter(m => m.isFinished);
+  // Sort newest first — recent matches generate events that outrank older ones
+  const finishedMatches = [...matches.filter(m => m.isFinished)]
+    .sort((a, b) => new Date(b.time) - new Date(a.time));
   // Build finishedArr in the same shape the rest of the feed expects (result objects)
   // but sourced from already-processed match objects so isFinished is authoritative.
   const finishedArr = finishedMatches.map(m => ({
