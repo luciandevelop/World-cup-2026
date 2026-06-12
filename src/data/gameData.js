@@ -1148,11 +1148,20 @@ export function generateActivityFeed({
   // Rule: finished matches + live matches + today's matches + next upcoming match
   const ctxTeams = new Set();
 
-  const finishedArr = Object.values(finishedResults).filter(r =>
-    r.liveStatus === 'ft' && r.realScoreA != null && r.realScoreB != null
-  );
+  // Use matches.isFinished (set by buildMatches) as single source of truth —
+  // mirrors exactly what the UI accordion uses. Raw finishedResults is
+  // only used to read score/status fields, not to decide "is this finished".
+  const finishedMatches = matches.filter(m => m.isFinished);
+  // Build finishedArr in the same shape the rest of the feed expects (result objects)
+  // but sourced from already-processed match objects so isFinished is authoritative.
+  const finishedArr = finishedMatches.map(m => ({
+    matchId:    m.id,
+    liveStatus: 'ft',
+    realScoreA: m.realScoreA,
+    realScoreB: m.realScoreB,
+  }));
   finishedArr.forEach(r => {
-    const m = matches.find(x => x.id === (r.matchId ?? r.id));
+    const m = matches.find(x => x.id === r.matchId);
     if (m && _isWCM(m)) { ctxTeams.add(_nr(m.teamA)); ctxTeams.add(_nr(m.teamB)); }
   });
   matches.filter(m => m.isLive && _isWCM(m))
@@ -1180,11 +1189,11 @@ export function generateActivityFeed({
   // ═══════════════════════════════════════════════════════════════════════
   let roundTopUid=null, roundTopPts=0, roundTopMatch=null;
 
-  finishedArr.forEach(r => {
-    const match = matches.find(m => m.id === (r.matchId ?? r.id));
+  finishedMatches.forEach(match => {
+    const r = finishedArr.find(x => x.matchId === match.id) || {};
     if (!match) return;
     const mName = `${match.teamA} vs ${match.teamB}`;
-    const sA = Number(r.realScoreA??0), sB = Number(r.realScoreB??0);
+    const sA = Number(match.realScoreA??0), sB = Number(match.realScoreB??0);
     const totalGoals = sA + sB;
     const mp = mpreds(match.id, { ...match, isFinished:true, realScoreA:sA, realScoreB:sB });
     const exact = mp.filter(p => p.exact);
@@ -1250,7 +1259,7 @@ export function generateActivityFeed({
   });
 
   // Round best scorer
-  if (finishedArr.length>=2 && roundTopUid && roundTopPts>0)
+  if (finishedMatches.length>=2 && roundTopUid && roundTopPts>0)
     ev('best_round', `🏅 ${nickOf(roundTopUid)} câștigă runda cu ${roundTopPts} pts la ${roundTopMatch.teamA} vs ${roundTopMatch.teamB}.`, 6);
 
   // ═══════════════════════════════════════════════════════════════════════
