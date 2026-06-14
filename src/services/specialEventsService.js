@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 
 // ── LOCK TIME ─────────────────────────────────────────────────────────────────
-export const SPECIAL_LOCK_TIME = new Date('2026-06-14T10:00:00.000Z'); // 13:00 RO
+export const SPECIAL_LOCK_TIME = new Date('2026-06-14T18:00:00.000Z'); // 21:00 RO
 
 export function isSpecialLocked() {
   return Date.now() >= SPECIAL_LOCK_TIME.getTime();
