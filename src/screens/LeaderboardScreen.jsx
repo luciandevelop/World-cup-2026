@@ -12,6 +12,7 @@ import {
   getPlayerForm,
 } from '../data/gameData.js';
 import { FootballAvatar } from '../components/UI.jsx';
+import { isSpecialLocked } from '../services/specialEventsService.js';
 
 function normalizePredMap(preds = {}) {
   return Object.fromEntries(
@@ -25,7 +26,7 @@ function normalizePredMap(preds = {}) {
 // Only shows finished matches (isFinished=true) — predictions for open/upcoming
 // matches are never revealed here, same rule as Friends tab.
 function PlayerDetailModal({ nickname, avatarId, rank, points, exactScores,
-                              allPredictions, finishedMatches, onClose }) {
+                              allPredictions, finishedMatches, onClose, specialPred = null }) {
   // Build this player's prediction map (normalised to numeric keys)
   const preds = useMemo(() => {
     const raw = allPredictions[nickname] || {};
@@ -186,6 +187,49 @@ function PlayerDetailModal({ nickname, avatarId, rank, points, exactScores,
                         paddingTop:8 }}>
             {matchRows.length} meciuri finalizate cu predicții
           </div>
+
+          {/* ── Special predictions — read-only, shown only when locked ── */}
+          {isSpecialLocked() && (
+            <div style={{ marginTop:16, padding:'12px 14px', background:'rgba(255,215,0,0.04)',
+                          border:'1px solid rgba(255,215,0,0.15)', borderRadius:10 }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#FFD700',
+                            letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:10 }}>
+                ⭐ Predicții speciale
+              </div>
+              {!specialPred ? (
+                <div style={{ fontSize:12, color:'rgba(255,255,255,0.3)', fontStyle:'italic' }}>
+                  Nu a completat predicțiile speciale.
+                </div>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
+                  <div>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:2 }}>
+                      🏆 Campioană
+                    </div>
+                    <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>
+                      {specialPred.winner || '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:2 }}>
+                      🥈 Semifinaliste
+                    </div>
+                    <div style={{ fontSize:12, color:'rgba(255,255,255,0.85)', lineHeight:1.5 }}>
+                      {(specialPred.semifinalists || []).join(', ') || '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:2 }}>
+                      ⚽ Țara golgheterului
+                    </div>
+                    <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>
+                      {specialPred.topScorerCountry || '—'}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -198,6 +242,7 @@ export default function LeaderboardScreen({
   allPredictions = {},
   finishedResults = {},
   allUsers = {},
+  allSpecialPredsByNick = {},
 }) {
   const currentNickname =
     typeof currentUser === 'string'
@@ -421,6 +466,7 @@ export default function LeaderboardScreen({
             })()
           }
           finishedMatches={buildMatches(finishedResults).filter(m => m.isFinished)}
+          specialPred={allSpecialPredsByNick[selectedPlayer] || null}
           onClose={() => setSelectedPlayer(null)}
         />
       );
