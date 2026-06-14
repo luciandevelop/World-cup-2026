@@ -570,11 +570,11 @@ export default function App() {
       {/* ── Content ── */}
       <div style={{ flex:1,overflowY:'auto',paddingBottom:72 }}>
         {adminMode
-          ? <AdminScreen currentUser={user} finishedResults={finishedResults} onMatchUpdate={handleMatchUpdate} specialResultsInit={specialResults}/>
+          ? <AdminScreen currentUser={user} finishedResults={finishedResults} onMatchUpdate={handleMatchUpdate} specialResultsInit={specialResults} allSpecialPreds={allSpecialPreds} allUsers={allUsers}/>
           : tab==='matches'
           ? <MatchesScreen predictions={predictions} onPredict={setPredictingMatch} finishedResults={finishedResults} groupOverrides={groupOverrides} allPredictions={allPredictions} allUsers={allUsers} activityFeed={activityFeedComputed} user={user} specialResults={specialResults} allSpecialPreds={allSpecialPreds}/>
           : tab==='leaderboard'
-          ? <LeaderboardScreen currentUser={user?.nickname} predictions={predictions} allPredictions={predsByNick} allUsers={allUsers} finishedResults={finishedResults}/>
+          ? <LeaderboardScreen currentUser={user?.nickname} predictions={predictions} allPredictions={predsByNick} allUsers={allUsers} finishedResults={finishedResults} allSpecialPredsByNick={allSpecialPredsByNick}/>
           : tab==='bracket'
           ? <BracketScreen/>
           : <HowToPlayScreen/>
