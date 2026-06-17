@@ -357,211 +357,233 @@ export const MOST_PREDICTED = {
 
 export const LIVE_FEED_EVENTS = [];
 
-// ─── ACTIVITY FEED v8 ────────────────────────────────────────────────────────
-// Think: sports tabloid + pub conversation + WhatsApp group + trivia page.
-// Mission: user spends 30-60 seconds reading even without caring about leaderboard.
-// Mix per 12 items: 4 match stories, 3 curiosities, 2 football facts, 2 banter, 1 leaderboard.
+// ─── ACTIVITY FEED v12 ───────────────────────────────────────────────────────
+// Romanian football folklore engine. Hagi logic, Grigoraș sarcasm, Liga 1 banter.
+// Mix per 12: ~30% match/live, ~25% banter, ~20% leaderboard, ~25% curiosities/folklore.
 // Latest 2 finished matches dominate. Old matches disappear.
-// Contextual facts only (live/last-2-finished/today/next). No Firestore writes.
+// Contextual facts only. No Firestore writes. No scoring changes.
+// BAN: haos total, orice e posibil, a venit ca un val, clasamentul a resimțit,
+//      a protestat intern, a plâns intern, obiecte pierdute, schimbare la vârf,
+//      a vrut să apară pe afiș.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const _A8={"Țările de Jos":"Olanda","Netherlands":"Olanda","Franța":"Franta","France":"Franta","Curaçao":"Curacao","Coasta de Fildeș":"Coasta de Fildes","DR Congo":"RD Congo","Congo RD":"RD Congo","Cape Verde":"Capul Verde","Bosnia & Herzegovina":"Bosnia","Bosnia & Herțegovina":"Bosnia"};
-const _n8=t=>_A8[t]??t;
-const _WC8=new Set(["Africa de Sud","Algeria","Anglia","Arabia Saudita","Argentina","Australia","Austria","Belgia","Bosnia","Brazilia","Canada","Capul Verde","Cehia","Coasta de Fildes","Columbia","Coreea de Sud","Croatia","Curacao","Ecuador","Egipt","Elvetia","Franta","Germania","Ghana","Haiti","Iordania","Irak","Iran","Japonia","Maroc","Mexic","Norvegia","Noua Zeelanda","Olanda","Panama","Paraguay","Portugalia","Qatar","RD Congo","SUA","Scotia","Senegal","Spania","Suedia","Tunisia","Turcia","Uruguay","Uzbekistan"]);
-const _isOff8=t=>_WC8.has(_n8(t));
-const _isWCM8=m=>m&&m.id>=1&&m.id<=72;
-const _p8=(arr,...seeds)=>{const h=Math.abs(seeds.reduce((a,s)=>((a*31)+(String(s).charCodeAt(0)|0))|0,7));return arr[h%arr.length];};
-const _c8=(arr,seeds,...args)=>{const fn=_p8(arr,...seeds);return typeof fn==='function'?fn(...args):String(fn);};
+const _A12={"Țările de Jos":"Olanda","Netherlands":"Olanda","Franța":"Franta","France":"Franta","Curaçao":"Curacao","Coasta de Fildeș":"Coasta de Fildes","DR Congo":"RD Congo","Congo RD":"RD Congo","Cape Verde":"Capul Verde","Bosnia & Herzegovina":"Bosnia","Bosnia & Herțegovina":"Bosnia"};
+const _n12=t=>_A12[t]??t;
+const _WC12=new Set(["Africa de Sud","Algeria","Anglia","Arabia Saudita","Argentina","Australia","Austria","Belgia","Bosnia","Brazilia","Canada","Capul Verde","Cehia","Coasta de Fildes","Columbia","Coreea de Sud","Croatia","Curacao","Ecuador","Egipt","Elvetia","Franta","Germania","Ghana","Haiti","Iordania","Irak","Iran","Japonia","Maroc","Mexic","Norvegia","Noua Zeelanda","Olanda","Panama","Paraguay","Portugalia","Qatar","RD Congo","SUA","Scotia","Senegal","Spania","Suedia","Tunisia","Turcia","Uruguay","Uzbekistan"]);
+const _isOff12=t=>_WC12.has(_n12(t));
+const _isWCM12=m=>m&&m.id>=1&&m.id<=72;
+const _p12=(arr,...seeds)=>{const h=Math.abs(seeds.reduce((a,s)=>((a*31)+(String(s).charCodeAt(0)|0))|0,7));return arr[h%arr.length];};
+const _c12=(arr,seeds,...args)=>{const fn=_p12(arr,...seeds);return typeof fn==='function'?fn(...args):String(fn);};
 
-
-const CUR8={
-  "Africa de Sud":["🇿🇦 Africa de Sud are 11 limbi oficiale. Dacă vrei să insulți arbitrul corect, ai de ales.", "🇿🇦 Vuvuzela — cornul de plastic care a scos din minți televiziunile în 2010 — e invenție sud-africană. Și nu, nu și-au cerut scuze.", "🇿🇦 Africa de Sud produce 80% din platina mondială și 0% din titlurile mondiale la fotbal. Bogăție selectivă.", "🇿🇦 Bafana Bafana înseamnă «băieții băieților». Entuziasmul din poreclă n-a ajuns întotdeauna pe teren.", "🇿🇦 Nelson Mandela a folosit CM 2010 ca instrument de unitate națională. Fotbalul face uneori ceea ce politicienii nu pot.", "🇿🇦 Pinguinii trăiesc pe plajele din Cape Town. Nu e o metaforă. Chiar trăiesc acolo.", "🇿🇦 Africa de Sud e una din puținele țări cu 3 capitale: executivă, legislativă, judecătorească. Organizare complexă, fotbal la fel."],
-  "Algeria":["🇩🇿 Algeria e cea mai mare țară din Africa, dar 85% e Sahara. Fotbalul se joacă în restul de 15% — intensitate maximă.", "🇩🇿 Algeria a eliminat Germania la CM 2014, câștigând 2-1 după prelungiri. Nimeni nu s-a așteptat. Algeria s-a așteptat.", "🇩🇿 Riyad Mahrez a câștigat Premier League cu Leicester în 2016. Un titlu la fel de improbabil ca și cel al Algeriei la CAN 2019.", "🇩🇿 Algeria a câștigat CAN 2019 fără să piardă un meci. Portarul a primit mai puține goluri decât minute jucate.", "🇩🇿 Orașul Timgad din Algeria e un oraș roman antic complet conservat în deșert. Fotbalul algerian e la fel de bine conservat în tradiție.", "🇩🇿 Algeria exportă gaz natural în toată Europa. Și fotbaliști buni în tot Franța."],
-  "Anglia":["🏴󠁧󠁢󠁥󠁮󠁧󠁿 Anglia a inventat fotbalul în 1863 și a câștigat un singur Mondial, în 1966. Cel mai prolific inventator cu cel mai slab palmares la propria invenție.", "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Football's coming home — cântecul englezilor la fiecare turneu din 1996. De fiecare dată, fotbalul a ales alt drum.", "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Gary Lineker nu a primit niciodată un cartonaș în cariera sa. Sfântul fotbalului englezesc.", "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League e transmisă în 212 teritorii — mai mult decât ONU are membri. Fotbalul englezesc e mai global decât politica.", "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Anglia a pierdut de 3 ori împotriva Germaniei la penaltii la turnee importante. Trauma are statistici proprii.", "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Wembley a găzduit finala CM 1966, concertele lui Adele și finala Euro 2020. Priorități clare.", "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Anglia bea 100 milioane de căni de ceai pe zi. Ceaiul nu ajută la penaltii."],
-  "Arabia Saudita":["🇸🇦 Arabia Saudită a bătut Argentina 2-1 la CM 2022. Messi a stat 5 minute nemișcat pe bancă după fluierul final.", "🇸🇦 Arabia Saudită a cumpărat fotbal la pachet: Ronaldo, Benzema, Kanté, Mahrez — în același an. Strategia e clară.", "🇸🇦 Arabia Saudită a câștigat Cupa Asiei de 3 ori. Nu e doar petrol — e și fotbal cu ambiții reale.", "🇸🇦 Riad e printre cele mai calde orașe în care se joacă fotbal internațional. Hidratarea e armă tactică.", "🇸🇦 Arabia Saudită organizează CM 2034. Lumea fotbalului se mișcă spre est, cu viteze diferite.", "🇸🇦 Mecca primește 2 milioane de pelerini anual. Fotbalul saudit vrea audiențe similare."],
-  "Argentina":["🇦🇷 Maradona a produs Mâna lui Dumnezeu și Golul Secolului în același meci, contra Angliei, 1986. Cel mai bun și cel mai controversat minut din istoria fotbalului.", "🇦🇷 Messi a plâns pe teren după câștigarea CM 2022. Publicul mondial a plâns cu el, inclusiv suporterii echipelor adverse.", "🇦🇷 Lotul Argentinei la CM 2022 valora peste 1 miliard de euro. La propriu. Un miliard.", "🇦🇷 Buenos Aires are cea mai mare densitate de psihologi din lume. Fotbalul explică cel puțin 30% din nevoi.", "🇦🇷 Argentina a câștigat Copa América de 15 ori. Dacă o comparezi cu numărul de crize politice, e aproape la egalitate.", "🇦🇷 Tango-ul s-a născut în mahalalele Buenos Aires-ului. La fel și stilul de fotbal al Argentinei.", "🇦🇷 Gabriel Batistuta a marcat 10 goluri la Cupe Mondiale. Fiecare a venit cu o grimasă de lup."],
-  "Australia":["🇦🇺 Australia a bătut Argentina la penaltii la CM 2022. Nimeni — absolut nimeni — nu se gândea la asta.", "🇦🇺 Există mai mulți canguri decât oameni în Australia. Pe teren de fotbal, echipa e la fel de imprevizibilă.", "🇦🇺 Australia e singurul continent care e și o singură țară. Dimensiune de continent, lot de 23.", "🇦🇺 Tim Cahill a marcat cu capul de la 30 de metri contra Germaniei la CM 2010. Înălțimea contează mai puțin decât momentul.", "🇦🇺 Koala nu e urs — e marsupial. Doarme 22 de ore pe zi. Portarul australian a dormit mai puțin la CM 2022.", "🇦🇺 Marea Barieră de Corali e singurul organism viu vizibil din spațiu. Schimbările climatice o distrug. O emoție similară cu un gol în minutul 90."],
-  "Austria":["🇦🇹 Salzburg a produs pe Haaland, Mané și Upamecano. Poate cel mai productiv club de talente din lume. Din Austria, nu din Spania.", "🇦🇹 Viena a fost de 3 ori consecutiv cel mai bun oraș în care să trăiești. Fotbalul nu a intrat în calcul.", "🇦🇹 Red Bull e austriac. Sponsorizează Salzburg, Leipzig, New York. Fotbalul, cafeina și ambițiile au același sponsor.", "🇦🇹 Austria a terminat pe locul 3 la CM 1954. De atunci, participările au venit și plecat discret.", "🇦🇹 Mozart s-a născut în Salzburg. Același oraș care produce acum fotbaliști pentru Champions League."],
-  "Belgia":["🇧🇪 Belgia a stat 3 ani pe locul 1 FIFA. Titlu major câștigat în această perioadă: zero. Paradoxul suprem al fotbalului modern.", "🇧🇪 Kevin De Bruyne a fost cotat cel mai bun pasator din lume 4 ani consecutivi. Belgia nu a câștigat nimic în acei 4 ani.", "🇧🇪 Belgia a funcționat fără guvern 541 de zile în 2010-11 — record mondial. Fotbalul a mers tot timpul.", "🇧🇪 Belgia produce 750 de tipuri de bere. Bere câte beri, trofee mondiale — mai puține.", "🇧🇪 Jan Vertonghen a jucat pentru Belgia 15 ani. A văzut generația de aur de la start la final. Fără trofeu.", "🇧🇪 Bruxelles e capitala UE și sediul NATO. Belgia coordonează Europa dar nu reușește să câștige un titlu major."],
-  "Bosnia":["🇧🇦 Bosnia a participat la CM pentru prima dată în 2014. Džeko a marcat la primul meci. Fotbalul nu a așteptat invitație.", "🇧🇦 Zlatan Ibrahimović are origini bosniace pe linie paternă. Baza genetică explică parțial.", "🇧🇦 Sarajevo a găzduit JO de iarnă 1984. Același oraș a văzut și un război. Rezistența e în ADN.", "🇧🇦 Bosniacii beau mai multă cafea per capita decât aproape orice națiune europeană. Cafea neagră, tare. Ca fotbalul lor.", "🇧🇦 Podul Stari Most din Mostar a fost construit în 1566, distrus în 1993 și reconstruit în 2004. Unesco și rezistență."],
-  "Brazilia":["🇧🇷 Brazilia are 5 titluri mondiale. Trofeul Jules Rimet le-a fost dat definitiv în 1970. Practic l-au câștigat în proprietate.", "🇧🇷 7-1 cu Germania în 2014, pe teren propriu, în semifinale. 5 goluri în 18 minute. Brazilia a primit 5 goluri înainte de a înțelege ce se întâmplă.", "🇧🇷 Pelé a câștigat 3 Cupe Mondiale la 17, 21 și 29 de ani. Nicio altă persoană nu a bifat acest achievement.", "🇧🇷 Ronaldinho a câștigat Balonul de Aur 2005 și a jucat Beach Soccer la pensie. Unicitate completă.", "🇧🇷 Capoeira — arta marțială-dans braziliană — a fost inventată de sclavi ca să se antreneze fără să pară că se antrenează.", "🇧🇷 Brazilia e singura țară din America care vorbește portugheză. Și unica cu 5 titluri mondiale.", "🇧🇷 Neymar e cel mai scump transfer din istoria fotbalului: 222 milioane euro. Brazilia nu a câștigat un Mondial de la acel transfer."],
-  "Canada":["🇨🇦 Canada are mai multe lacuri decât restul lumii la un loc. 563 mai mari de 100 km². Apa nu e problemă.", "🇨🇦 Alphonso Davies s-a născut în tabără de refugiați, a crescut în Canada și valorează 70 milioane euro la Bayern München. Povestea secolului.", "🇨🇦 Canada nu a marcat niciun gol la CM 1986 — prima și singura participare până în 2022. A revenit cu scor mai bun.", "🇨🇦 Hockey pe gheață e religie în Canada. Wayne Gretzky e Dumnezeul lui. Fotbalul e fratele mai mic care vrea și el atenție.", "🇨🇦 Toronto vorbește 200 de limbi zilnic — mai mult decât orice alt oraș din lume.", "🇨🇦 Canada are granița neguardată cea mai lungă din lume cu SUA — 8.891 km. Relație mai bună decât ar sugera fotbalul."],
-  "Capul Verde":["🇨🇻 Capul Verde are o diasporă de 3 ori mai mare decât populația insulelor. Echipa națională vine din toată lumea.", "🇨🇻 Capul Verde nu are râuri permanente. Zero. Apa de băut vine din ploi și desalinizare. Adversarii vin cu mai multe resurse, dar nu întotdeauna mai mult curaj.", "🇨🇻 Capul Verde a eliminat Maroc la CAN 2021. Favoritul clar. Surpriza turneului.", "🇨🇻 Muzica Morna din Capul Verde e UNESCO — gen melancolic creat de oameni care trăiesc departe de casă. La fel ca jucătorii lor.", "🇨🇻 Insulele Capului Verde au fost nelocuite până în sec. XV. Portughezii le-au descoperit. Fotbaliștii lor descoperă Europa.", "🇨🇻 Capul Verde e format din 10 insule vulcanice. Cea mai înaltă are 2.829 m. Adversarii vin cu altitudinea lor."],
-  "Cehia":["🇨🇿 Panenka a inventat lovitura cu chip la Euro 1976 contra lui Sepp Maier. Lovitura îi poartă numele pentru totdeauna. Faimă eternă dintr-o secundă.", "🇨🇿 Cehia produce și consumă mai multă bere per capita decât orice altă țară. Prioritățile sunt clare.", "🇨🇿 Petr Čech a purtat cască de hochei pe gheață la fotbal pentru tot restul carierei după 2006. Cel mai recognoscibil portar al generației.", "🇨🇿 Cehia (ca Cehoslovacia) a terminat pe locul 2 la CM 1934 și 1962. Finalist fără titlu — un club select.", "🇨🇿 Franz Kafka s-a născut în Praga. A scris despre absurd, birocrație și transformare. Un meci de fotbal ceh conține uneori toate trei."],
-  "Coasta de Fildes":["🇨🇮 Drogba a negociat personal un armistițiu în războiul civil din Coasta de Fildes în 2006. Fotbalul a oprit un conflict real. Literalmente.", "🇨🇮 Coasta de Fildes produce 40% din cacaoul mondial. Ciocolata din toată lumea are rădăcini acolo.", "🇨🇮 Generația lui Drogba era considerată cea mai bună din Africa în 2006-2014. Niciodată n-a câștigat Mondialul.", "🇨🇮 Yaya Touré a câștigat Premier League, La Liga și CAN. A jucat ca centrul-box al generalei de aur ivoriene.", "🇨🇮 Abidjan e cel mai mare port din Africa de Vest. Cacao, cafea și fotbaliști buni ies pe acolo."],
-  "Columbia":["🇨🇴 James Rodríguez a câștigat Gheata de Aur la CM 2014 cu 6 goluri. A venit practic din neant la nivel mondial.", "🇨🇴 René Higuita, portarul columbian, a inventat Scorpion Kick în 1995 — o apărare cu călcâiele în aer, la un meci demonstrativ. Nu oficial. Nu contează.", "🇨🇴 Columbia produce 10% din cafeaua mondială. Energia de la cafea se vede uneori pe teren.", "🇨🇴 Columbia a câștigat Copa América 2024 fără să primească gol în fazele eliminatorii. Apărare sau magie — dezbatere deschisă.", "🇨🇴 Carlos Valderrama, cu părul afro iconic, a fost capitanul Columbiei la 3 Cupe Mondiale. Coafura e la fel de faimoasă ca pasele lui."],
-  "Coreea de Sud":["🇰🇷 Coreea de Sud a ajuns în semifinalele CM 2002. A eliminat Spania și Italia pe drum. Arbitrajul a rămas controversat. Performanța, nu.", "🇰🇷 Son Heung-min a câștigat Gheata de Aur în Premier League fără să bată un singur penalti. 23 de goluri, zero penaltii.", "🇰🇷 Park Ji-sung juca pe 3 posturi la Manchester United simultan, conform lui Sir Alex Ferguson.", "🇰🇷 Coreea de Sud e lider mondial în viteza internetului. K-pop e mai popular decât K-football, dar ambele au audiențe globale.", "🇰🇷 Seul are 25 de milioane de oameni în zona metropolitană. Suportul pentru echipa națională e proporțional."],
-  "Croatia":["🇭🇷 Croatia a terminat pe locul 2 la CM 2018 și locul 3 în 2022. 4 milioane de oameni, rezultate de țară mare.", "🇭🇷 Luka Modrić a câștigat Balonul de Aur 2018 — primul altul decât Messi sau Ronaldo în 10 ani. A plâns la discurs.", "🇭🇷 Cravata a fost inventată în Croatia în sec. XVII. Un export cultural care valorează miliarde azi.", "🇭🇷 Croatia a eliminat Brazilia la CM 2022 la penaltii. Livaković a apărat 3 lovituri. Nimeni nu l-a prezis.", "🇭🇷 Coasta dalmată a Croației are peste 1.000 de insule. La fel de greu de numărat ca golurile ratate de adversarii lor."],
-  "Curacao":["🇨🇼 Curaçao are 150.000 de locuitori — mai puțin decât un cartier din București. Una din cele mai mici echipe de la un Mondial.", "🇨🇼 Willemstad, capitala, e UNESCO pentru arhitectura olandezo-caribbeană colorată din sec. XVII.", "🇨🇼 Curaçao a eliminat Costa Rica la barajul CONCACAF pentru CM 2026. O victorie istorică pentru 150.000 de oameni.", "🇨🇼 Jucătorii lui Curaçao provin mai ales din Olanda, unde au crescut. Diaspora e strategia națională.", "🇨🇼 Curaçao e o insulă de 444 km². Pentru comparație, județul Ilfov e de 3 ori mai mare."],
-  "Ecuador":["🇪🇨 Ecuador a deschis CM 2022 cu un 2-0 contra gazdei Qatar în meciul inaugural. Gazda n-a mai câștigat după aceea.", "🇪🇨 Enner Valencia a marcat 3 din cele 5 goluri ale Ecuadorului la CM 2022. Un singur om, un turneu întreg.", "🇪🇨 Quito, capitala, e la 2.850 m altitudine. Adversarii vin și nu pot respira normal câteva zile.", "🇪🇨 Insulele Galapagos fac parte din Ecuador. Darwin a vizitat insulele și a inventat teoria evoluției. Ecuador a evoluat și la fotbal.", "🇪🇨 Ecuador e traversat de Ecuator — linia de 0° latitudine. Există o linie galbenă pe un deal care marchează exact locul."],
-  "Egipt":["🇪🇬 Egipt a câștigat CAN de 7 ori — record absolut. Nicio altă echipă africană nu e la mai mult de 4.", "🇪🇬 Mohamed Salah a marcat 200+ goluri pentru Liverpool. Orașul Liverpool i-a pus porecla «Egyptian King».", "🇪🇬 Egipt a câștigat CAN 2006, 2008, 2010 — 3 titluri consecutive. Record mondial la orice competiție continentală.", "🇪🇬 Ahmed Hassan a jucat 184 de meciuri pentru Egipt — record african.", "🇪🇬 Piramidele de la Giza sunt singura minune antică rămasă în picioare. Egipt a supraviețuit mai mult decât orice altă civilizație.", "🇪🇬 Cairo e cel mai mare oraș din Africa. Traficul e legendar. Fotbalul e singura activitate mai haotică."],
-  "Elvetia":["🇨🇭 Elveția a eliminat Franta la Euro 2020 în optimi, de la 1-3, la penaltii. Favorita clară a pierdut. Elveția nu știa că ar fi trebuit să fie îngrijorată.", "🇨🇭 Elveția are 4 limbi oficiale. Echipa națională e multilingvă — franceză, germană, italiană în cabine.", "🇨🇭 CERN, cel mai mare accelerator de particule din lume, e la Geneva. Elveția produce știință și fotbal surprinzător.", "🇨🇭 Ceasurile elvețiene sunt atât de precise că sunt referință mondială. Portarul lor nu e mai puțin precis.", "🇨🇭 Granit Xhaka a fost huiduit la Arsenal, a revenit, a câștigat Bundesliga cu Leverkusen. Revenirile sunt tradiție elvețiană."],
-  "Franta":["🇫🇷 Mbappé a marcat hat-trick în finala CM 2022 în ultimele 8 minute. Franta a pierdut la penaltii totuși. Dramă pură.", "🇫🇷 Franta a câștigat CM 1998 și 2018. Două generații complet diferite, același rezultat.", "🇫🇷 Lotul Frantei la CM 2022 valora peste 1,2 miliarde euro — cel mai scump din turneu. Și au ajuns în finală.", "🇫🇷 Zidane a marcat de 2 ori cu capul în finala CM 1998. La ultimul meci oficial, a dat cu capul în Materazzi. Carieră cinematografică.", "🇫🇷 Franta e cel mai vizitat stat din lume. Turnul Eiffel era planificat a fi demolat în 1909. Nimeni nu a vrut să-l dărâme.", "🇫🇷 Thierry Henry a marcat cu mâna la barajul cu Irlanda și s-a calificat. S-a calificat."],
-  "Germania":["🇩🇪 Germania are 4 titluri mondiale și obiceiul enervant de a apărea exact când turneele devin serioase.", "🇩🇪 7-1 cu Brazilia în semifinale, 2014 — pe teren propriu. 5 goluri în 18 minute. Cel mai mare șoc din istoria turneului.", "🇩🇪 Miroslav Klose are 16 goluri la Mondiale — record mondial absolut. Nimeni nu s-a apropiat.", "🇩🇪 Germania are legea purității berii din 1516. Disciplina e în ADN. Pe teren, la fel.", "🇩🇪 Oliver Kahn a câștigat Mingea de Aur la CM 2002 — primul și singurul portar care a primit-o.", "🇩🇪 Thomas Müller a marcat 10 goluri la CM 2010 și 2014 combinate. E «Raumdeuter» — interpretul spațiului."],
-  "Ghana":["🇬🇭 Ghana a ratat semifinala CM 2010 la penaltii cu Uruguay. Suárez a blocat cu mâna pe linie în ultimul minut. Fotbalul poate fi crud.", "🇬🇭 Ghana a câștigat CAN de 4 ori. Prima țară din Africa Sub-Sahariană independentă față de britanici, în 1957.", "🇬🇭 Asamoah Gyan e golgheterul all-time african la Mondiale cu 6 goluri — și a ratat penaltiul decisiv în 2010. Ironia supremă.", "🇬🇭 Ghana produce 30% din exportul mondial de cacao. Ciocolata Toblerone ar trebui să spună «mulțumim» în twi."],
-  "Haiti":["🇭🇹 Haiti a fost prima republică neagră din lume, în 1804. Cu 200 de ani înainte de independența multor state africane.", "🇭🇹 Emmanuel Sanon a marcat pentru Haiti contra Italiei la CM 1974. Primul gol haitian la un Mondial. Legendă națională.", "🇭🇹 Haiti a câștigat Copa Caribe de mai multe ori. Forță tradițională în zona Caraibelor, ignorată de restul lumii.", "🇭🇹 Creola haitiană e singura limbă creolă cu statut oficial de limbă națională în Americi.", "🇭🇹 Haiti și Republica Dominicană împart insula Hispaniola. Granița e una din cele mai contrastante ecologic din lume."],
-  "Iordania":["🇯🇴 Iordania conține Marea Moartă — cel mai jos punct de pe suprafața terestră: 430 m sub nivelul mării.", "🇯🇴 Iordania a ajuns în finala Cupei Asiei 2023. Cel mai bun rezultat din istoria lor.", "🇯🇴 Petra, orașul antic săpat în stâncă, a apărut în Indiana Jones. E și mai impresionant în realitate.", "🇯🇴 Iordania s-a calificat la CM 2026 prin baraj intercontinental. Un traseu care merită respect.", "🇯🇴 Wadi Rum, deșertul de nisip roșu, a servit ca decor pentru Lawrence of Arabia și Marte. Scenografie de Mondial."],
-  "Irak":["🇮🇶 Irak a câștigat Cupa Asiei în 2007 — în timp ce țara era în plină instabilitate politică. Fotbalul a unit când nimic altceva nu putea.", "🇮🇶 Ahmed Radhi a marcat singurul gol al Irakului la un Mondial, în 1986, contra Belgiei. Legendă națională din acel moment.", "🇮🇶 Mesopotamia e leagănul primelor civilizații umane. Primii care au inventat scrisul, roata, agricultura. Nu și fotbalul, dar aproape.", "🇮🇶 Irak a jucat fotbal internațional acasă chiar și în perioade de conflict. Fotbalul nu s-a oprit niciodată."],
-  "Iran":["🇮🇷 Iran a câștigat Cupa Asiei de 3 ori consecutiv: 1968, 1972, 1976. Dominanță regională solidă.", "🇮🇷 Mehdi Taremi a marcat o foarfecă spectaculoasă contra Angliei la CM 2022 — ales printre golurile turneului.", "🇮🇷 Persepolis e cel mai mare club din Iran — meciuri cu 100.000 de spectatori. Atmosfera e o armă tactică.", "🇮🇷 Iran are una din cele mai vechi civilizații neîntrerupte — peste 3.000 de ani. Fotbalul e tânăr față de asta.", "🇮🇷 Poetul Rumi s-a născut în Persia (Iran modern). Versurile lui sunt citate de milioane. Golurile iraniene, de mai puțini."],
-  "Japonia":["🇯🇵 Japonia a eliminat Germania și Spania la CM 2022. Ambele conduceau la pauză. Japonia nu a primit memo-ul.", "🇯🇵 Japonia are milioane de automate de vânzare și poți cumpăra aproape orice dintr-una.", "🇯🇵 Kazuyoshi Miura a jucat fotbal profesionist la 56 de ani — record mondial de longevitate. King Kazu e legendă vie.", "🇯🇵 Bullet Train merge cu 320 km/h și are o medie de întârziere de 0.9 minute pe an. Precizie aplicată la tot.", "🇯🇵 Manga și anime japonez e consumat în 70 de țări. Captainul Tsubasa a inspirat generații de fotbaliști europeni.", "🇯🇵 Japonia are mai mult de 6.800 de insule. Pe una singură — Honshu — trăiesc 100 de milioane de oameni."],
-  "Maroc":["🇲🇦 Maroc a fost prima echipă africană ajunsă în semifinalele unui Mondial. CM 2022. Milioane au plâns de bucurie acasă.", "🇲🇦 Maroc găzduiește una din cele mai vechi universități active din lume: Al-Qarawiyyin, fondată în 859 d.Hr.", "🇲🇦 Achraf Hakimi a marcat penaltiul decisiv contra Spaniei cu Panenka — la cel mai important meci din istoria Marocului.", "🇲🇦 Marocul consumă milioane de pahare de ceai de mentă pe zi. Un ritual social mai important decât masa.", "🇲🇦 Marrakech și Fes sunt orașe medievale cu piețe tradiționale funcționale și azi. Fotbalul e la fel de tradițional.", "🇲🇦 Maroc e singura țară africană cu coastă la Atlantic și la Mediterană simultan."],
-  "Mexic":["🇲🇽 Mexic nu a trecut niciodată de sferturi la un Mondial — blestemul sferturilor e fenomen cultural. Cântece, meme-uri, documentare.", "🇲🇽 Stadionul Azteca e singurul care a găzduit 2 finale mondiale: 1970 și 1986. Și acum găzduiește meciuri la CM 2026.", "🇲🇽 Chicharito (Javier Hernández) e golgheterul all-time al Mexicului cu 52 de goluri. A jucat la Man United, Real Madrid, Leverkusen.", "🇲🇽 Mexico City are 22 de milioane de oameni. Traficul e atât de dens că elicopterele private sunt transport curent.", "🇲🇽 Mexic e biodiversitate la maxim: 5% din speciile lumii pe 1% din suprafața Pământului."],
-  "Norvegia":["🇳🇴 Norvegia vine cu Haaland. Planul tactic începe simplu: găsiți-l pe băiatul mare. Restul urmează.", "🇳🇴 Erling Haaland a marcat 36 de goluri în sezonul 2022-23 în Premier League — record absolut al competiției.", "🇳🇴 Norvegia s-a calificat la CM 2026 — prima participare din 1998. 28 de ani de absență cu Haaland la final.", "🇳🇴 Martin Odegaard a devenit căpitanul Arsenalului la 23 de ani — cel mai tânăr din istoria clubului.", "🇳🇴 Norvegia are mai multă linie de coastă decât SUA, deși e de 30 de ori mai mică."],
-  "Noua Zeelanda":["🇳🇿 Noua Zeelandă a participat la CM 2010 și nu a pierdut niciun meci — 3 egaluri. A ieșit totuși din grupe.", "🇳🇿 All Blacks au 77% rată de victorie — cea mai înaltă din orice sport echipă din istoria sportului.", "🇳🇿 Noua Zeelandă a acordat dreptul de vot femeilor în 1893 — prima țară din lume. Un secol de avans.", "🇳🇿 Noua Zeelandă are ~6 oi per persoană. Pe teren de fotbal, oile nu ajută.", "🇳🇿 Peter Jackson a filmat Stăpânul Inelelor acolo. Peisajele sunt atât de spectaculoase că Hollywood a venit la el."],
-  "Olanda":["🇳🇱 Johan Cruyff a inventat fotbalul total în anii 1970. Un sistem care a schimbat tot. Olanda nu l-a câștigat niciodată pe Mondial.", "🇳🇱 Olanda a terminat pe locul 2 la CM 2010, 1974 și 1978. Cea mai bună echipă care nu a câștigat niciodată titlul suprem.", "🇳🇱 Marco van Basten a marcat gol din unghi imposibil în finala Euro 1988. Comentatorii au rămas muți 3 secunde.", "🇳🇱 Olanda are 25% din teritoriu sub nivelul mării — controlat de diguri și pompe. Rezistența e în ADN.", "🇳🇱 Olanda are mai mulți bicicliști decât oameni. Singura țară unde treci strada cu frică de biciclete, nu mașini."],
-  "Panama":["🇵🇦 Panama s-a calificat la CM 2018 și toată țara a oprit activitatea pentru meciul inaugural. Muncitorii și-au lăsat sculele.", "🇵🇦 Canalul Panama scurtează drumul maritim cu 15.000 km între Atlantic și Pacific. Cel mai important shortcut din lume.", "🇵🇦 Panama a câștigat prima victorie la un Mondial în 2018 contra Tunisia. Inscripționat în istoria națională.", "🇵🇦 Roman Torres a marcat golul calificant al Panamei la CM 2018. E monument național. Literalmente."],
-  "Paraguay":["🇵🇾 Chilavert, portarul paraguayan, a marcat 62 de goluri din penaltii și lovituri libere — record mondial pentru portari.", "🇵🇾 Paraguay e una din cele două țări fără ieșire la mare din America de Sud. Tot au ajuns la Mondiale.", "🇵🇾 Paraguay are două limbi oficiale: spaniola și guaraní — singura limbă indigenă americană cu statut oficial.", "🇵🇾 Paraguay a ajuns în sferturile CM 2010 cu fotbal defensiv solid. Cine zice că apărarea e plictisitoare?"],
-  "Portugalia":["🇵🇹 Cristiano Ronaldo a marcat 128 de goluri pentru Portugalia — record mondial absolut la goluri înscrise pentru o națională.", "🇵🇹 Eusébio a marcat 9 goluri la CM 1966. Portugalia a terminat pe locul 3. Un singur om a dus o națiune pe podium.", "🇵🇹 Portugalia a câștigat Euro 2016 cu un gol al lui Éder în prelungiri. Éder juca la Lille. Nu la Real Madrid. La Lille.", "🇵🇹 Portugalia a navigat toate coastele Africii, Asiei și Americii în sec. XV-XVI. Fotbaliști exploratori.", "🇵🇹 Fado-ul — muzica melancolică portugheză — e UNESCO. Saudade e un cuvânt intraductibil care înseamnă dor profund."],
-  "Qatar":["🇶🇦 Qatar a organizat CM 2022 — primul Mondial de iarnă, primul în Orientul Mijlociu. Și primul gazdă care a ieșit din grupe fără victorie.", "🇶🇦 Lusail Iconic Stadium are 88.966 de locuri. Mai mare decât oricare stadion din Europa.", "🇶🇦 Doha a crescut din sat de pescari de 30.000 în 1950 la 2,5 milioane în 2020. 70 de ani, oraș ultramodern.", "🇶🇦 Qatar are cel mai mare PIB per capita din lume datorat gazului natural. Bani sunt. Fotbal la Mondiale — în formare."],
-  "RD Congo":["🇨🇩 RD Congo revine la Mondial după 52 de ani — cel mai lung interval de revenire din istoria turneului.", "🇨🇩 Kinshasa e cel mai mare oraș francofon din lume cu 17 milioane de oameni. Paris e al doilea.", "🇨🇩 Muzica Rumba Congoleză e UNESCO — un gen care a influențat muzica africană pe 3 continente.", "🇨🇩 Fluviul Congo e al doilea ca debit din lume după Amazon. Forță naturală. Ca fotbalul lor azi."],
-  "SUA":["🇺🇸 SUA a înregistrat în 1994 cea mai mare medie de spectatori per meci din istoria CM — 68.626. Americanii au descoperit fotbalul târziu, dar cu entuziasm.", "🇺🇸 Christian Pulisic a marcat golul calificant al SUA la CM 2022 și a ieșit accidentat din teren. Sacrificiu de centru.", "🇺🇸 SUA are 4 Cupe Mondiale feminine — recordul mondial absolut. La feminin, SUA e Brazilia fotbalului.", "🇺🇸 Tim Howard a apărat 16 șuturi contra Belgiei la CM 2014 — record mondial la un meci eliminator.", "🇺🇸 Super Bowl-ul atrage mai mulți telespectatori decât orice alt eveniment sportiv. CM 2026 vrea să bată recordul."],
-  "Scotia":["🏴󠁧󠁢󠁳󠁣󠁴󠁿 Scoția și Anglia au jucat primul meci internațional din istoria fotbalului, în 1872 — 0-0. Chiar și prima dată, un 0-0.", "🏴󠁧󠁢󠁳󠁣󠁴󠁿 Denis Law a marcat golul care a retrogradat Anglia în 1975 — cu spatele la poartă, cu călcâiul. A celebrat cu tristețe.", "🏴󠁧󠁢󠁳󠁣󠁴󠁿 Celtic și Rangers — The Old Firm — e unul din cele mai urmărite derby-uri locale din lume.", "🏴󠁧󠁢󠁳󠁣󠁴󠁿 Scoția s-a calificat la CM 2026 — prima participare din 1998. 28 de ani de așteptare.", "🏴󠁧󠁢󠁳󠁣󠁴󠁿 Whisky-ul scotch e exportat în 180 de țări. O industrie de 6 miliarde de lire. Mândrie națională numărul 2 după fotbal."],
-  "Senegal":["🇸🇳 Senegal a eliminat Franta la CM 2002 — campioana mondială în exercițiu. La primul meci al grupei.", "🇸🇳 Sadio Mané a câștigat Premier League, Champions League și CAN în carieră. Definește generația de aur.", "🇸🇳 Senegal a câștigat CAN 2021 și CAN 2022 — două titluri consecutive. Performanță rară în Africa.", "🇸🇳 Kalidou Koulibaly a jucat la Napoli, Chelsea și Al-Hilal. Fundaș central african de generație."],
-  "Spania":["🇪🇸 Spania a câștigat Euro 2024 cu cei mai tineri jucători de start din istoria turneului final. Generația nouă funcționează.", "🇪🇸 Iniesta a marcat golul finalei CM 2010 în prelungiri. A băut vin de la vie proprie după. Celebrare perfectă.", "🇪🇸 Real Madrid și Barcelona au câștigat împreună 22 de titluri Champions League din 69 de ediții. Monopol iberic.", "🇪🇸 Spania joacă posesie și te adoarme, apoi te bate 1-0. Eficient. Enervant. Câștigător.", "🇪🇸 Spania a câștigat CM 2010, Euro 2008, 2012, 2024. Cea mai dominantă perioadă din istoria fotbalului european."],
-  "Suedia":["🇸🇪 Zlatan a marcat din foarfecă de la 30 de metri contra Angliei în 2013. Comentatorul a tăcut 4 secunde și a zis «incredible».", "🇸🇪 Zlatan Ibrahimović a marcat 62 de goluri pentru Suedia — record național absolut pe care nimeni nu pare să-l atingă.", "🇸🇪 Suedia a terminat pe locul 3 la CM 1994 și locul 2 în 1958. O națiune mică cu palmares mai mare decât așteptările.", "🇸🇪 Spotify a fost fondată la Stockholm. Suezia a inventat streamingul muzical și produce fotbaliști buni. Multitasking.", "🇸🇪 IKEA, H&M, Volvo, Ericsson — toate suedeze. Export de design, tehnologie și mijlocași talentați."],
-  "Tunisia":["🇹🇳 Tunisia a bătut Franta la CM 2022 — campioana mondială. Franta rotise lotul, Tunisia a jucat serios. Victorie istorică.", "🇹🇳 Tunisia a fost prima echipă africană care a câștigat un meci la CM, în 1978 — Mexic 3-1. Africa a marcat în 1978.", "🇹🇳 Cartagina, una din marile puteri antice, se afla pe coasta tunisiană. Hannibal traversa Alpii cu elefanți de acolo.", "🇹🇳 Tunisia a terminat pe locul 1 în grupă la CM 2022, înaintea Frantei. A ieșit pe golaveraj totuși. Matematica e brutală.", "🇹🇳 Tunisia e poarta de intrare în Africa de Nord — climat mediteranean, cultură mixtă, fotbal solid."],
-  "Turcia":["🇹🇷 Hakan Şükür a marcat în 11 secunde la CM 2002 — cel mai rapid gol din istoria Mondialelor.", "🇹🇷 Turcia a terminat pe locul 3 la CM 2002. Performanță nerepetată de atunci.", "🇹🇷 Istanbul e singurul oraș din lume aflat pe două continente simultan. Europa pe malul stâng, Asia pe malul drept.", "🇹🇷 Turcia produce 75% din alunele mondiale. Nutella are un furnizor garantat.", "🇹🇷 Hagia Sophia, construită în 537 d.Hr., a fost catedrală, moschee, muzeu și din nou moschee. Versatilitate de 1.500 de ani."],
-  "Uruguay":["🇺🇾 Maracanazo 1950: Uruguay a bătut Brazilia pe Maracanã, în fața a 200.000 de suportători. Cel mai mare șoc din istoria fotbalului.", "🇺🇾 Uruguay a câștigat CM 1930 și CM 1950 — primele două turnee mondiale. Fundația fotbalului sud-american.", "🇺🇾 Darwin Núñez a costat Liverpool 85 milioane euro. Cel mai scump uruguayan din istoria fotbalului.", "🇺🇾 Uruguay a câștigat Copa América de 15 ori — record mondial la orice competiție continentală.", "🇺🇾 Luis Suárez a blocat cu mâna pe linia porții contra Ghanei în CM 2010. A fost eliminat. A plâns pe teren. Ghana a ratat penaltiul."],
-  "Uzbekistan":["🇺🇿 Uzbekistan e singurul stat din lume înconjurat doar de țări terminate în «-stan».", "🇺🇿 În Uzbekistan, pâinea e considerată sacră și nu se pune niciodată cu fața în jos pe masă.", "🇺🇿 Samarkand a fost cel mai important nod al Drumului Mătăsii — calea comercială China-Europa.", "🇺🇿 Uzbekistan e la primul Mondial FIFA senior — o premieră absolută.", "🇺🇿 Uzbekistanul e una din doar 2 țări din lume complet înconjurate de alte state fără ieșire la mare.", "🇺🇿 Registan din Samarkand — piața cu 3 madrase medievale — e considerată una din cele mai frumoase piețe din lume."],
+const CUR12={
+  "Africa de Sud":["🇿🇦 Africa de Sud are 11 limbi oficiale. Dacă vrei să înjuri arbitrul corect, ai de unde alege.", "🇿🇦 Vuvuzela e invenție sud-africană. În 2010 a scos din minți o planetă întreagă. Și nu s-au scuzat.", "🇿🇦 Africa de Sud scoate 80% din platina lumii. Argint la fotbal, mai rar.", "🇿🇦 Bafana Bafana înseamnă «băieții băieților». Numele e mai îndrăzneț decât rezultatele de obicei.", "🇿🇦 Pinguinii trăiesc pe plajă în Cape Town. Mă, nu pe gheață. Pe plajă.", "🇿🇦 Mandela a folosit fotbalul ca să unească țara. A funcționat mai bine decât multe legi.", "🇿🇦 Table Mountain apare pe globul ceresc. Fotbalul sud-african, mai puțin pe glob de aur."],
+  "Algeria":["🇩🇿 Algeria e cea mai mare țară din Africa. 85% e Sahara. Restul de 15% e suficient pentru fotbal.", "🇩🇿 Algeria a eliminat Germania la CM 2014. Nimeni din Germania n-a văzut-o venind. Nici Algeria, probabil.", "🇩🇿 Mahrez a câștigat Premier League cu Leicester. Probabilitate mică, execuție perfectă — la fel ca o predicție bună.", "🇩🇿 Algeria a luat CAN 2019 fără să piardă vreun meci. Portarul a primit mai puține goluri decât ore de somn.", "🇩🇿 Timgad, oraș roman, e îngropat în nisip de secole. Fotbalul algerian e la fel de bine conservat — în tradiție."],
+  "Anglia":["🏴󠁧󠁢󠁥󠁮󠁧󠁿 Anglia a inventat fotbalul în 1863. A câștigat un singur Mondial. Inventator de geniu, executor mai modest.", "🏴󠁧󠁢󠁥󠁮󠁧󠁿 «Football's coming home» de prin '96. Fotbalul tot n-a venit acasă. Adresa s-a schimbat, probabil.", "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Lineker n-a primit niciun cartonaș în carieră. Sfânt pe teren, comentator obraznic la TV.", "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League e în 212 țări. Mai global decât ONU. Englezii au priorități clare.", "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Anglia a pierdut de 3 ori la penaltii cu Germania. Trauma are statistici, nu doar amintiri."],
+  "Arabia Saudita":["🇸🇦 Arabia Saudită a bătut Argentina 2-1 la CM 2022. Messi a stat 5 minute pe bancă fără să clipească.", "🇸🇦 Arabia Saudită a luat fotbal la pachet: Ronaldo, Benzema, Kanté, în același an fiscal.", "🇸🇦 Riad e printre cele mai calde orașe în care joci fotbal. Hidratarea e tactică, nu opțiune.", "🇸🇦 Arabia Saudită găzduiește CM 2034. Lumea fotbalului se mută la propriu spre est.", "🇸🇦 Al-Nassr îi plătește lui Ronaldo cam 200 de milioane pe an. Bani sunt. Vârsta lui Ronaldo — la fel."],
+  "Argentina":["🇦🇷 Maradona a dat Mâna lui Dumnezeu și Golul Secolului în același meci. La omul ăsta, două legende dintr-un foc.", "🇦🇷 Messi a plâns pe teren după CM 2022. Toată lumea a plâns cu el, inclusiv ăia care pierduseră cu Argentina.", "🇦🇷 Buenos Aires are cea mai mare densitate de psihologi din lume. Fotbalul explică 30% din nevoi.", "🇦🇷 Argentina a luat Copa América de 15 ori. Record mondial. Calmul, mai rar.", "🇦🇷 Tango s-a născut în mahalalele din Buenos Aires. Stilul de fotbal argentinian, la fel."],
+  "Australia":["🇦🇺 Australia a bătut Argentina la penaltii la CM 2022. Messi n-a ratat. Australia a câștigat tot.", "🇦🇺 Sunt mai mulți canguri decât oameni în Australia. Pe teren, echipa e tot atât de imprevizibilă.", "🇦🇺 Australia e singurul continent care e și țară. Ambițios ca concept geografic.", "🇦🇺 Cahill a marcat cu capul de la 30 de metri contra Germaniei. Înălțimea contează mai puțin decât momentul.", "🇦🇺 Koala doarme 22 de ore pe zi. Portarul australian la CM 2022 a dormit mai puțin."],
+  "Austria":["🇦🇹 Salzburg a produs Haaland, Mané și Upamecano. Cel mai productiv club din Europa. Din Austria, nu din Spania.", "🇦🇹 Viena a fost de 3 ori cel mai bun oraș să trăiești. Fotbalul n-a intrat în calcul.", "🇦🇹 Red Bull e austriac. Sponsorizează Salzburg, Leipzig, New York. Cafeina și ambiția au același portofel.", "🇦🇹 Mozart s-a născut în Salzburg. Acum orașul ăla scoate fotbaliști pentru Champions League.", "🇦🇹 Austria a luat locul 3 la CM 1954. De atunci, participă discret."],
+  "Belgia":["🇧🇪 Belgia a stat 3 ani pe locul 1 FIFA. Titlu major câștigat în acea perioadă: zero. Paradoxul ăsta merită un dosar.", "🇧🇪 De Bruyne a fost cel mai bun pasator din lume 4 ani. Belgia n-a câștigat nimic în acei 4 ani. Pase bune, finaluri rele.", "🇧🇪 Belgia a stat 541 de zile fără guvern. Fotbalul a mers tot timpul. Țara, mai cu emoții.", "🇧🇪 Belgia scoate 750 de tipuri de bere. Bere câte beri, trofee — mai puține.", "🇧🇪 Belgia a bătut Brazilia în sferturi la CM 2018. Generația de aur și-a justificat porecla o singură dată."],
+  "Bosnia":["🇧🇦 Bosnia a fost la primul Mondial în 2014. Džeko a marcat la primul meci. Fotbalul n-a stat la coadă.", "🇧🇦 Zlatan are origini bosniace pe linie paternă. Baza genetică explică parțial atitudinea.", "🇧🇦 Sarajevo a avut JO de iarnă în '84 și un război după. Rezistența e în ADN.", "🇧🇦 Bosniacii beau mai multă cafea decât aproape orice națiune europeană. Neagră, tare. Ca fotbalul lor.", "🇧🇦 Bosnia are 3 președinți în rotație. Mai complicat decât orice apărare în zonă."],
+  "Brazilia":["🇧🇷 Brazilia are 5 Mondiale. Unele naționale încă încearcă să ajungă la primul.", "🇧🇷 7-1 cu Germania în 2014, pe teren propriu. Au primit 5 goluri în 18 minute. N-au înțeles ce se întâmplă la timp.", "🇧🇷 Pelé a câștigat 3 Mondiale la 17, 21 și 29 de ani. Nimeni altcineva nu poate spune asta.", "🇧🇷 Ronaldinho a luat Balonul de Aur și a jucat Beach Soccer la pensie. Traiectorie de scenariu, nu de carieră.", "🇧🇷 Neymar e cel mai scump transfer din istorie. Brazilia n-a mai câștigat Mondial de atunci. Coincidență, probabil."],
+  "Canada":["🇨🇦 Canada are mai multe lacuri decât restul lumii la un loc. Apa nu-i problema lor.", "🇨🇦 Davies s-a născut în tabără de refugiați, a crescut în Canada, valorează 70 de milioane la Bayern. Poveste de film.", "🇨🇦 Canada n-a marcat niciun gol la CM '86. A revenit în 2022 cu scor mai bun. Progres, măcar.", "🇨🇦 Hockey-ul e religie în Canada. Fotbalul e fratele mai mic care vrea și el atenție.", "🇨🇦 Toronto vorbește 200 de limbi zilnic. Mai mult decât orice alt oraș din lume."],
+  "Capul Verde":["🇨🇻 Capul Verde are mai mulți oameni în diaspora decât acasă. Practic joacă și cu galeria din străinătate.", "🇨🇻 Capul Verde nu are râuri permanente. Zero. Apa vine din ploi. Și totuși echipa a ieșit pe teren.", "🇨🇻 Capul Verde a eliminat Maroc la CAN 2021. Favoritul clar. Surpriza turneului, ca un meci la care nu te aștepți.", "🇨🇻 Capul Verde sunt 10 insule vulcanice. Mică țară, mare surpriză când vine vorba de fotbal.", "🇨🇻 Muzica Morna e UNESCO — gen melancolic făcut de oameni care trăiesc departe de casă. La fel ca jucătorii lor."],
+  "Cehia":["🇨🇿 Panenka a inventat lovitura cu chip la Euro '76, contra lui Sepp Maier. Faimă eternă din o secundă de curaj.", "🇨🇿 Cehia bea mai multă bere decât orice altă țară. Prioritățile lor sunt foarte clare.", "🇨🇿 Čech a purtat cască de hochei la fotbal tot restul carierei. Cel mai recognoscibil portar al generației.", "🇨🇿 Cehia a fost finalistă de 2 ori, niciodată campioană. Club select, dar fără cupă acasă.", "🇨🇿 Kafka s-a născut la Praga. A scris despre absurd. Un meci de fotbal ceh conține uneori exact asta."],
+  "Coasta de Fildes":["🇨🇮 Drogba a negociat un armistițiu în războiul civil de acasă. Fotbalul a oprit un conflict. Mă, la propriu.", "🇨🇮 Coasta de Fildes scoate 40% din cacaoul mondial. Ciocolata din toată lumea are rădăcini acolo.", "🇨🇮 Generația lui Drogba era cea mai bună din Africa în acei ani. N-a luat niciodată Mondialul. Talent fără trofeu.", "🇨🇮 Yaya Touré a luat Premier League, La Liga și CAN. Trei titluri, trei continente.", "🇨🇮 Coasta de Fildes a luat CAN de 3 ori. Africa de Vest are tradiție, nu doar speranțe."],
+  "Columbia":["🇨🇴 James Rodríguez a luat Gheata de Aur la CM 2014. A venit din neant și a plecat cu trofeul individual.", "🇨🇴 Higuita a inventat Scorpion Kick. La un meci demonstrativ. Nu oficial. Dar a intrat în istorie tot.", "🇨🇴 Columbia scoate 10% din cafeaua mondială. Energia de la cafea se vede uneori pe teren.", "🇨🇴 Valderrama avea părul ăla afro la 3 Mondiale. Coafura mai faimoasă decât unele pase.", "🇨🇴 Columbia a luat Copa América 2024 fără gol primit în eliminatorii. Apărare sau magie, alegeți voi."],
+  "Coreea de Sud":["🇰🇷 Coreea de Sud a fost în semifinale la CM 2002. A eliminat Spania și Italia pe drum. Arbitrajul, controversat. Performanța, nu.", "🇰🇷 Son a luat Gheata de Aur în Premier League fără să bată un penalti. 23 de goluri, zero penaltii. Curat.", "🇰🇷 Park Ji-sung juca pe 3 posturi simultan la Manchester United, după Ferguson. Un om, trei roluri.", "🇰🇷 Coreea de Sud are internetul cel mai rapid din lume. K-pop e mai popular decât fotbalul lor. Pentru acum.", "🇰🇷 Coreea de Sud a eliminat Germania campioana en-titre la CM 2018. Surpriza decadei."],
+  "Croatia":["🇭🇷 Croatia a luat locul 2 la CM 2018 și locul 3 în 2022. 4 milioane de oameni, rezultate de țară mare.", "🇭🇷 Modrić a luat Balonul de Aur 2018. Primul altul decât Messi sau Ronaldo în 10 ani. A plâns la discurs.", "🇭🇷 Cravata a fost inventată în Croatia. Export cultural care valorează miliarde azi. Mai mult decât unele transferuri.", "🇭🇷 Croatia a eliminat Brazilia la CM 2022, la penaltii. Livaković a apărat 3 lovituri. Cine se aștepta la asta?", "🇭🇷 Croatia a pierdut finala 2018 cu Franta, 2-4. A condus 1-0 după un autogol. Apoi a pierdut tot."],
+  "Curacao":["🇨🇼 Curaçao are 150.000 de locuitori. Mai puțin decât un cartier din Cluj. Și totuși, la Mondial.", "🇨🇼 Curaçao a eliminat Costa Rica la baraj. Victorie istorică pentru 150.000 de oameni.", "🇨🇼 Jucătorii lui Curaçao vin mai ales din Olanda, unde au crescut. Diaspora e strategia lor.", "🇨🇼 Insula e de 444 km². Pentru comparație, Ilfov e de 3 ori mai mare. Și nu e la Mondial.", "🇨🇼 Willemstad e UNESCO pentru arhitectura colorată olandezo-caraibiană. Frumos pe afară, fotbal serios pe interior."],
+  "Ecuador":["🇪🇨 Ecuador a deschis CM 2022 cu 2-0 contra gazdei Qatar. Gazda n-a mai câștigat după aceea. Stricat de la prima.", "🇪🇨 Enner Valencia a marcat 3 din cele 5 goluri ale Ecuadorului la CM 2022. Un om, un turneu.", "🇪🇨 Quito e la 2.850 m altitudine. Adversarii vin și nu mai respiră normal câteva zile.", "🇪🇨 Insulele Galapagos sunt în Ecuador. Darwin a venit, a văzut, a inventat evoluția. Ecuador a evoluat și la fotbal.", "🇪🇨 Ecuador e traversat de Ecuator. Există o linie pictată pe un deal care marchează exact unde."],
+  "Egipt":["🇪🇬 Egipt are 7 Cupe ale Africii. Restul continentului încă încearcă să recupereze.", "🇪🇬 Cleopatra a trăit mai aproape de lansarea iPhone-ului decât de construirea piramidelor. Egiptul vine cu istorie, nu cu glumă.", "🇪🇬 Salah a marcat 200+ goluri pentru Liverpool. Orașul i-a pus porecla «Egyptian King». Pe merite.", "🇪🇬 Egipt a luat CAN de 3 ori la rând: 2006, 2008, 2010. Record mondial la competiții continentale.", "🇪🇬 Piramidele de la Giza sunt singura minune antică rămasă în picioare. Au supraviețuit mai mult decât orice club."],
+  "Elvetia":["🇨🇭 Elveția a eliminat Franta la Euro 2020, de la 1-3, la penaltii. Franta nu știa că trebuia să fie îngrijorată.", "🇨🇭 Elveția are 4 limbi oficiale. Echipa e multilingvă în cabine. Comunicarea e provocare, nu accesoriu.", "🇨🇭 CERN, cel mai mare accelerator de particule, e la Geneva. Elveția produce știință și fotbal surprinzător.", "🇨🇭 Ceasurile elvețiene sunt referință mondială la precizie. Portarul lor, nu mai puțin precis.", "🇨🇭 Xhaka a fost huiduit la Arsenal, a revenit, a câștigat Bundesliga cu Leverkusen. Revenirile sunt tradiție elvețiană."],
+  "Franta":["🇫🇷 Mbappé a dat hat-trick în finala CM 2022, în ultimele 8 minute. Franta a pierdut la penaltii totuși. Dramă pură, nu happy end.", "🇫🇷 Franta a luat CM '98 și 2018. Generații diferite, același result. Sistemul funcționează.", "🇫🇷 Lotul Frantei la CM 2022 valora peste 1,2 miliarde. Cea mai scumpă echipă a turneului. Și au pierdut finala.", "🇫🇷 Zidane a dat cu capul de 2 ori în finala '98. La ultimul meci oficial, a dat cu capul în Materazzi. Cap de aur, cap de foc.", "🇫🇷 Turnul Eiffel era programat la demolare în 1909. Bine că au mai zis o predicție și au lăsat-o."],
+  "Germania":["🇩🇪 Germania are 4 titluri mondiale și obiceiul enervant de a apărea exact când contează.", "🇩🇪 7-1 cu Brazilia în semifinale, 2014. 5 goluri în 18 minute. Cel mai mare șoc din istoria turneului.", "🇩🇪 Klose are 16 goluri la Mondiale. Record absolut. Nimeni n-a venit aproape.", "🇩🇪 Germania are legea purității berii din 1516. Disciplina e în ADN, pe teren la fel.", "🇩🇪 Müller a dat 10 goluri la 2 Mondiale combinate. «Raumdeuter» — interpretul spațiului. Sau, pe românește, cel care e mereu liber."],
+  "Ghana":["🇬🇭 Ghana a ratat semifinala CM 2010 la penaltii cu Uruguay. Suárez a blocat cu mâna pe linie. Fotbalul poate fi crud.", "🇬🇭 Gyan e golgheterul african all-time la Mondiale. A și ratat penaltiul decisiv în 2010. Ironia supremă, completă.", "🇬🇭 Ghana a luat CAN de 4 ori. Prima țară din Africa Sub-Sahariană independentă, în 1957.", "🇬🇭 Ghana scoate 30% din cacaoul mondial. Ciocolata de pe toate rafturile are rădăcini acolo.", "🇬🇭 Ghana a eliminat SUA la CM 2010, pe teren american, cu suporterii americani în tribune. Fără respect pentru gazdă."],
+  "Haiti":["🇭🇹 Haiti a fost prima republică neagră din lume, în 1804. Cu 200 de ani înainte de independența multor state africane.", "🇭🇹 Sanon a marcat primul gol al Haiti la un Mondial, '74, contra Italiei. Legendă din acel moment, pentru totdeauna.", "🇭🇹 Creola haitiană e singura limbă creolă oficială ca limbă națională în Americi.", "🇭🇹 Haiti a jucat fotbal internațional și în perioade de criză. Fotbalul nu s-a oprit niciodată complet.", "🇭🇹 Wyclef Jean s-a născut în Haiti și a candidat la președinție. Versatilitate de carieră, nu doar de stil muzical."],
+  "Iordania":["🇯🇴 Iordania are Marea Moartă — cel mai jos punct de pe Pământ. 430 m sub nivelul mării.", "🇯🇴 Iordania a fost în finala Cupei Asiei 2023. Cel mai bun rezultat din istoria lor.", "🇯🇴 Petra, orașul săpat în stâncă, a apărut în Indiana Jones. În realitate e și mai impresionant.", "🇯🇴 Iordania s-a calificat la CM 2026 prin baraj intercontinental. Drum lung, merită respect.", "🇯🇴 Wadi Rum, deșertul de nisip roșu, a fost decor pentru Lawrence of Arabia și Marte. Scenografie de Mondial."],
+  "Irak":["🇮🇶 Irakul are una dintre cele mai vechi civilizații din lume. La fotbal, însă, mingea nu respectă vechimea.", "🇮🇶 Irak a luat Cupa Asiei 2007, în plină instabilitate politică. Fotbalul a unit când nimic altceva nu putea.", "🇮🇶 Radhi a marcat singurul gol al Irakului la un Mondial, '86, contra Belgiei. Legendă din acel moment.", "🇮🇶 Mesopotamia, leagănul civilizațiilor. Primii care au inventat scrisul, roata. Fotbalul, abia mai recent.", "🇮🇶 Irak a jucat fotbal internațional acasă chiar și în conflict. Fotbalul nu s-a oprit niciodată."],
+  "Iran":["🇮🇷 Iran a luat Cupa Asiei de 3 ori la rând: '68, '72, '76. Dominanță regională, fără glumă.", "🇮🇷 Taremi a marcat o foarfecă spectaculoasă contra Angliei la CM 2022. Gol ales printre cele mai frumoase ale turneului.", "🇮🇷 Persepolis joacă cu 100.000 de spectatori. Atmosfera e armă tactică, nu doar decor.", "🇮🇷 Iran are o civilizație neîntreruptă de peste 3.000 de ani. Fotbalul e tânăr pe lângă asta.", "🇮🇷 Poetul Rumi e citat de milioane. Golurile iraniene, de mai puțini. Dar contează la fel."],
+  "Japonia":["🇯🇵 Japonia are automate pentru aproape orice. Dacă pierzi, măcar găsești cafea.", "🇯🇵 Japonia a eliminat Germania și Spania la CM 2022. Ambele conduceau la pauză. Japonia n-a primit memo-ul.", "🇯🇵 Miura a jucat profesionist la 56 de ani. Record mondial de longevitate. King Kazu e legendă vie.", "🇯🇵 Trenul japonez are întârziere medie de 0.9 minute pe an. Precizie aplicată la tot, inclusiv fotbal.", "🇯🇵 Captainul Tsubasa a inspirat generații de fotbaliști europeni. Manga japoneză, fani globali."],
+  "Maroc":["🇲🇦 Maroc are una dintre cele mai vechi universități încă active din lume. Lecția de fotbal se predă fără catalog.", "🇲🇦 Maroc a fost prima echipă africană în semifinale de Mondial, 2022. Milioane au plâns de bucurie acasă.", "🇲🇦 Hakimi a marcat penaltiul decisiv contra Spaniei cu Panenka. Curaj rar la cel mai important meci al carierei.", "🇲🇦 Marocul bea milioane de pahare de ceai de mentă pe zi. Ritual mai serios decât multe ședințe tehnice.", "🇲🇦 En-Nesyri a marcat cu capul de la 2.78 m înălțime. Cap de fier, gol de aur."],
+  "Mexic":["🇲🇽 Mexic n-a trecut niciodată de sferturi la un Mondial. «Blestemul sferturilor» e fenomen cultural acum, nu doar statistic.", "🇲🇽 Azteca e singurul stadion cu 2 finale mondiale: 1970 și 1986. Și acum, meciuri la CM 2026.", "🇲🇽 Chicharito e golgheterul all-time al Mexicului. A jucat la Man United, Real Madrid, Leverkusen.", "🇲🇽 Mexico City are 22 de milioane de oameni. Traficul e atât de dens că elicopterele private sunt transport curent.", "🇲🇽 Hugo Sánchez a luat 5 titluri consecutive cu Real Madrid. Mexican la Madrid, dominant la gol."],
+  "Norvegia":["🇳🇴 Norvegia vine cu Haaland. Planul tactic poate încăpea pe un bilețel: găsiți-l pe băiatul mare.", "🇳🇴 Haaland a marcat 36 de goluri într-un sezon de Premier League. Record absolut. Restul recalculează.", "🇳🇴 Norvegia s-a calificat la CM 2026 — prima participare din 1998. 28 de ani cu Haaland la final.", "🇳🇴 Odegaard e căpitanul Arsenalului la 23 de ani. Cel mai tânăr din istoria clubului.", "🇳🇴 Norvegia are cel mai mare fond suveran de investiții din lume. Bani din petrol, fotbal din Haaland."],
+  "Noua Zeelanda":["🇳🇿 În Noua Zeelandă sunt mult mai multe oi decât oameni. Presiune de pe margine există, doar nu de la public.", "🇳🇿 All Blacks au 77% rată de victorie. Cel mai înalt din orice sport, vreodată. La fotbal, mai lucrează.", "🇳🇿 Noua Zeelandă a fost prima țară care a dat vot femeilor, în 1893. Un secol de avans.", "🇳🇿 Peisajele din Stăpânul Inelelor sunt din Noua Zeelandă. Hollywood a venit la ei, nu invers.", "🇳🇿 Noua Zeelandă n-a pierdut niciun meci la CM 2010. 3 egaluri și a ieșit din grupe totuși."],
+  "Olanda":["🇳🇱 Cruyff a inventat fotbalul total. Olanda nu l-a câștigat niciodată pe Mondial. Inventator de geniu, finalist etern.", "🇳🇱 Olanda a luat locul 2 de 3 ori: 2010, 1974, 1978. Cea mai bună echipă care nu a câștigat niciodată.", "🇳🇱 Van Basten a dat gol din unghi imposibil în finala Euro '88. Comentatorii au tăcut 3 secunde.", "🇳🇱 Olanda are mai mulți bicicliști decât oameni. Singura țară unde te ferești de biciclete, nu de mașini.", "🇳🇱 Ajax a luat 4 Champions League. Mai mult decât orice club din afara Spaniei, Angliei, Italiei."],
+  "Panama":["🇵🇦 Panama s-a calificat la CM 2018 și toată țara a oprit treaba pentru meciul inaugural.", "🇵🇦 Canalul Panama scurtează drumul maritim cu 15.000 km. Cel mai important shortcut din lume.", "🇵🇦 Roman Torres a marcat golul calificant la CM 2018. E monument național. La propriu, nu metaforic.", "🇵🇦 Panama nu are armată permanentă din 1990. Are echipă de fotbal, totuși.", "🇵🇦 Panama City e singurul capitală latino-americană cu pădure tropicală la marginea orașului."],
+  "Paraguay":["🇵🇾 Chilavert, portarul paraguayan, a marcat 62 de goluri din penaltii și free-kick-uri. Record mondial pentru portari.", "🇵🇾 Paraguay e una din cele 2 țări sud-americane fără ieșire la mare. Tot au ajuns la Mondiale, totuși.", "🇵🇾 Guaraní e vorbită de 90% din populație, indiferent de educație sau clasă socială.", "🇵🇾 Paraguay a ajuns în sferturile CM 2010 cu fotbal defensiv solid. Apărarea poate fi spectacol, dovedit.", "🇵🇾 Paraguay produce cea mai ieftină energie din America de Sud, prin barajul Itaipu."],
+  "Portugalia":["🇵🇹 Ronaldo a marcat 128 de goluri pentru Portugalia. Record mondial absolut pentru o națională.", "🇵🇹 Eusébio a dat 9 goluri la CM '66. Portugalia a luat locul 3. Un singur om, o țară pe podium.", "🇵🇹 Portugalia a luat Euro 2016 cu un gol al lui Éder în prelungiri. Éder juca la Lille, nu la Real Madrid.", "🇵🇹 Portugalia a navigat coastele Africii, Asiei și Americii în secolul XV-XVI. Fotbaliști exploratori, la propriu istoric.", "🇵🇹 Fado-ul portughez e UNESCO. Saudade e un cuvânt intraductibil. Suporterii portughezi îl simt și la fotbal."],
+  "Qatar":["🇶🇦 Qatar a găzduit primul Mondial de iarnă, primul din Orientul Mijlociu.", "🇶🇦 Qatar a ieșit din grupe fără victorie, ca gazdă. Primul caz din istoria turneului.", "🇶🇦 Lusail Stadium are 88.966 de locuri. Mai mare decât oricare stadion din Europa.", "🇶🇦 Doha a crescut din sat de pescari în oraș ultramodern, în 70 de ani.", "🇶🇦 Qatar are cel mai mare PIB per capita din lume. Bani sunt. Fotbal la Mondiale — în formare."],
+  "RD Congo":["🇨🇩 RD Congo revine la Mondial după 52 de ani. Cel mai lung interval de revenire din istoria turneului.", "🇨🇩 Kinshasa e cel mai mare oraș francofon din lume, mai mare decât Paris.", "🇨🇩 Muzica Rumba Congoleză e UNESCO. A influențat muzica africană pe 3 continente.", "🇨🇩 RD Congo a luat CAN în '68 și '74. Glorie veche, foame de afirmare nouă.", "🇨🇩 RD Congo are 80% din rezervele mondiale de coltan. Mineral esențial pentru telefoanele tale."],
+  "SUA":["🇺🇸 SUA a înregistrat cea mai mare medie de spectatori per meci din istoria CM, în 1994.", "🇺🇸 Pulisic a marcat golul calificant și a ieșit accidentat din teren. Sacrificiu de centru, literal.", "🇺🇸 SUA are 4 Mondiale feminine. Recordul absolut. La feminin, SUA e Brazilia fotbalului.", "🇺🇸 Tim Howard a apărat 16 șuturi contra Belgiei la CM 2014. Record mondial la un eliminator.", "🇺🇸 SUA, Canada și Mexic co-organizează CM 2026, cu 16 orașe gazdă."],
+  "Scotia":["🏴󠁧󠁢󠁳󠁣󠁴󠁿 Scoția și Anglia au jucat primul meci internațional din istorie, 1872. Scor: 0-0. Chiar și la prima dată.", "🏴󠁧󠁢󠁳󠁣󠁴󠁿 Denis Law a marcat golul care a retrogradat Anglia, '75. Cu călcâiul. A celebrat cu tristețe.", "🏴󠁧󠁢󠁳󠁣󠁴󠁿 Celtic vs Rangers e unul din cele mai urmărite derby-uri locale din lume.", "🏴󠁧󠁢󠁳󠁣󠁴󠁿 Scoția s-a calificat la CM 2026, prima participare din 1998. 28 de ani de așteptare.", "🏴󠁧󠁢󠁳󠁣󠁴󠁿 Whisky-ul scotch e exportat în 180 de țări. Mândrie națională, după fotbal."],
+  "Senegal":["🇸🇳 Senegal a eliminat Franta campioana mondială la CM 2002. La primul meci. Fără respect pentru reputație.", "🇸🇳 Mané a luat Premier League, Champions League și CAN. Definește generația de aur senegaleză.", "🇸🇳 Senegal a luat CAN de 2 ori la rând: 2021, 2022. Performanță rară pe continent.", "🇸🇳 Koulibaly a jucat la Napoli, Chelsea, Al-Hilal. Fundaș central african de generație.", "🇸🇳 Senegal e singura echipă care a eliminat campioana mondială la primul lor meci din istoria Mondialelor."],
+  "Spania":["🇪🇸 Spania a luat Euro 2024 cu cei mai tineri jucători de start din istoria turneului final.", "🇪🇸 Iniesta a dat golul finalei CM 2010 în prelungiri. A băut vin de la vie proprie după. Celebrare la nivelul golului.", "🇪🇸 Real Madrid și Barca au câștigat împreună 22 de Champions League din 69 de ediții. Monopol iberic.", "🇪🇸 Spania joacă posesie și te adoarme, apoi te bate 1-0. Enervant. Eficient. Câștigător.", "🇪🇸 Spania a câștigat CM 2010 plus Euro 2008, 2012, 2024. Perioada cea mai dominantă din fotbalul european."],
+  "Suedia":["🇸🇪 Zlatan a dat o foarfecă absurdă de la 30 de metri contra Angliei. Comentatorul a rămas mut.", "🇸🇪 Zlatan are 62 de goluri pentru Suedia. Record național pe care nimeni nu se apropie să-l ia.", "🇸🇪 Suedia a luat locul 3 la CM '94 și locul 2 la '58. Națiune mică, palmares mare.", "🇸🇪 Spotify s-a fondat la Stockholm. Suezia a inventat streamingul muzical. Și fotbaliști buni, ocazional.", "🇸🇪 IKEA, H&M, Volvo, Ericsson — toate suedeze. Export de design, tehnologie, mijlocași talentați."],
+  "Tunisia":["🇹🇳 Tunisia a bătut Franta campioana mondială la CM 2022. Franta rotise lotul. Tunisia a jucat serios.", "🇹🇳 Tunisia a fost prima echipă africană care a câștigat un meci la un Mondial, '78, contra Mexic.", "🇹🇳 Cartagina, putere antică, era pe coasta tunisiană. Hannibal traversa Alpii cu elefanți de acolo.", "🇹🇳 Tunisia a luat locul 1 în grupă la CM 2022, înaintea Frantei. Ieșire pe golaveraj totuși.", "🇹🇳 Tunisia a luat CAN în 2004. Singurul titlu continental, dar al lor."],
+  "Turcia":["🇹🇷 Hakan Şükür a marcat în 11 secunde la CM 2002. Cel mai rapid gol din istoria turneului.", "🇹🇷 Turcia a luat locul 3 la CM 2002. Performanță nerepetată de atunci.", "🇹🇷 Istanbul e singurul oraș de pe Pământ pe două continente simultan.", "🇹🇷 Turcia produce 75% din alunele lumii. Nutella are un furnizor garantat.", "🇹🇷 Çalhanoğlu a marcat dintr-un free-kick fabulos contra Elveției la Euro 2020."],
+  "Uruguay":["🇺🇾 Uruguay a bătut Brazilia pe Maracanã, 1950, în fața a 200.000 de oameni. Cel mai mare șoc din istoria fotbalului.", "🇺🇾 Uruguay a luat primele 2 Mondiale: 1930, 1950. Fundația fotbalului sud-american.", "🇺🇾 Suárez a blocat cu mâna pe linie contra Ghanei la CM 2010. A plâns. Ghana a ratat penaltiul.", "🇺🇾 Uruguay a luat Copa América de 15 ori. Record mondial pentru competiții continentale.", "🇺🇾 Uruguay are 3,5 milioane de oameni. Mai puțin decât Londra. Și 2 Mondiale acasă."],
+  "Uzbekistan":["🇺🇿 Uzbekistan este singura țară care locuiește într-un cartier unde toți vecinii se termină în «-stan».", "🇺🇿 În Uzbekistan, pâinea e sacră. Nu se pune niciodată cu fața în jos. Respect total pentru un aliment.", "🇺🇿 Samarkand a fost cel mai important nod al Drumului Mătăsii. China și Europa treceau pe acolo.", "🇺🇿 Uzbekistan e la primul Mondial FIFA senior. Premieră absolută pentru fotbalul lor.", "🇺🇿 Uzbekistanul e una din doar 2 țări din lume complet înconjurate de state fără ieșire la mare."],
 };
-
-// ── BANTER POOLS ─────────────────────────────────────────────────────────────
-// Tabloid voice. Sharp. Friendly. No generic AI phrases.
+// ── BANTER POOLS — Liga 1 dressing room, Hagi logic, Grigoraș sarcasm ────────
 const T_EXACT=[
-  (n,m)=>`🎯 ${n} a ghicit scorul la ${m}. FIFA a deschis o investigație informală.`,
-  (n,m)=>`🔮 ${n} n-a prezis, a scurs scenariul de la ${m}. Grupul cere parolă de la contul lui.`,
-  (n,m)=>`🧙 ${n} cu scor exact la ${m}. Se cere control antidoping la globul de cristal.`,
-  (n,m)=>`📡 ${n} a recepționat semnalul de la ${m} când toți ceilalți aveau interferențe.`,
-  (n,m)=>`🏹 ${n} direct în centrul dianaei la ${m}. Ceilalți vedeau cu totul alt meci.`,
-  (n,m)=>`🃏 ${n} a jucat cartea perfectă la ${m}. Ceilalți au jucat cu o punte greșită.`,
-  (n,m)=>`🦊 ${n} la ${m}: scor exact când nimeni nu se uita. Stilul vulpii.`,
-  (n,m)=>`⚡ ${n} la ${m}: scor exact din prima. Nici măcar n-a transpirat.`,
-  n=>`🎯 ${n} a ghicit scorul. FIFA investigatorii au fost notificați.`,
-  n=>`🔮 ${n} n-a prezis, a scurs scenariul. Grupul cere parolă de la contul lui.`,
-  n=>`🧙 ${n} cu scor exact. Se cere control antidoping la globul de cristal.`,
-  n=>`📡 ${n} a recepționat semnalul corect când toți aveau interferențe.`,
-  n=>`🏹 ${n} direct în centrul dianaei. Precizie fără explicație plauzibilă.`,
-  n=>`🎯 ${n}: scor exact confirmat. Grupul investighează discret.`,
-  n=>`⚡ ${n}: scor exact din prima. Nici măcar n-a transpirat.`,
-  n=>`🦊 ${n}: scor exact când nimeni nu se uita. Stilul vulpii.`,
-];
-const T_ZERO=[
-  (n,m)=>`🤦 ${n} la ${m}: a prezis cu televizorul stins și telecomanda în altă cameră.`,
-  (n,m)=>`🪦 ${n} la ${m}: predicția a murit liniștit în primele minute.`,
-  (n,m)=>`🍿 ${n} la ${m}: a venit pentru spectacol și a plecat fără puncte.`,
-  (n,m)=>`😶 ${n} la ${m}: 0 puncte. Meciul nu a colaborat cu predicția sub nicio formă.`,
-  (n,m)=>`🎭 ${n} la ${m}: tragedie completă. Toate câmpurile greșite simultan.`,
-  (n,m)=>`🌵 ${n} la ${m}: 0 puncte. A supraviețuit secetei de predicție.`,
-  (n,m)=>`🎲 ${n} la ${m}: a aruncat zarul și a ieșit față greșită de fiecare dată.`,
-  (n,m)=>`😴 ${n} la ${m}: predicție somnoroasă cu rezultat la înălțimea somnului.`,
-  n=>`🤦 ${n}: a prezis cu televizorul stins și telecomanda în altă cameră.`,
-  n=>`🪦 ${n}: predicția a murit liniștit în primele minute.`,
-  n=>`🍿 ${n}: a venit pentru spectacol și a plecat fără puncte.`,
-  n=>`😶 ${n}: 0 puncte. Meciul nu a colaborat cu predicția sub nicio formă.`,
-  n=>`🎭 ${n}: tragedie completă. Toate câmpurile greșite simultan.`,
-  n=>`🌵 ${n}: 0 puncte. A supraviețuit secetei de predicție.`,
-  n=>`🎲 ${n}: zarul a dat față greșită de fiecare dată.`,
-  n=>`😴 ${n}: predicție somnoroasă cu rezultat la înălțimea somnului.`,
-];
-const T_UP=[
-  (n,r)=>`🚀 ${n} a urcat în clasament ca liftul la mall. Fără semnalizare. Locul ${r}.`,
-  (n,r)=>`⚡ ${n} accelerează. Nimeni n-a văzut de unde a apărut. Locul ${r}.`,
-  (n,r)=>`🧨 ${n}: locul ${r}. Motor ascuns, confirmat.`,
-  (n,r)=>`🔥 ${n}: locul ${r}. Temperatura în clasament a crescut cu un grad.`,
-  (n,d,r)=>`🧨 ${n} sare ${d} locuri la ${r}. Cineva verifică dacă are motor ascuns.`,
-  (n,d,r)=>`🚀 ${n}: +${d} locuri. Periculos pentru cine e deasupra. Locul ${r}.`,
-  n=>`🚀 ${n} urcă. Meciul a spus tot ce trebuia.`,
-  n=>`📈 ${n} în ascensiune. Clasamentul simte mișcarea.`,
-  n=>`⚡ ${n} accelerează fără să anunțe pe nimeni.`,
-  n=>`🔥 ${n} arde în clasament. Nu glumă.`,
-  n=>`🏃 ${n} aleargă spre top fără bilet de întoarcere.`,
-];
-const T_DOWN=[
-  (n,r)=>`📉 ${n}: locul ${r}. Clasamentul nu iartă, doar notează.`,
-  (n,r)=>`😬 ${n}: locul ${r}. Clasamentul nu iartă. Niciodată.`,
-  (n,r)=>`🪦 ${n}: locul ${r}. VAR-ul nu poate interveni în clasament.`,
-  (n,d,r)=>`📉 ${n} coboară ${d} locuri — pe ${r}. Teren pierdut, urgență crescută.`,
-  (n,d,r)=>`😬 ${n}: ${d} locuri în jos, pe ${r}. Recalculare necesară imediat.`,
-  n=>`📉 ${n} coboară. Meciul următor e decisiv.`,
-  n=>`😬 ${n} pierde teren. Clasamentul notează fără milă.`,
-  n=>`🪦 ${n} mai coboară un loc. VAR-ul nu intervine în clasament.`,
-  n=>`💀 ${n}: puncte urgente necesare.`,
-  n=>`🎭 ${n} în drama clasamentului. Scriptul nu e bun.`,
+  (n,m)=>`🎯 ${n} a prins scorul exact la ${m}. Care era în fața porții, s-a înscris.`,
+  (n,m)=>`🎯 ${n} a pus scorul corect la ${m}. Pase scurte, pe sus, direct în tabel.`,
+  (n,m)=>`🎯 ${n} a zis scorul la ${m} și scorul a executat ordinul.`,
+  (n,m)=>`🎯 ${n} a nimerit la ${m}. Omul este o persoană predictivă.`,
+  (n,m)=>`🎯 ${n} a prins scorul exact la ${m}. Să fie bine, ca să nu fie rău.`,
+  (n,m)=>`🎯 ${n} a văzut ${m} cum trebuie. De data asta chiar meciul ăsta.`,
+  (n,m)=>`🎯 ${n} a pus scorul la ${m}. Fotbalul a fost cooperant azi.`,
+  (n,m)=>`🎯 ${n} a prins scorul la ${m}. Nu știm dacă e inspirație sau bulan cu acte.`,
+  (n,m)=>`🎯 ${n} a pus rezultatul la ${m} înainte să-l afle tabela.`,
+  (n,m)=>`🎯 ${n} a nimerit scorul exact la ${m}. Restul au venit la antrenament.`,
+  (n,m)=>`🎯 ${n} a dat cu predicția în vinclu la ${m}.`,
+  (n,m)=>`🎯 ${n} a văzut golurile de la ${m} înainte să le vadă portarul.`,
+  (n,m)=>`🎯 ${n} a prins scorul la ${m}. La pomul lăudat, de data asta chiar a făcut mere.`,
+  (n,m)=>`🎯 ${n} a pus scorul exact la ${m}. Dacă era pariu, casa trăgea obloanele.`,
+  (n,m)=>`🎯 ${n} a fost omul potrivit la scorul potrivit, la ${m}.`,
+  n=>`🎯 ${n} a nimerit. Situația e fără ieșire pentru ceilalți.`,
+  n=>`🎯 ${n} a avut dreptate atât de clar încât devine enervant.`,
+  n=>`🎯 ${n} a citit meciul ca pe foaia de examen.`,
+  n=>`🎯 ${n} a prins scorul exact. Aici nu mai e fotbal, e contabilitate divină.`,
+  n=>`🎯 ${n} a zis cât se termină și a plecat. Mingea a rezolvat restul.`,
+  n=>`🎯 ${n} a prins scorul. Dacă mai continuă, îl punem să aleagă și vremea.`,
+  n=>`🎯 ${n} a nimerit scorul. Ceilalți au avut ocazii, în afară de puncte.`,
+  n=>`🎯 ${n} a pus scorul exact. La bulanu' lui, intră și mingea pătrată.`,
+  n=>`🎯 ${n} a demonstrat că predicția e și posibilă, și imposibilă. La el e posibilă.`,
+  n=>`🎯 ${n} a prins scorul. Restul să se ducă la șah.`,
 ];
 
-// ── MATCH STORY VOICE ─────────────────────────────────────────────────────────
-// Tabloid voice. Use real data. Make it worth reading.
-const _matchStory=(name,sA,sB,hSc,aSc,cards,corners)=>{
+const T_ZERO=[
+  (n,m)=>`🤦 ${n} la ${m}: a luat 0 puncte. În afară de rezultat, n-a greșit nimic.`,
+  (n,m)=>`🤦 ${n} n-a avut nicio predicție bună la ${m}, în afară de cele greșite.`,
+  (n,m)=>`🤦 ${n} a văzut ${m} perfect. Doar că pe alt stadion.`,
+  (n,m)=>`🤦 ${n} a fost aproape de adevăr la ${m}. Adevărul era în altă grupă.`,
+  (n,m)=>`🤦 ${n} a pus scorul la ${m} cu sufletul. Fotbalul i-a cerut buletinul.`,
+  (n,m)=>`🤦 ${n} a avut ochelari de cal la ${m} și televizorul pe alt post.`,
+  (n,m)=>`🤦 ${n} a intrat la ${m} cu plan. A ieșit cu explicații.`,
+  (n,m)=>`🤦 ${n} la ${m}: a făcut-o de oaie. Oaia cere drept la replică.`,
+  (n,m)=>`🤦 ${n} a pus predicția la ${m} ca fundașul care degajează în propria bară.`,
+  (n,m)=>`🤦 ${n} a avut idei la ${m}. Meciul n-a fost informat.`,
+  (n,m)=>`🤦 ${n} a fost muncitor la ${m}, dar fotbalul nu e șantier.`,
+  (n,m)=>`🤦 ${n} a muncit 24 de ore la predicția de la ${m}, uneori și noaptea. Tot 0 a ieșit.`,
+  (n,m)=>`🤦 ${n} a pus scorul la ${m} de parcă mingea era opțională.`,
+  (n,m)=>`🤦 ${n} a dat-o în bară la ${m} fără să tragă la poartă.`,
+  (n,m)=>`🤦 ${n} a citit ${m} invers. Dacă tăcea, filosof rămânea.`,
+  n=>`🤦 ${n} a avut dreptate, dacă ignorăm complet meciul.`,
+  n=>`🤦 ${n} a fost aproape. Aproape de nimic.`,
+  n=>`🤦 ${n} a vrut să fie bine, ca să nu fie rău. A fost rău.`,
+  n=>`🤦 ${n} a pus scorul ca omul care știe fotbal. Din auzite.`,
+  n=>`🤦 ${n} a greșit elegant. Punctele n-au apreciat eleganța.`,
+  n=>`🤦 ${n} a jucat predicția pe instinct. Instinctul era la șah.`,
+  n=>`🤦 ${n} a prezis cu încredere. Încrederea a cerut schimbare la pauză.`,
+  n=>`🤦 ${n} a pus scorul cu cap. Capul era la alt meci.`,
+  n=>`🤦 ${n} a nimerit tot, mai puțin echipele, scorul și rezultatul.`,
+  n=>`🤦 ${n} a avut tactică. Mingea nu citise planul.`,
+];
+
+const T_UP=[
+  (n,r)=>`📈 ${n} a urcat în clasament ca factura la curent. Când te uiți, e deja sus. Locul ${r}.`,
+  (n,r)=>`🚀 ${n} a prins liftul. Restul încă urcă scările. Locul ${r}.`,
+  (n,r)=>`⚡ ${n} s-a băgat în față fără semnalizare. Locul ${r}.`,
+  (n,r)=>`📈 ${n} a venit din spate ca fundașul la corner. Locul ${r}.`,
+  (n,d,r)=>`🚀 ${n} a luat clasamentul pe persoană fizică. ${d} locuri, pe ${r}.`,
+  (n,d,r)=>`📈 ${n} a făcut saltul de ${d} locuri. Restul studiază gazonul. Pe ${r}.`,
+  n=>`⚡ ${n} a prins viteză. Cineva să-i verifice ghetele.`,
+  n=>`📈 ${n} a urcat de parcă avea pile la tabelă.`,
+  n=>`🚀 ${n} a prins o etapă mare. Și calul aleargă, dar azi a dat și lapte.`,
+  n=>`📈 ${n} a urcat. Fotbalul e frumos, dar merită prezis.`,
+  n=>`🚀 ${n} a trecut peste clasament ca buldozerul peste teren.`,
+  n=>`📈 ${n} a făcut ce trebuia când trebuia. Rar, dar frumos.`,
+  n=>`🚀 ${n} a urcat. Care era în fața lui, a fost depășit.`,
+  n=>`📈 ${n} a intrat în top ca atacantul la colțul scurt.`,
+  n=>`⚡ ${n} a urcat. Nu știm dacă e formă, bulan sau ambele.`,
+];
+
+const T_DOWN=[
+  (n,r)=>`📉 ${n} a coborât. A făcut-o de oaie, capră și tot efectivul. Locul ${r}.`,
+  (n,r)=>`📉 ${n} a pierdut teren. Fotbalul nu e șantier, dar aici s-a surpat. Locul ${r}.`,
+  (n,r)=>`📉 ${n} a alunecat ca fundașul pe ploaie. Locul ${r}.`,
+  (n,r)=>`📉 ${n} pierde locuri. Clasamentul nu iartă, doar notează. Locul ${r}.`,
+  (n,d,r)=>`📉 ${n} a fost prins pe contraatac de clasament. ${d} locuri, pe ${r}.`,
+  (n,d,r)=>`📉 ${n} a coborât ${d} locuri cu eleganță. Păcat că eleganța nu dă puncte. Pe ${r}.`,
+  n=>`📉 ${n} a coborât. Dacă era pârtie, lua medalie.`,
+  n=>`📉 ${n} a făcut pasul înapoi. Tactic, probabil. Sau nu.`,
+  n=>`📉 ${n} a pierdut ritmul. Probabil era iarnă în Brazilia.`,
+  n=>`📉 ${n} a coborât. La anul vine un an nou și alt an.`,
+  n=>`📉 ${n} a pierdut poziții. Dacă era meci, cerea schimbare.`,
+  n=>`📉 ${n} a fost depășit. Poziție bună, marcaj slab.`,
+  n=>`📉 ${n} s-a dus în jos. Nu e tragedie, dar nici nuntă nu e.`,
+  n=>`📉 ${n} a căzut. Publicul cere explicații, dar nu foarte multe.`,
+  n=>`📉 ${n} a ajuns mai jos. Calificarea e și posibilă, și imposibilă.`,
+];
+
+// ── MATCH DRAMA — Liga 1 dressing room voice, real data ──────────────────────
+const _matchDrama=(name,sA,sB,hSc,aSc,cards,corners)=>{
   const t=sA+sB; const items=[];
-  // Goal story — voice varies by count
-  if(t>=5)items.push(_p8([
-    (m,t)=>`${m}: ${t} goluri. Dacă ai pus scor mare, azi îți plătești concediul.`,
-    (m,t)=>`${t} goluri la ${m}. Apărările au lipsit motivat — sau deloc.`,
-    (m,t)=>`${m} a dat ${t} goluri în 90 de minute. Medie de un gol la ${Math.round(90/t)} minute.`,
-    (m,t)=>`${t} la ${m}. Portarii au văzut mingea mai des decât și-ar fi dorit.`,
+
+  if(t>=5)items.push(_p12([
+    (m,t)=>`⚽ ${m}: ${t} goluri. În afară de goluri, n-au avut prea multe ocazii. Dar golurile ajung.`,
+    (m,t)=>`⚽ ${m}: ${t} goluri. Atacanții au alergat, fundașii au completat cereri.`,
+    (m,t)=>`⚽ ${m}: ${t} goluri în 90 de minute. Cine a mizat pe logică a primit fotbal.`,
   ],name,t)(name,t));
-  else if(t===4)items.push(_p8([
-    (m)=>`${m}: 4 goluri. Meciul nu a dezamăgit față de predicțiile îndrăznețe.`,
-    (m)=>`4 goluri la ${m}. Suficient pentru un top YouTube al zilei.`,
+  else if(t===4)items.push(_p12([
+    m=>`⚽ ${m}: 4 goluri. Cine a pus scor mic a avut cap. Cine a pus spectacol a avut speranță.`,
+    m=>`⚽ ${m}: 4 goluri. Marcatorii au intrat pe tabelă, predicțiile au intrat în gard.`,
   ],name)(name));
-  else if(t===3)items.push(_p8([
-    (m)=>`${m}: 3 goluri. Meciu cu ritm — nu toate au rămas la 0-0 la pauză.`,
-    (m)=>`3 goluri la ${m}. Câteva predicții au primit viață, altele au murit.`,
+  else if(t===3)items.push(_p12([
+    m=>`⚽ ${m}: 3 goluri. Apărarea a fost bună, dacă ignorăm momentele când s-a luat gol.`,
+    m=>`⚽ ${m}: 3 goluri. Scorul a fost clar, predicțiile mai puțin.`,
   ],name)(name));
-  else if(t===0)items.push(_p8([
-    m=>`${m}: 0-0. Goalkeepers worked. Strikers attended. 0 goluri.`,
-    m=>`${m}: 0-0. Cine a pariat pe spectacol și-a cerut banii înapoi.`,
-    m=>`${m} s-a blocat la 0-0. Portarii au câștigat. Publicul — mai puțin.`,
-    m=>`${m}: 0-0. Undeva, un specialist în apărare e fericit. Restul, mai puțin.`,
+  else if(t===0)items.push(_p12([
+    m=>`🥊 ${m}: 0-0. Portarii au muncit, atacanții au meditat.`,
+    m=>`🥊 ${m}: 0-0. Cine a pariat pe spectacol cere bani înapoi.`,
+    m=>`🥊 ${m}: 0-0. Golurile au venit greu, ca scuzele după o predicție proastă. N-au venit deloc.`,
   ],name)(name));
-  else if(t===1)items.push(_p8([
-    m=>`${m}: 1 gol, 89 de minute de chin. Cineva s-a trezit erou fără să planifice.`,
-    m=>`${m}: un singur gol a hotărât tot. Scriptul a livrat minimul dramatic.`,
-    m=>`${m}: 1-0. Cine l-a prezis exact e erou discret al zilei.`,
+  else if(t===1)items.push(_p12([
+    m=>`⚽ ${m}: 1 gol, 89 de minute de chin. Care era în fața porții, a marcat o singură dată — și a fost suficient.`,
+    m=>`⚽ ${m}: un singur gol a hotărât tot. Golurile au venit greu azi.`,
   ],name)(name));
-  else if(sA===sB)items.push(_p8([
-    (m,s)=>`${m}: ${s}-${s}. Egal matematic și moral. Clasamentul ia câte un punct de la fiecare.`,
-    (m,s)=>`${m}: ${s}-${s}. Nici una, nici alta. Diplomație cu gheată.`,
-    (m,s)=>`${m}: ${s} goluri fiecare. Punctele se împart, frustrările — nu.`,
+  else if(sA===sB)items.push(_p12([
+    (m,s)=>`⚽ ${m}: ${s}-${s}. Să fie bine, ca să nu fie rău. A fost doar egal.`,
+    (m,s)=>`⚽ ${m}: egal la ${s}. Punctele se împart, nervii nu.`,
   ],name,sA)(name,sA));
-  else{const d=Math.abs(sA-sB);const w=sA>sB?'gazdele':'oaspeții';
-    items.push(_p8([
-      (m,d,w)=>`${m}: ${sA}-${sB}. ${d === 1 ? 'Un gol diferență, dar suficient.' : d + ' goluri diferență — fără discuții.'}`,
-      (m,d,w)=>`${m}: ${sA}-${sB}. ${w.charAt(0).toUpperCase()+w.slice(1)} au vrut mai mult. S-a văzut pe tabelă.`,
-      (m,d,w)=>`${m}: ${sA}-${sB}. ${w.charAt(0).toUpperCase()+w.slice(1)} au câștigat. Restul — nu.`,
-    ],name,d,w)(name,d,w));}
-  // Scorers — named, tabloid voice
+  else{
+    const d=Math.abs(sA-sB);const w=sA>sB?'gazdele':'oaspeții';
+    items.push(_p12([
+      (m,d,w)=>`⚽ ${m}: ${sA}-${sB}. ${d === 1 ? 'Un gol diferență, dar suficient.' : d + ' goluri diferență — fără discuții.'}`,
+      (m,d,w)=>`⚽ ${m}: ${sA}-${sB}. ${w.charAt(0).toUpperCase()+w.slice(1)} au avut idei. Restul, doar speranțe.`,
+      (m,d,w)=>`⚽ ${m}: ${sA}-${sB}. ${w.charAt(0).toUpperCase()+w.slice(1)} au câștigat. Restul — nu.`,
+    ],name,d,w)(name,d,w));
+  }
+
   if(hSc||aSc){
-    const parts=[];
-    if(hSc)parts.push(hSc);
-    if(aSc)parts.push(aSc);
+    const parts=[];if(hSc)parts.push(hSc);if(aSc)parts.push(aSc);
     const joined=parts.join(' / ');
-    items.push(_p8([
-      (m,s)=>`⚽ ${m}: golurile poartă numele ${s}.`,
-      (m,s)=>`${m} — marcatori: ${s}.`,
-      (m,s)=>`${s} — ei au scris meciul la ${m}.`,
+    items.push(_p12([
+      (m,s)=>`⚽ ${m} — marcatori: ${s}.`,
+      (m,s)=>`⚽ La ${m} au marcat: ${s}.`,
     ],name,hSc||'',aSc||'')(name,joined));
   }
-  // Cards
-  if(cards>=8)items.push(_p8([
-    (m,c)=>`${c} cartonașe la ${m}. Dacă ai pariat pe galbene, astăzi e ziua ta.`,
-    (m,c)=>`${m}: ${c} cartonașe. Arbitrul a lucrat ore suplimentare.`,
-    (m,c)=>`${m} a produs ${c} cartonașe. Suficient pentru un episod de dramă sportivă.`,
+
+  if(cards>=8)items.push(_p12([
+    (m,c)=>`🟨 ${m}: ${c} cartonașe. Cât pentru un dosar cu șină.`,
+    (m,c)=>`🟨 ${m}: arbitrul a muncit 24 de ore pe zi, uneori și noaptea. ${c} cartonașe scoase.`,
+    (m,c)=>`🟨 ${c} cartonașe la ${m}. Dacă pariai pe galbene, nu mai întrebai de salariu.`,
   ],name,cards)(name,cards));
-  else if(cards>=5)items.push(_p8([
-    (m,c)=>`${c} cartonașe la ${m}. Fotbal fizic cu nervi scurți.`,
-    (m,c)=>`${m}: ${c} cartonașe. Meciul s-a jucat și pe regulament.`,
+  else if(cards>=5)items.push(_p12([
+    (m,c)=>`🟨 ${m}: ${c} cartonașe. Fotbal pe nervi, regulament invocat des.`,
   ],name,cards)(name,cards));
-  // Corners
-  if(corners>=14)items.push(_p8([
-    (m,c)=>`${m} a avut ${c} cornere. Mingea a vizitat stegulețul atât de des că ar fi trebuit să plătească chirie.`,
-    (m,c)=>`${c} cornere la ${m}. Constructorii stegulețelor de corner au avut ziua lor.`,
-    (m,c)=>`${m}: ${c} cornere. Atacanții au preferat linia de fund ca rampă de lansare.`,
+
+  if(corners>=14)items.push(_p12([
+    (m,c)=>`🚩 ${m}: ${c} cornere. Mingea a stat la corner de parcă plătea chirie.`,
+    (m,c)=>`🚩 ${c} cornere la ${m}. La câte au fost, fanionul merita notă în aplicație.`,
+    (m,c)=>`🚩 ${m}: ${c} cornere. Fanionul cere primă de joc.`,
   ],name,corners)(name,corners));
-  else if(corners>=10)items.push(_p8([
-    (m,c)=>`${c} cornere la ${m}. Portarii au văzut mingea din unghiuri neplăcute.`,
-    (m,c)=>`${m}: ${c} cornere. Mulți, eficienți — sau nu, depinde de scor.`,
+  else if(corners>=10)items.push(_p12([
+    (m,c)=>`🚩 ${c} cornere la ${m}. Cornere peste cornere.`,
   ],name,corners)(name,corners));
+
   return items;
 };
 
@@ -593,26 +615,25 @@ export function generateActivityFeed({
   const todayEnd=new Date(todayStart);todayEnd.setDate(todayEnd.getDate()+1);
   const isToday=t=>{const d=new Date(t);return d>=todayStart&&d<todayEnd;};
 
-  // Context teams: live + last 2 finished + today upcoming + next match
   const ctxTeams=new Set();
   const finishedMatches=[...matches.filter(m=>m.isFinished)]
     .sort((a,b)=>new Date(b.time)-new Date(a.time));
   const liveMatches=matches.filter(m=>m.isLive);
-  const todayMatches=matches.filter(m=>!m.isFinished&&!m.isLive&&_isWCM8(m)&&isToday(m.time));
-  const nextMatch=matches.filter(m=>!m.isFinished&&!m.isLive&&_isWCM8(m))
+  const todayMatches=matches.filter(m=>!m.isFinished&&!m.isLive&&_isWCM12(m)&&isToday(m.time));
+  const nextMatch=matches.filter(m=>!m.isFinished&&!m.isLive&&_isWCM12(m))
     .sort((a,b)=>new Date(a.time)-new Date(b.time))[0];
   const latestFinished=finishedMatches.slice(0,2);
 
   [...liveMatches,...latestFinished,...todayMatches].forEach(m=>{
-    if(_isWCM8(m)){ctxTeams.add(_n8(m.teamA));ctxTeams.add(_n8(m.teamB));}
+    if(_isWCM12(m)){ctxTeams.add(_n12(m.teamA));ctxTeams.add(_n12(m.teamB));}
   });
-  if(nextMatch){ctxTeams.add(_n8(nextMatch.teamA));ctxTeams.add(_n8(nextMatch.teamB));}
+  if(nextMatch){ctxTeams.add(_n12(nextMatch.teamA));ctxTeams.add(_n12(nextMatch.teamB));}
 
   const ctxFact=(team,seed=0)=>{
-    const canon=_n8(team);
-    if(!_isOff8(team)||!ctxTeams.has(canon))return null;
-    const facts=CUR8[canon];if(!facts||!facts.length)return null;
-    return _p8(facts,canon,seed);
+    const canon=_n12(team);
+    if(!_isOff12(team)||!ctxTeams.has(canon))return null;
+    const facts=CUR12[canon];if(!facts||!facts.length)return null;
+    return _p12(facts,canon,seed);
   };
 
   // ── BLOCK A: LIVE ────────────────────────────────────────────────────────────
@@ -626,16 +647,16 @@ export function generateActivityFeed({
     if(m.liveCorners)parts.push(`🚩 ${m.liveCorners}`);
     const det=parts.length?` (${parts.join(' · ')})`:'';
     ev('live',`🔴 LIVE: ${m.teamA} ${sA}–${sB} ${m.teamB}${det}`,11);
-    if(sA>sB&&m.liveMinute)ev('live_hype',`🔥 ${m.teamA} conduce cu ${sA-sB}. ${m.teamB} mai are ${90-m.liveMinute} minute să întoarcă soarta.`,10);
-    else if(sB>sA&&m.liveMinute)ev('live_hype',`⚠️ ${m.teamB} conduce cu ${sB-sA}. ${m.teamA} în recuperare — ${90-m.liveMinute} minute rămase.`,10);
-    else if(m.liveMinute>70)ev('live_hype',`⏱️ Egal în ${m.liveMinute}'. Oricine marchează acum scrie istoria zilei.`,10);
-    else ev('live_hype',`⚖️ ${m.teamA} ${sA}-${sB} ${m.teamB} — orice se poate întâmpla.`,10);
+    if(sA>sB&&m.liveMinute)ev('live_hype',`🔥 ${m.teamA} conduce cu ${sA-sB}. ${m.teamB} mai are ${90-m.liveMinute} minute.`,10);
+    else if(sB>sA&&m.liveMinute)ev('live_hype',`⚠️ ${m.teamB} conduce cu ${sB-sA}. ${m.teamA} în recuperare.`,10);
+    else if(m.liveMinute>70)ev('live_hype',`⏱️ Egal în ${m.liveMinute}'. Care marchează acum, scrie istoria zilei.`,10);
+    else ev('live_hype',`⚖️ ${m.teamA} ${sA}-${sB} ${m.teamB}. Totul e de jucat.`,10);
     const f=ctxFact(m.teamA,m.id)||ctxFact(m.teamB,m.id+99);
     if(f)ev('curiosity',f,5);
   });
 
-  // ── BLOCK B: LAST 2 FINISHED (dominate the feed) ────────────────────────────
-  let predCount=0; const PCAP=2; // max 2 banter per feed
+  // ── BLOCK B: LAST 2 FINISHED — dominate the feed ────────────────────────────
+  let predCount=0; const PCAP=2;
 
   latestFinished.forEach((match,idx)=>{
     const BASE=idx===0?10:9;
@@ -646,16 +667,14 @@ export function generateActivityFeed({
     const rCornA=match.realAwayCorners!=null?Number(match.realAwayCorners):null;
     const rCornT=match.realCorners!=null?Number(match.realCorners):null;
     const corners=rCornT??(rCornH!=null&&rCornA!=null?rCornH+rCornA:null);
-    const isWC=_isWCM8(match);
+    const isWC=_isWCM12(match);
     const mp=mpreds(match.id,match);
     const exact=mp.filter(p=>p.exact);
     const top=[...mp].sort((a,b)=>b.pts-a.pts)[0];
 
-    // Match stories — tabloid voice
-    const storyItems=_matchStory(mName,sA,sB,match.homeScorers,match.awayScorers,rCards??0,corners??0);
-    storyItems.forEach((text,i)=>ev('match_story',text,BASE+1-i*0.1));
+    const items=_matchDrama(mName,sA,sB,match.homeScorers,match.awayScorers,rCards??0,corners??0);
+    items.forEach((text,i)=>ev('match_drama',text,BASE+1-i*0.1));
 
-    // Country curiosities — tabloid facts, contextual only
     if(isWC){
       [match.teamA,match.teamB].forEach((team,i)=>{
         const f=ctxFact(team,match.id+i*100);
@@ -663,47 +682,43 @@ export function generateActivityFeed({
       });
     }
 
-    // Banter — max PCAP total, varied
     if(exact.length===1&&predCount<PCAP){
-      ev('exact',_c8(T_EXACT,[exact[0].nick,match.id,'ex'],exact[0].nick,mName),BASE+2);predCount++;
+      ev('exact',_c12(T_EXACT,[exact[0].nick,match.id,'ex'],exact[0].nick,mName),BASE+2);predCount++;
     }else if(exact.length>=2&&predCount<PCAP){
-      const names=exact.slice(0,3).map(e=>e.nick).join(', ');
-      ev('exact',`🎯 ${names} — scor exact la ${mName}. FIFA investigatorii au fost notificați.`,BASE+2);predCount++;
+      const names=exact.slice(0,3).map(e=>e.nick).join(' și ');
+      ev('exact',`🎯 ${names} au prins scorul exact la ${mName}. Coincidența cere concediu medical.`,BASE+2);predCount++;
     }
     const zeroes=mp.filter(p=>p.pts===0);
     if(zeroes.length===1&&predCount<PCAP){
-      ev('miss',_c8(T_ZERO,[zeroes[0].uid,match.id,'z'],zeroes[0].nick,mName),BASE-2);predCount++;
+      ev('miss',_c12(T_ZERO,[zeroes[0].uid,match.id,'z'],zeroes[0].nick,mName),BASE-2);predCount++;
     }
-    // Upset
     if(mp.length>=3&&mp.filter(p=>p.ok).length===0)
-      ev('upset',`😱 ${mName}: niciun jucător nu a prezis corect rezultatul. Fotbalul a câștigat.`,BASE);
-    // Best scorer
-    if(top&&top.pts>=80&&top.pts>0)
-      ev('best',`🏅 ${top.nick}: ${top.pts} pts la ${mName}. Cel mai bun din grupul de azi.`,BASE-1);
+      ev('upset',`😱 ${mName}: niciun jucător n-a prezis rezultatul. Fotbalul a câștigat etapa.`,BASE);
+    if(top&&top.pts>=80)
+      ev('best',`🏅 ${top.nick}: ${top.pts} pts la ${mName}. Liderul etapei.`,BASE-1);
   });
 
-  // ── BLOCK C: TODAY UPCOMING / NEXT MATCH ────────────────────────────────────
+  // ── BLOCK C: TODAY / NEXT ────────────────────────────────────────────────────
   const T_PRE=[
-    (a,b)=>`🔥 ${a} – ${b} azi. 90 de minute, o predicție, și poate un conflict diplomatic în grup.`,
-    (a,b)=>`⚽ ${a} vs ${b}: tipul de meci unde un 1-1 banal rupe clasamentul de față.`,
-    (a,b)=>`🎯 Scor exact la ${a} – ${b}: 100 puncte și o săptămână de lăudăroșenie.`,
-    (a,b)=>`🧠 ${a} – ${b}: simplu de urmărit, complicat de prezis. Cartonașele — mai ales.`,
-    (a,b)=>`🥶 ${a} – ${b}: un gol în minutul 88 poate strica o seară întreagă.`,
-    (a,b)=>`🎲 La ${a} – ${b}, cine nimerează cartonașele merită un titlu onorific în grup.`,
-    (a,b)=>`📺 ${a} – ${b}: dacă ai pus 0-0, ai nevoie fie de curaj, fie de noroc pur.`,
+    (a,b)=>`🔥 ${a} – ${b} azi. Care e în fața porții, s-o înscrie.`,
+    (a,b)=>`⚽ ${a} vs ${b}: simplu pe hârtie, complicat la cartonașe. Acolo e drama.`,
+    (a,b)=>`🎯 Scor exact la ${a} – ${b}: 100 puncte și o săptămână de lăudăroșenie în grup.`,
+    (a,b)=>`🥶 ${a} – ${b}: un gol în minutul 88 strică o seară întreagă.`,
+    (a,b)=>`🎲 La ${a} – ${b}, cine nimerește cartonașele merită titlu onorific.`,
+    (a,b)=>`📺 ${a} – ${b}: dacă pui 0-0, ai nevoie de curaj sau de noroc cu acte.`,
     (a,b)=>`🌪️ ${a} – ${b}: pronosticul e gata? Clasamentul nu mai are răbdare.`,
   ];
-  const todayOff=matches.filter(m=>_isWCM8(m)&&!m.isFinished&&!m.isLive&&isToday(m.time));
+  const todayOff=matches.filter(m=>_isWCM12(m)&&!m.isFinished&&!m.isLive&&isToday(m.time));
   todayOff.slice(0,2).forEach(m=>{
-    ev('preview',_c8(T_PRE,[m.id,'pre'],m.teamA,m.teamB),3);
+    ev('preview',_c12(T_PRE,[m.id,'pre'],m.teamA,m.teamB),3);
     [m.teamA,m.teamB].forEach((t,i)=>{const f=ctxFact(t,m.id+i*200);if(f)ev('curiosity',f,3);});
   });
   if(nextMatch&&todayOff.length===0){
-    ev('preview',_c8(T_PRE,[nextMatch.id,'nxt'],nextMatch.teamA,nextMatch.teamB),3);
+    ev('preview',_c12(T_PRE,[nextMatch.id,'nxt'],nextMatch.teamA,nextMatch.teamB),3);
     [nextMatch.teamA,nextMatch.teamB].forEach((t,i)=>{const f=ctxFact(t,nextMatch.id+i*300);if(f)ev('curiosity',f,3);});
   }
 
-  // ── BLOCK D: LEADERBOARD (max 2, only if drama) ─────────────────────────────
+  // ── BLOCK D: LEADERBOARD — Liga 1 banter, max 2 ──────────────────────────────
   let rc=0;
   if(prevLeaderboard.length>0&&n>=2){
     leaderboard.forEach(entry=>{
@@ -711,28 +726,39 @@ export function generateActivityFeed({
       const prev=prevLeaderboard.find(p=>p.nickname===entry.nickname);if(!prev)return;
       const delta=prev.rank-entry.rank,nick=entry.nickname;
       if(entry.rank===1&&prev.rank>1){
-        const d=prevLeaderboard.find(p=>p.rank===1)?.nickname||'?';
-        ev('lead',_p8([(n,p)=>`👑 ${n} detronează pe ${p}. Tronul a schimbat proprietarul.`,(n,p)=>`🏆 ${n} preia coroana de la ${p}. Drama continuă.`,(n,p)=>`🍾 ${n} a pus șampania la rece. ${p} recalculează tot.`],nick,d)(nick,d),11);rc++;
+        ev('lead',_p12([
+          n=>`👑 Tronul are proprietar nou: ${n}.`,
+          n=>`👑 ${n} e lider. Restul vin cu furca și calculatorul.`,
+          n=>`👑 ${n} conduce clasamentul ca pe propria gospodărie.`,
+        ],nick)(nick),11);rc++;
       }
-      if(prev.rank===1&&entry.rank>1&&rc<2){ev('fall',`😬 ${nick} pierde primul loc. Clasamentul nu iartă, niciodată.`,10);rc++;}
-      if(entry.rank<=3&&prev.rank>3&&rc<2){ev('top3',`🚀 ${nick} intră în Top 3. Locul ${entry.rank}. Cineva să-i verifice ghetele.`,9);rc++;}
-      if(entry.rank>3&&prev.rank<=3&&rc<2){ev('top3_exit',`🥉 ${nick} iese din Top 3 — locul ${entry.rank}. Clasamentul e brutal.`,9);rc++;}
-      if(delta>=3&&entry.rank>1&&rc<2){ev('rank_up',_c8(T_UP,[nick,delta,entry.rank,'up'],nick,delta,entry.rank),8);rc++;}
-      else if(delta===2&&entry.rank>1&&rc<2){ev('rank_up',_c8(T_UP,[nick,entry.rank,'up2'],nick,entry.rank),7);rc++;}
-      if(delta<=-2&&rc<2){ev('rank_down',_c8(T_DOWN,[nick,Math.abs(delta),entry.rank,'dn'],nick,Math.abs(delta),entry.rank),7);rc++;}
+      if(prev.rank===1&&entry.rank>1&&rc<2){
+        ev('fall',`📉 ${nick} a pierdut tronul. Liderul respiră greu, ceilalți vin cu bocancii.`,10);rc++;
+      }
+      if(entry.rank<=3&&prev.rank>3&&rc<2){
+        ev('top3',`🚀 ${nick} a intrat în Top 3. Podiumul s-a strâns, aici nu mai e prietenie, e ședință de bloc.`,9);rc++;
+      }
+      if(entry.rank>3&&prev.rank<=3&&rc<2){
+        ev('top3_exit',`📉 ${nick} a ieșit din Top 3. Locul ${entry.rank}.`,9);rc++;
+      }
+      if(delta>=3&&entry.rank>1&&rc<2){ev('rank_up',_c12(T_UP,[nick,delta,entry.rank,'up'],nick,delta,entry.rank),8);rc++;}
+      else if(delta===2&&entry.rank>1&&rc<2){ev('rank_up',_c12(T_UP,[nick,entry.rank,'up2'],nick,entry.rank),7);rc++;}
+      if(delta<=-2&&rc<2){ev('rank_down',_c12(T_DOWN,[nick,Math.abs(delta),entry.rank,'dn'],nick,Math.abs(delta),entry.rank),7);rc++;}
     });
     const L=leaderboard[0],S=leaderboard[1],pL=prevLeaderboard[0],pS=prevLeaderboard[1];
     if(L&&S&&pL&&pS){
       const gap=L.points-S.points,pg=pL.points-pS.points;
-      if(gap>pg&&gap>=20)ev('gap',`👑 ${L.nickname} extinde avantajul la ${gap} puncte. ${S.nickname} are de lucru serios.`,7);
-      else if(gap<pg&&gap>0&&gap<=15)ev('chase',`⚔️ Doar ${gap} puncte despart locul 1 de locul 2. Nimeni nu doarme confortabil.`,8);
+      if(gap>pg&&gap>=20)ev('gap',`👑 ${L.nickname} stă sus. ${S.nickname} se uită ca la tabela după 0-3.`,7);
+      else if(gap<pg&&gap>0&&gap<=15)ev('chase',`⚔️ Între ${L.nickname} și ${S.nickname} e atât de puțin încât și VAR-ul cere reluare. ${gap} puncte.`,8);
     }
   }
-  if(n>=3){const l=leaderboard[0],t=leaderboard[2],sp=l.points-t.points;
-    if(sp<=20&&sp>=0&&l.points>0)ev('drama',`⚔️ ${sp} puncte despart locul 1 de locul 3. Un singur meci schimbă tot.`,6);}
+  if(n>=3){
+    const l=leaderboard[0],t=leaderboard[2],sp=l.points-t.points;
+    if(sp<=20&&sp>=0&&l.points>0)
+      ev('drama',`⚔️ Top 3 e mai aglomerat decât grătarul de 1 Mai. ${sp} puncte despart locul 1 de locul 3.`,6);
+  }
 
-  // ── FINAL: dedup, priority sort, mix enforcement ────────────────────────────
-  // Target per 12: 4 match_story, 3 curiosity, 2 exact/miss, 1-2 leaderboard
+  // ── FINAL — dedup, sort, enforce mix ────────────────────────────────────────
   const seen=new Set();
   const deduped=events
     .filter(e=>{if(seen.has(e.text))return false;seen.add(e.text);return true;})
@@ -754,7 +780,7 @@ export function generateActivityFeed({
     result.push(e);tc[e.type]=(tc[e.type]||0)+1;
   }
   for(const e of deduped){if(result.length>=15)break;if(!result.find(x=>x.id===e.id))result.push(e);}
-  return result.slice(0,12);
+  return result.slice(0,15);
 }
 
 
