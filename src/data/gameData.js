@@ -1133,29 +1133,9 @@ export function generateActivityFeed({
     return{type:'quote',text:shifted[0]};
   };
 
-  // ── Build result array in fixed order ────────────────────────────────────────
+  // ── Build result array ────────────────────────────────────────────────────────
   const result=[];
-  const push=item=>{if(item&&result.length<20)result.push(item);};
-  const pushCurQuotePair=(seed)=>{
-    const c1=curiosities.shift();
-    const q1=nextStandalone(seed);
-    const c2=curiosities.shift();
-    const q2=nextStandalone(seed+1);
-    if(c1)push(c1);
-    if(q1)push(q1);
-    if(c2)push(c2);
-    if(q2)push(q2);
-  };
-
-  // Helpers pentru predicțiile unui meci
-  const getMatchPreds=(m)=>{
-    return Object.entries(allPredictions)
-      .filter(([,up])=>up[m.id]||up[String(m.id)])
-      .map(([uid,up])=>{
-        const p=up[m.id]||up[String(m.id)];
-        return {uid,nick:nickOf(uid),pA:Number(p.scoreA),pB:Number(p.scoreB)};
-      });
-  };
+  const push=item=>{if(item&&result.length<24)result.push(item);};// allow more, trim at end
 
   // ── SLOT 1: LIVE cu scor + mesaj funny ───────────────────────────────────────
   liveMatches.slice(0,1).forEach(m=>{
@@ -1172,56 +1152,127 @@ export function generateActivityFeed({
     push({type:'live',text:`${funny}${scorersText}`});
   });
 
-  // ── SLOTS 2-3: PREDICȚII meci live sau următor (SUS în feed) ─────────────────
+  // ── SLOT 2: UN SINGUR post despre meciul următor/live ─────────────────────────
   const upcomingForPreds=liveMatches.length>0?liveMatches.slice(0,1):
     (todayOff.length>0?todayOff.slice(0,1):(nextMatch?[nextMatch]:[]));
-
   upcomingForPreds.forEach(m=>{
-    const preds=getMatchPreds(m);
-    if(preds.length===0)return;
+    const preds=Object.entries(allPredictions)
+      .filter(([,up])=>up[m.id]||up[String(m.id)])
+      .map(([uid,up])=>{const p=up[m.id]||up[String(m.id)];return{nick:nickOf(uid),pA:Number(p.scoreA),pB:Number(p.scoreB)};});
+    if(preds.length===0){
+      const T_PRE=[(a,b)=>`🔜 ${a} – ${b} urmează. Care e în fața porții, s-o înscrie.`,(a,b)=>`🔜 ${a} vs ${b}: simplu pe hârtie, complicat la cartonașe.`,(a,b)=>`🔜 ${a} – ${b}: un gol în minutul 88 strică o seară întreagă.`,(a,b)=>`🔜 ${a} – ${b}: dacă pui 0-0, ai nevoie de curaj sau de noroc cu acte.`,(a,b)=>`🔜 ${a} vs ${b}: cine a pus, a pus. Cine n-a pus — îl doare mai târziu.`];
+      push({type:'preview',text:_call(T_PRE,[m.id,'pre'],m.teamA,m.teamB)});return;
+    }
+    const home=preds.filter(p=>p.pA>p.pB),away=preds.filter(p=>p.pB>p.pA),draw=preds.filter(p=>p.pA===p.pB);
     const mName=`${m.teamA} vs ${m.teamB}`;
-
-    // Câți au pus predicție
-    if(preds.length>=3){
+    if(home.length>0&&away.length>0){
+      push({type:'preview_split',text:`⚔️ La ${mName}: ${home.length} au pus ${m.teamA}, ${away.length} au pus ${m.teamB}${draw.length>0?`, ${draw.length} egal`:''}.`});
+    }else if(draw.length===1&&preds.length>=3){
+      push({type:'preview_solo',text:_call(T_MAN_DRAW,[draw[0].nick,m.id],draw[0].nick)});
+    }else{
       const names=preds.slice(0,3).map(p=>p.nick).join(', ');
       const rest=preds.length>3?` și alți ${preds.length-3}`:'';
       push({type:'preview_preds',text:`📋 ${names}${rest} au pus predicție la ${mName}.`});
     }
-
-    // Predicții opuse în grup
-    const home=preds.filter(p=>p.pA>p.pB);
-    const away=preds.filter(p=>p.pB>p.pA);
-    const draw=preds.filter(p=>p.pA===p.pB);
-    if(home.length>0&&away.length>0){
-      push({type:'preview_split',text:`⚔️ La ${mName}: ${home.length} au pus ${m.teamA}, ${away.length} au pus ${m.teamB}${draw.length>0?`, ${draw.length} au pus egal`:''}.`});
-    } else if(draw.length===1&&preds.length>=3){
-      push({type:'preview_solo',text:_call(T_MAN_DRAW,[draw[0].nick,m.id],draw[0].nick)});
-    } else if(home.length===preds.length&&preds.length>=3){
-      push({type:'preview_consensus',text:`🤝 Toată lumea a pus ${m.teamA} la ${mName}. Curaj colectiv sau greșeală colectivă.`});
-    } else if(away.length===preds.length&&preds.length>=3){
-      push({type:'preview_consensus',text:`🤝 Toată lumea a pus ${m.teamB} la ${mName}. Dacă greșesc toți, greșesc împreună.`});
-    }
   });
 
-  // Preview meci următor dacă nu e live
-  if(liveMatches.length===0){
-    const T_PRE=[
-      (a,b)=>`🔜 ${a} – ${b} urmează. Care e în fața porții, s-o înscrie.`,
-      (a,b)=>`🔜 ${a} vs ${b}: simplu pe hârtie, complicat la cartonașe.`,
-      (a,b)=>`🔜 ${a} – ${b}: un gol în minutul 88 strică o seară întreagă.`,
-      (a,b)=>`🔜 ${a} – ${b}: dacă pui 0-0, ai nevoie de curaj sau de noroc cu acte.`,
-      (a,b)=>`🔜 ${a} vs ${b}: cine a pus, a pus. Cine n-a pus — îl doare mai târziu.`,
-    ];
-    const previewTargets=todayOff.length>0?todayOff.slice(0,1):(nextMatch?[nextMatch]:[]);
-    previewTargets.forEach(m=>{
-      push({type:'preview',text:_call(T_PRE,[m.id,'pre'],m.teamA,m.teamB)});
+  // ── Colectez știrile de clasament ca pool, le intercalez mai jos ──────────────
+  const lbItems=[];
+  const pushLb=item=>{if(item)lbItems.push(item);};
+
+  if(n>=2){
+    const L=leaderboard[0],S=leaderboard[1];
+    const gap=L&&S?L.points-S.points:0;
+    const eLast=leaderboard[n-1];
+
+    // Schimbări de rang față de prevLeaderboard
+    if(prevLeaderboard.length>0){
+      leaderboard.forEach(entry=>{
+        if(lbItems.length>=4)return;
+        const prev=prevLeaderboard.find(p=>p.nickname===entry.nickname);if(!prev)return;
+        const delta=prev.rank-entry.rank,nick=entry.nickname;
+        if(entry.rank===1&&prev.rank>1){
+          let text;
+          if(_roll(nick,hourSeed,'mn-lead'))text=_call(T_MAN_LEAD,[nick,hourSeed,'mnl'],nick);
+          else if(gap>=100)text=_call(T_LEAD_HUGE,[nick,gap,'lh'],nick,gap);
+          else if(gap>0&&gap<=30)text=_call(T_LEAD_CLOSE,[nick,gap,'lc'],nick,gap);
+          else text=_call(T_LEAD,[nick,hourSeed,'lead'],nick);
+          pushLb({type:'lead',text});
+        }
+        if(prev.rank===1&&entry.rank>1&&lbItems.length<4){
+          const text=_roll(nick,hourSeed,'mn-fall')?_call(T_MAN_FALL,[nick,hourSeed,'mnf'],nick):`📉 ${nick} a coborât de pe tron. "Ce a fost nu va mai fi."`;
+          pushLb({type:'fall',text});
+        }
+        if(entry.rank<=3&&prev.rank>3&&lbItems.length<4)pushLb({type:'top3',text:`🏅 ${nick} a intrat în Top 3. Podiumul nu mai are loc liber.`});
+        if(entry.rank>3&&prev.rank<=3&&lbItems.length<4)pushLb({type:'top3_exit',text:`📉 ${nick} a ieșit din Top 3. Acum e pe locul ${entry.rank}.`});
+        if(delta>=3&&entry.rank>1&&lbItems.length<4){
+          const text=_roll(nick,hourSeed,'mn-rise')?_call(T_MAN_RISE,[nick,hourSeed,'mnr'],nick):_call(T_UP_BIG,[nick,delta,entry.rank,'ub'],nick,delta,entry.rank);
+          pushLb({type:'rank_up',text});
+        }else if(delta>=2&&entry.rank>1&&lbItems.length<4){
+          pushLb({type:'rank_up',text:_call(T_UP_SMALL,[nick,delta,entry.rank,'us'],nick,delta,entry.rank)});
+        }
+        if(delta<=-3&&lbItems.length<4)pushLb({type:'rank_down',text:_call(T_DOWN_BIG,[nick,Math.abs(delta),entry.rank,'db'],nick,Math.abs(delta),entry.rank)});
+        else if(delta<=-2&&lbItems.length<4)pushLb({type:'rank_down',text:_call(T_DOWN_SMALL,[nick,Math.abs(delta),entry.rank,'ds'],nick,Math.abs(delta),entry.rank)});
+        if(delta===1&&entry.rank>1&&lbItems.length<4){
+          const beaten=prevLeaderboard.find(p=>p.rank===entry.rank);
+          if(beaten)pushLb({type:'rank_up',text:_call(T_MAN_PASSED,[nick,beaten.nickname,'mp'],nick,beaten.nickname)});
+        }
+        const twin=leaderboard.find(e2=>e2.nickname!==entry.nickname&&e2.points===entry.points&&e2.rank===entry.rank);
+        if(twin&&entry.nickname<twin.nickname&&lbItems.length<4)pushLb({type:'equal',text:_call(T_MAN_EQUAL,[nick,twin.nickname,'eq'],nick,twin.nickname)});
+      });
+    }
+
+    // Starea curentă — rotează pe hourSeed între lider/ultimul/runda/top3
+    const stateType=hourSeed%5;
+    // Best of round
+    const roundScores=[];
+    latestFinished.slice(0,1).forEach(match=>{
+      Object.entries(allPredictions).forEach(([uid,up])=>{
+        const p=up[match.id]||up[String(match.id)];if(!p)return;
+        const pts=calcPoints(p,match)||0;
+        if(pts>0)roundScores.push({nick:nickOf(uid),pts,matchName:`${match.teamA} vs ${match.teamB}`});
+      });
     });
+    roundScores.sort((a,b)=>b.pts-a.pts);
+    const topRound=roundScores[0];
+
+    if(stateType===0||lbItems.length===0){
+      // Lider cu manea rotită pe hourSeed
+      const text=_roll(L.nickname,hourSeed,'mn-lhx')
+        ?_call(T_MAN_LEAD,[L.nickname,hourSeed,'lhx'],L.nickname)
+        :gap>=100?_call(T_LEAD_HUGE,[L.nickname,gap,'lhx'],L.nickname,gap)
+        :gap<=25?_call(T_LEAD_CLOSE,[L.nickname,gap,'lc'],L.nickname,gap)
+        :_call(T_LEAD,[L.nickname,hourSeed,'lead2'],L.nickname);
+      pushLb({type:'lead',text});
+    }
+    if(stateType===1&&eLast){
+      // Ultimul loc cu manea
+      const text=_roll(eLast.nickname,hourSeed,'mn-last')
+        ?_call(T_MAN_LAST,[eLast.nickname,hourSeed,'mnl'],eLast.nickname)
+        :`📉 ${eLast.nickname} e pe ultimul loc cu ${eLast.points} puncte. Mai e timp.`;
+      pushLb({type:'rank',text});
+    }
+    if(stateType===2&&topRound){
+      pushLb({type:'round_best',text:`🏆 ${topRound.nick} a luat ${topRound.pts} puncte la ${topRound.matchName}. Etapa lui.`});
+    }
+    if(stateType===3){
+      pushLb({type:'rank',text:`📊 Top 3: ${leaderboard.slice(0,3).map((e,i)=>`${i+1}. ${e.nickname} (${e.points}pts)`).join(' · ')}`});
+    }
+    if(stateType===4&&S){
+      // Cursă strânsă sau locul 2
+      if(gap<=25)pushLb({type:'chase',text:_call(T_GAPCHASE,[L.nickname,S.nickname,hourSeed,'gc'],L.nickname,S.nickname)});
+      else pushLb({type:'rank',text:_roll(S.nickname,hourSeed,'mn-e2')?_call(T_MAN_RISE,[S.nickname,hourSeed,'mnr2'],S.nickname):`🥈 ${S.nickname} pe locul 2 cu ${S.points} puncte. La ${gap} de primul.`});
+    }
+
+    // Dacă tot nu avem nimic, adăugăm default
+    if(lbItems.length===0){
+      pushLb({type:'lead',text:_call(T_LEAD,[L.nickname,hourSeed,'def'],L.nickname)});
+    }
   }
 
-  // ── SLOTS 4-5: PREDICȚII din ultimul meci terminat ───────────────────────────
-  let predSlots=0;
-  for(const match of latestFinished){
-    if(predSlots>=2)break;
+  // ── PREDICȚII din ultimul meci terminat ──────────────────────────────────────
+  const predItems=[];
+  for(const match of latestFinished.slice(0,1)){
     const mName=`${match.teamA} vs ${match.teamB}`;
     const mp=mpreds(match.id,match);
     const exact=mp.filter(p=>p.exact);
@@ -1229,213 +1280,54 @@ export function generateActivityFeed({
     const soloX=mp.filter(p=>p.pOutcome==='X');
     const opposed=mp.filter(p=>p.pOutcome==='1');
     const opposedB=mp.filter(p=>p.pOutcome==='2');
-
-    if(exact.length===1&&predSlots<2){
+    if(exact.length===1){
       const nk=exact[0].nick;
-      const text=_roll(nk,match.id,'mn-ex')
-        ?_call(T_MAN_EXACT,[nk,match.id],nk)
-        :_roll(nk,match.id,'ci-ex')
-          ?_call(T_CITE_EXACT,[nk,match.id],nk)
-          :_call(T_EXACT,[nk,match.id,'ex'],nk,mName);
-      push({type:'exact',text});predSlots++;
-    }else if(exact.length>=2&&predSlots<2){
+      const text=_roll(nk,match.id,'mn-ex')?_call(T_MAN_EXACT,[nk,match.id],nk):_roll(nk,match.id,'ci-ex')?_call(T_CITE_EXACT,[nk,match.id],nk):_call(T_EXACT,[nk,match.id,'ex'],nk,mName);
+      predItems.push({type:'exact',text});
+    }else if(exact.length>=2){
       const names=exact.slice(0,3).map(e=>e.nick).join(' și ');
-      push({type:'exact',text:_call(T_EXACT_MULTI,[names,match.id],names,mName)});predSlots++;
-    }else if(opposed.length>=1&&opposedB.length>=1&&predSlots<2){
-      const nA=opposed[0].nick,nB=opposedB[0].nick;
-      push({type:'banter',text:`🎯 ${nA} a pus ${match.teamA}, ${nB} a pus ${match.teamB}. Fotbalul a ales — și cineva a avut dreptate.`});
-      predSlots++;
-    }else if(soloX.length===1&&mp.length>=3&&predSlots<2){
-      push({type:'banter',text:_call(T_MAN_DRAW,[soloX[0].nick,match.id],soloX[0].nick)});predSlots++;
+      predItems.push({type:'exact',text:_call(T_EXACT_MULTI,[names,match.id],names,mName)});
+    }else if(opposed.length>=1&&opposedB.length>=1){
+      predItems.push({type:'banter',text:`🎯 ${opposed[0].nick} a pus ${match.teamA}, ${opposedB[0].nick} a pus ${match.teamB}. Fotbalul a ales.`});
+    }else if(soloX.length===1&&mp.length>=3){
+      predItems.push({type:'banter',text:_call(T_MAN_DRAW,[soloX[0].nick,match.id],soloX[0].nick)});
     }
-    if(zeroes.length===1&&predSlots<2){
+    if(zeroes.length===1){
       const nk=zeroes[0].nick;
-      const text=_roll(nk,match.id,'mn-z')
-        ?_call(T_MAN_ZERO,[nk,match.id],nk)
-        :_roll(nk,match.id,'ci-z')
-          ?_call(T_CITE_ZERO,[nk,match.id],nk)
-          :_call(T_ZERO,[zeroes[0].uid,match.id,'z'],nk,mName);
-      push({type:'miss',text});predSlots++;
+      const text=_roll(nk,match.id,'mn-z')?_call(T_MAN_ZERO,[nk,match.id],nk):_roll(nk,match.id,'ci-z')?_call(T_CITE_ZERO,[nk,match.id],nk):_call(T_ZERO,[zeroes[0].uid,match.id,'z'],nk,mName);
+      predItems.push({type:'miss',text});
     }
-    if(mp.length>=3&&mp.filter(p=>p.ok).length===0&&predSlots<2){
-      push({type:'upset',text:`⚡ ${mName}: niciun jucător n-a prezis rezultatul. Fotbalul a câștigat runda singur.`});predSlots++;
-    }
+    if(mp.length>=3&&mp.filter(p=>p.ok).length===0)predItems.push({type:'upset',text:`⚡ ${mName}: niciun jucător n-a prezis rezultatul. Fotbalul a câștigat runda singur.`});
   }
 
-  // ── SLOTS 6-9: curiozități + citate (intercalate) PRIMA rundă ────────────────
-  pushCurQuotePair(hourSeed%1000);
+  // ── STRUCTURA FINALĂ: intercalat curiozitate→citat→lb/pred→curiozitate→citat→lb/pred ──
+  // Adaug prima știre de predicție/meci recent
+  if(predItems.length>0)push(predItems.shift());
 
-  // ── SLOTS 8-9: CLASAMENT ──────────────────────────────────────────────────────
-  let lbAdded=0;
-  if(n>=2){
-    const L=leaderboard[0],S=leaderboard[1];
-    const gap=L&&S?L.points-S.points:0;
+  // Runda 1: curiozitate → citat → clasament
+  const c1=curiosities.shift();if(c1)push(c1);
+  const q1=nextStandalone(hourSeed*3);if(q1)push(q1);
+  if(lbItems.length>0)push(lbItems.shift());
 
-    // Schimbări de rang față de prevLeaderboard
-    if(prevLeaderboard.length>0){
-      leaderboard.forEach(entry=>{
-        if(lbAdded>=2)return;
-        const prev=prevLeaderboard.find(p=>p.nickname===entry.nickname);if(!prev)return;
-        const delta=prev.rank-entry.rank,nick=entry.nickname;
-        // Lider nou
-        if(entry.rank===1&&prev.rank>1){
-          let text;
-          if(_roll(nick,'mn-lead'))text=_call(T_MAN_LEAD,[nick,'mnl'],nick);
-          else if(gap>=100)text=_call(T_LEAD_HUGE,[nick,gap,'lh'],nick,gap);
-          else if(gap>0&&gap<=30)text=_call(T_LEAD_CLOSE,[nick,gap,'lc'],nick,gap);
-          else text=_call(T_LEAD,[nick,'lead'],nick);
-          push({type:'lead',text});lbAdded++;
-        }
-        // Cădere de pe tron
-        if(prev.rank===1&&entry.rank>1&&lbAdded<2){
-          const text=_roll(nick,'mn-fall')
-            ?_call(T_MAN_FALL,[nick,'mnf'],nick)
-            :`📉 ${nick} a coborât de pe tron. "Ce a fost nu va mai fi."`;
-          push({type:'fall',text});lbAdded++;
-        }
-        // Intrare top 3
-        if(entry.rank<=3&&prev.rank>3&&lbAdded<2){
-          push({type:'top3',text:`🏅 ${nick} a intrat în Top 3. Podiumul nu mai are loc liber.`});lbAdded++;
-        }
-        // Ieșire top 3
-        if(entry.rank>3&&prev.rank<=3&&lbAdded<2){
-          push({type:'top3_exit',text:`📉 ${nick} a ieșit din Top 3. Acum e pe locul ${entry.rank}.`});lbAdded++;
-        }
-        // Urcare mare
-        if(delta>=3&&entry.rank>1&&lbAdded<2){
-          const text=_roll(nick,'mn-rise')
-            ?_call(T_MAN_RISE,[nick,delta,'mnr'],nick)
-            :_roll(nick,'ci-rise')
-              ?_call(T_CITE_RISE,[nick,'cir'],nick)
-              :_call(T_UP_BIG,[nick,delta,entry.rank,'ub'],nick,delta,entry.rank);
-          push({type:'rank_up',text});lbAdded++;
-        }else if(delta>=2&&entry.rank>1&&lbAdded<2){
-          push({type:'rank_up',text:_call(T_UP_SMALL,[nick,delta,entry.rank,'us'],nick,delta,entry.rank)});lbAdded++;
-        }
-        // Coborâre mare
-        if(delta<=-3&&lbAdded<2){
-          push({type:'rank_down',text:_call(T_DOWN_BIG,[nick,Math.abs(delta),entry.rank,'db'],nick,Math.abs(delta),entry.rank)});lbAdded++;
-        }else if(delta<=-2&&lbAdded<2){
-          push({type:'rank_down',text:_call(T_DOWN_SMALL,[nick,Math.abs(delta),entry.rank,'ds'],nick,Math.abs(delta),entry.rank)});lbAdded++;
-        }
-        // Depășire la limită (1 punct)
-        if(delta===1&&entry.rank>1&&lbAdded<2){
-          const beaten=prevLeaderboard.find(p=>p.rank===entry.rank);
-          if(beaten){
-            push({type:'rank_up',text:_call(T_MAN_PASSED,[nick,beaten.nickname,'mp'],nick,beaten.nickname)});lbAdded++;
-          }
-        }
-        // Doi jucători la același punctaj
-        const twin=leaderboard.find(e2=>e2.nickname!==entry.nickname&&e2.points===entry.points&&e2.rank===entry.rank);
-        if(twin&&entry.nickname<twin.nickname&&lbAdded<2){
-          push({type:'equal',text:_call(T_MAN_EQUAL,[nick,twin.nickname,'eq'],nick,twin.nickname)});lbAdded++;
-        }
-      });
-    }
+  // A doua știre predicție dacă există
+  if(predItems.length>0)push(predItems.shift());
 
-    // Starea curentă — apare mereu indiferent de prevLeaderboard
-    if(lbAdded<2&&L&&S){
-      // Lider detașat
-      if(gap>=100){
-        const text=_roll(L.nickname,hourSeed,'mn-lhx')
-          ?_call(T_MAN_LEAD,[L.nickname,hourSeed,'lhx'],L.nickname)
-          :_call(T_LEAD_HUGE,[L.nickname,gap,'lhx'],L.nickname,gap);
-        push({type:'lead',text});lbAdded++;
-      }
-      // Cursă strânsă
-      else if(gap>0&&gap<=25){
-        const text=_roll(L.nickname,S.nickname,hourSeed,'ci-close')
-          ?_call(T_CITE_CLOSE,[L.nickname,S.nickname,hourSeed,'cl'],L.nickname,S.nickname)
-          :_call(T_GAPCHASE,[L.nickname,S.nickname,hourSeed,'gc'],L.nickname,S.nickname);
-        push({type:'chase',text});lbAdded++;
-      }
-      // Lider normal
-      else if(lbAdded<1){
-        const text=_roll(L.nickname,hourSeed,'mn-lead2')
-          ?_call(T_MAN_LEAD,[L.nickname,hourSeed,'mnl2'],L.nickname)
-          :_call(T_LEAD,[L.nickname,hourSeed,'lead2'],L.nickname);
-        push({type:'lead',text});lbAdded++;
-      }
-    }
-    // Starea curentă — apare mereu indiferent de prevLeaderboard
-    if(lbAdded<2&&L&&S){
-      // Lider detașat
-      if(gap>=100){
-        const text=_roll(L.nickname,hourSeed,'mn-lhx')
-          ?_call(T_MAN_LEAD,[L.nickname,hourSeed,'lhx'],L.nickname)
-          :_call(T_LEAD_HUGE,[L.nickname,gap,'lhx'],L.nickname,gap);
-        push({type:'lead',text});lbAdded++;
-      }
-      // Cursă strânsă
-      else if(gap>0&&gap<=25){
-        const text=_roll(L.nickname,S.nickname,hourSeed,'ci-close')
-          ?_call(T_CITE_CLOSE,[L.nickname,S.nickname,hourSeed,'cl'],L.nickname,S.nickname)
-          :_call(T_GAPCHASE,[L.nickname,S.nickname,hourSeed,'gc'],L.nickname,S.nickname);
-        push({type:'chase',text});lbAdded++;
-      }
-      // Lider normal
-      else{
-        const text=_roll(L.nickname,hourSeed,'mn-lead2')
-          ?_call(T_MAN_LEAD,[L.nickname,hourSeed,'mnl2'],L.nickname)
-          :_call(T_LEAD,[L.nickname,hourSeed,'lead2'],L.nickname);
-        push({type:'lead',text});lbAdded++;
-      }
-    }
+  // Runda 2: curiozitate → citat → clasament
+  const c2=curiosities.shift();if(c2)push(c2);
+  const q2=nextStandalone(hourSeed*3+1);if(q2)push(q2);
+  if(lbItems.length>0)push(lbItems.shift());
 
-    // FIX 3+4: Al doilea slot — rotează între mai multe tipuri bazat pe hourSeed
-    if(lbAdded<2&&n>=2){
-      const slotType=hourSeed%6;
-      const e2=leaderboard[1];
-      const e3=leaderboard[2];
-      const eLast=leaderboard[n-1];
-      const eSecLast=n>=2?leaderboard[n-2]:null;
+  // A treia știre predicție/upset
+  if(predItems.length>0)push(predItems.shift());
 
-      // FIX 5: Best of round — jucătorul cu cele mai multe puncte din ultimul meci
-      const roundScores=[];
-      latestFinished.slice(0,1).forEach(match=>{
-        Object.entries(allPredictions).forEach(([uid,up])=>{
-          const p=up[match.id]||up[String(match.id)];if(!p)return;
-          const pts=calcPoints(p,match)||0;
-          if(pts>0)roundScores.push({nick:nickOf(uid),pts,matchName:`${match.teamA} vs ${match.teamB}`});
-        });
-      });
-      roundScores.sort((a,b)=>b.pts-a.pts);
-      const topRound=roundScores[0];
+  // Runda 3: curiozitate → citat → clasament
+  const c3=curiosities.shift();if(c3)push(c3);
+  const q3=nextStandalone(hourSeed*3+2);if(q3)push(q3);
+  if(lbItems.length>0)push(lbItems.shift());
 
-      if(slotType===0&&topRound&&topRound.pts>=100){
-        push({type:'round_best',text:`🏆 ${topRound.nick} a luat ${topRound.pts} puncte la ${topRound.matchName}. Etapa lui.`});lbAdded++;
-      }else if(slotType===1&&e3&&e2.points-e3.points<=20){
-        push({type:'chase',text:_call(T_GAPCHASE,[e2.nickname,e3.nickname,hourSeed,'gc23'],e2.nickname,e3.nickname)});lbAdded++;
-      }else if(slotType===2&&eLast){
-        const text=_roll(eLast.nickname,hourSeed,'mn-last')
-          ?_call(T_MAN_LAST,[eLast.nickname,hourSeed,'mnl'],eLast.nickname)
-          :`📉 ${eLast.nickname} e ultimul cu ${eLast.points} puncte. Mai e timp.`;
-        push({type:'rank',text});lbAdded++;
-      }else if(slotType===3&&topRound){
-        push({type:'round_best',text:`⚡ ${topRound.nick}: ${topRound.pts} puncte din ultimul meci. Cel mai bun din grupul ăsta azi.`});lbAdded++;
-      }else if(slotType===4&&e2){
-        // FIX 4: locul 2 cu manea sau citat
-        const text=_roll(e2.nickname,hourSeed,'mn-e2')
-          ?_call(T_MAN_RISE,[e2.nickname,hourSeed,'mnr2'],e2.nickname)
-          :`🥈 ${e2.nickname} pe locul 2 cu ${e2.points} puncte. La ${gap} de primul.`;
-        push({type:'rank',text});lbAdded++;
-      }else{
-        // Default: top 3 clasament
-        push({type:'rank',text:`📊 Top 3: ${leaderboard.slice(0,3).map((e,i)=>`${i+1}. ${e.nickname} (${e.points}pts)`).join(' · ')}`});lbAdded++;
-      }
-    }
-  } // end if(n>=2)
-
-  // ── SLOTS 10-13: 2 curiozități + 2 citate (intercalate) A DOUA rundă ─────────
-  pushCurQuotePair((Date.now()%1000)+500);
-
-  // ── SLOT pentru preview meci următor ─────────────────────────────────────────
-  // ── SLOTS finale: curiozități + citate (intercalate) ────────────────────────
-  pushCurQuotePair((Date.now()%1000)+1000);
-
-  // ── DRAMA de meci (dacă mai e loc) ───────────────────────────────────────────
+  // Completez cu drama de meci dacă mai e loc
   for(const match of latestFinished){
-    if(result.length>=18)break;
+    if(result.length>=12)break;
     const mName=`${match.teamA} vs ${match.teamB}`;
     const sA=Number(match.realScoreA??0),sB=Number(match.realScoreB??0);
     const rCards=match.realPossession!=null?Number(match.realPossession):null;
@@ -1444,15 +1336,15 @@ export function generateActivityFeed({
     const rCornA=match.realAwayCorners!=null?Number(match.realAwayCorners):null;
     const corners=rCornT??(rCornH!=null&&rCornA!=null?rCornH+rCornA:null);
     const items=_matchDrama(mName,sA,sB,match.homeScorers,match.awayScorers,rCards??0,corners??0,match.id);
-    items.forEach(text=>push({type:'match_drama',text}));
+    items.forEach(text=>{if(result.length<12)push({type:'match_drama',text});});
   }
 
-  // Deduplicate by text
+  // Deduplicate by text and return 12 items
   const seen=new Set();
   return result
     .filter(e=>{if(!e||!e.text)return false;if(seen.has(e.text))return false;seen.add(e.text);return true;})
-    .slice(0,20)
-    .map((e,i)=>({id:`feed_${Date.now()}_${i}`,type:e.type,icon:'',text:e.text,ts:Date.now(),priority:20-i}));
+    .slice(0,12)
+    .map((e,i)=>({id:`feed_${Date.now()}_${i}`,type:e.type,icon:'',text:e.text,ts:Date.now(),priority:12-i}));
 }
 
 
