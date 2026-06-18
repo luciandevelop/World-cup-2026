@@ -1098,12 +1098,14 @@ export function generateActivityFeed({
   };
 
   // ── Collect curiosities (country facts) for pattern slots ────────────────────
+  // Seed includes current hour so facts rotate every hour, not stuck on same one
+  const hourSeed=Math.floor(Date.now()/3600000);
   const curiosities=[];
   const usedCurTeams=new Set();
   const addCur=(team,seed)=>{
     const canon=_n14(team);
     if(usedCurTeams.has(canon))return;
-    const f=ctxFact(team,seed);
+    const f=ctxFact(team,seed+hourSeed);
     if(f){curiosities.push({type:'curiosity',text:`🌍 ${f}`});usedCurTeams.add(canon);}
   };
   liveMatches.forEach(m=>{addCur(m.teamA,m.id);addCur(m.teamB,m.id+50);});
@@ -1115,8 +1117,9 @@ export function generateActivityFeed({
   const standalonePool=T_CITE_STANDALONE.slice();
   const seenStandalone=new Set();
   const nextStandalone=(seed)=>{
-    const idx=Math.abs(seed)%standalonePool.length;
-    const shifted=standalonePool.slice(idx).concat(standalonePool.slice(0,idx));
+    // Rotate based on hourSeed + local seed so different quotes appear each hour
+    const startIdx=(hourSeed*7+Math.abs(seed))%standalonePool.length;
+    const shifted=standalonePool.slice(startIdx).concat(standalonePool.slice(0,startIdx));
     for(const s of shifted){if(!seenStandalone.has(s)){seenStandalone.add(s);return{type:'quote',text:s};}}
     return{type:'quote',text:shifted[0]};
   };
@@ -1141,16 +1144,20 @@ export function generateActivityFeed({
     const sA=m.realScoreA??0,sB=m.realScoreB??0;
     const min=m.liveMinute??45;
     const sc=m.homeScorers?m.homeScorers.split(',')[0].trim():'';
-    let text;
+    let funny;
     if(sA>sB){
-      text=_call(T_LIVE_FUNNY_HOME,[m.id,'lh'],m.teamA,m.teamB,sA-sB,min);
+      funny=_call(T_LIVE_FUNNY_HOME,[m.id,'lh'],m.teamA,m.teamB,sA-sB,min);
     }else if(sB>sA){
-      text=_call(T_LIVE_FUNNY_AWAY,[m.id,'la'],m.teamA,m.teamB,sB-sA,min);
+      funny=_call(T_LIVE_FUNNY_AWAY,[m.id,'la'],m.teamA,m.teamB,sB-sA,min);
     }else{
-      text=_call(T_LIVE_FUNNY_DRAW,[m.id,'ld'],m.teamA,m.teamB,min);
+      funny=_call(T_LIVE_FUNNY_DRAW,[m.id,'ld'],m.teamA,m.teamB,min);
     }
-    if(sc)text+=` ⚽ ${sc}.`;
-    push({type:'live',text});
+    // Always include scorers if available
+    const scorersPart=[];
+    if(m.homeScorers)scorersPart.push(`⚽ ${m.teamA}: ${m.homeScorers}`);
+    if(m.awayScorers)scorersPart.push(`⚽ ${m.teamB}: ${m.awayScorers}`);
+    const scorersText=scorersPart.length?` (${scorersPart.join(' · ')})`:'';
+    push({type:'live',text:`${funny}${scorersText}`});
   });
 
   // ── SLOTS 2-3: PREDICȚII din meciurile recente ────────────────────────────────
@@ -1217,21 +1224,7 @@ export function generateActivityFeed({
     const L=leaderboard[0],S=leaderboard[1];
     const gap=L&&S?L.points-S.points:0;
 
-    // Lider detașat fără schimbare de rang (permanent)
-    if(lbAdded<2&&gap>=150){
-      const text=_roll(L.nickname,'mn-lhx')
-        ?_call(T_MAN_LEAD,[L.nickname,'lhx'],L.nickname)
-        :_call(T_LEAD_HUGE,[L.nickname,gap,'lhx'],L.nickname,gap);
-      push({type:'lead',text});lbAdded++;
-    }
-    // Cursă strânsă (permanent)
-    else if(lbAdded<2&&gap>0&&gap<=20){
-      const text=_roll(L.nickname,S.nickname,'ci-close')
-        ?_call(T_CITE_CLOSE,[L.nickname,S.nickname,'cl'],L.nickname,S.nickname)
-        :_call(T_GAPCHASE,[L.nickname,S.nickname,'gc'],L.nickname,S.nickname);
-      push({type:'chase',text});lbAdded++;
-    }
-
+    // Schimbări de rang față de prevLeaderboard
     if(prevLeaderboard.length>0){
       leaderboard.forEach(entry=>{
         if(lbAdded>=2)return;
@@ -1239,11 +1232,10 @@ export function generateActivityFeed({
         const delta=prev.rank-entry.rank,nick=entry.nickname;
         // Lider nou
         if(entry.rank===1&&prev.rank>1){
-          const gapNow=S?entry.points-S.points:0;
           let text;
           if(_roll(nick,'mn-lead'))text=_call(T_MAN_LEAD,[nick,'mnl'],nick);
-          else if(gapNow>=100)text=_call(T_LEAD_HUGE,[nick,gapNow,'lh'],nick,gapNow);
-          else if(gapNow>0&&gapNow<=30)text=_call(T_LEAD_CLOSE,[nick,gapNow,'lc'],nick,gapNow);
+          else if(gap>=100)text=_call(T_LEAD_HUGE,[nick,gap,'lh'],nick,gap);
+          else if(gap>0&&gap<=30)text=_call(T_LEAD_CLOSE,[nick,gap,'lc'],nick,gap);
           else text=_call(T_LEAD,[nick,'lead'],nick);
           push({type:'lead',text});lbAdded++;
         }
@@ -1283,8 +1275,7 @@ export function generateActivityFeed({
         if(delta===1&&entry.rank>1&&lbAdded<2){
           const beaten=prevLeaderboard.find(p=>p.rank===entry.rank);
           if(beaten){
-            const text=_call(T_MAN_PASSED,[nick,beaten.nickname,'mp'],nick,beaten.nickname);
-            push({type:'rank_up',text});lbAdded++;
+            push({type:'rank_up',text:_call(T_MAN_PASSED,[nick,beaten.nickname,'mp'],nick,beaten.nickname)});lbAdded++;
           }
         }
         // Doi jucători la același punctaj
@@ -1293,6 +1284,41 @@ export function generateActivityFeed({
           push({type:'equal',text:_call(T_MAN_EQUAL,[nick,twin.nickname,'eq'],nick,twin.nickname)});lbAdded++;
         }
       });
+    }
+
+    // Starea curentă — apare mereu indiferent de prevLeaderboard
+    if(lbAdded<2&&L&&S){
+      // Lider detașat
+      if(gap>=100){
+        const text=_roll(L.nickname,hourSeed,'mn-lhx')
+          ?_call(T_MAN_LEAD,[L.nickname,hourSeed,'lhx'],L.nickname)
+          :_call(T_LEAD_HUGE,[L.nickname,gap,'lhx'],L.nickname,gap);
+        push({type:'lead',text});lbAdded++;
+      }
+      // Cursă strânsă
+      else if(gap>0&&gap<=25){
+        const text=_roll(L.nickname,S.nickname,hourSeed,'ci-close')
+          ?_call(T_CITE_CLOSE,[L.nickname,S.nickname,hourSeed,'cl'],L.nickname,S.nickname)
+          :_call(T_GAPCHASE,[L.nickname,S.nickname,hourSeed,'gc'],L.nickname,S.nickname);
+        push({type:'chase',text});lbAdded++;
+      }
+      // Lider normal
+      else if(lbAdded<1){
+        const text=_roll(L.nickname,hourSeed,'mn-lead2')
+          ?_call(T_MAN_LEAD,[L.nickname,hourSeed,'mnl2'],L.nickname)
+          :_call(T_LEAD,[L.nickname,hourSeed,'lead2'],L.nickname);
+        push({type:'lead',text});lbAdded++;
+      }
+    }
+    // Al doilea slot — locul 2 sau 3
+    if(lbAdded<2&&leaderboard[1]){
+      const e2=leaderboard[1];
+      const e3=leaderboard[2];
+      if(e3&&e2.points-e3.points<=15){
+        push({type:'chase',text:_call(T_GAPCHASE,[e2.nickname,e3.nickname,hourSeed,'gc23'],e2.nickname,e3.nickname)});lbAdded++;
+      }else{
+        push({type:'rank',text:`📊 Top 3: ${leaderboard.slice(0,3).map((e,i)=>`${i+1}. ${e.nickname} (${e.points}pts)`).join(' · ')}`});lbAdded++;
+      }
     }
   }
 
