@@ -385,7 +385,7 @@ const CUR14={
   "Belgia":["Belgia a stat 3 ani pe locul 1 FIFA. Titlu major luat în acea perioadă: zero. Dosar de deschis.","Belgia a stat 541 de zile fără guvern. Fotbalul a mers tot timpul. Țara — mai cu emoții.","Belgia a bătut Brazilia în sferturi la CM 2018. Generația de aur s-a justificat o singură dată.","De Bruyne a fost cel mai bun pasator din lume 4 ani la rând. Pase bune, finaluri rele.","Belgia scoate 750 de tipuri de bere. Bere câte beri, trofee — altă poveste.","Ciocolata belgiană e standard mondial. Și fotbalul belgian, din ce în ce mai aproape de standard.","Bruxelles e capitala UE. Și a birocrației. Și a generației de aur fără trofee.","Belgia e mai mică decât județul Timiș. Și totuși produce fotbaliști pentru toate marile cluburi."],
   "Bosnia":["Bosnia a fost la primul Mondial în 2014. Džeko a marcat la primul meci. Fotbalul n-a stat la coadă.","Bosnia are 3 președinți în rotație. Mai complicat decât orice apărare din zonă.","Zlatan Ibrahimović are origini bosniace pe linie paternă. Baza genetică explică parțial atitudinea.","Edin Džeko a marcat 66 de goluri pentru Bosnia. Cel mai prolific jucător din istoria țării.","Sarajevo a organizat JO de iarnă în \'84 și a supraviețuit unui asediu de 4 ani după. Rezistența e în ADN.","Bosnia are cafea pregătită în stil turcesc — džezva — și se bea lent, cu povești.","Podul Vechi din Mostar a rezistat 400 de ani, a fost distrus în \'93, reconstruit în 2004. Ca fotbalul bosniac."],
   "Brazilia":["Brazilia are 5 Mondiale. Unele naționale încă încearcă să ajungă la primul.","7-1 cu Germania în 2014, pe teren propriu. N-au înțeles ce se întâmplă la timp.","Pelé a luat 3 Mondiale la 17, 21 și 29 de ani. Altcineva n-a mai zis asta.","Brazilia e singura echipă care a jucat la fiecare ediție a Cupei Mondiale. 22 din 22.","Amazon produce 20% din oxigenul planetei. Brazilia produce fotbaliști pentru toată lumea.","Rio de Janeiro a găzduit CM 2014 și JO 2016. Carnavalul, toată viața.","Caipirinha e mai periculoasă decât pare. La fel ca echipa la CM.","Brazilia are mai multe specii de animale decât orice altă țară. Și mai mulți golghetereri."],
-  "Canada":["Canada are mai multe lacuri decât restul lumii la un loc. Apa nu-i problema lor.","Davies s-a născut în tabără de refugiați, a crescut în Canada, valorează 70 de milioane la Bayern.","Canada n-a marcat niciun gol la CM \'86. La CM 2022 a dat mai bine. Progres real.","Canada are a doua cea mai mare suprafață din lume. Și cel mai puțin zgomotoasă.","Poutine e mâncarea națională canadiană: cartofi prăjiți, brânză și sos. Și fotbal din ce în ce mai bun.","Toronto e unul din cele mai multiculturale orașe din lume — 200 de limbi vorbite zilnic.","Jonathan David e golgheterul din Ligue 1 de mai mulți ani. Francezii l-ar vrea, canadienii îl au."],
+  "Canada":["Canada are mai multe lacuri decât restul lumii la un loc. Apa nu-i problema lor.","Davies, fundaș la naționala Canadei, s-a născut în tabără de refugiați și valorează 70 de milioane la Bayern.","Canada n-a marcat niciun gol la CM \'86. La CM 2022 a dat mai bine. Progres real.","Canada are a doua cea mai mare suprafață din lume. Și cel mai puțin zgomotoasă.","Poutine e mâncarea națională canadiană: cartofi prăjiți, brânză și sos. Și fotbal din ce în ce mai bun.","Toronto e unul din cele mai multiculturale orașe din lume — 200 de limbi vorbite zilnic.","Jonathan David e golgheterul din Ligue 1 de mai mulți ani. Francezii l-ar vrea, canadienii îl au."],
   "Capul Verde":["În Capul Verde sunt mai mulți capverdieni în afara țării decât în țară.","Capul Verde nu are râuri permanente. Zero. Și totuși au pus echipă pe teren.","Capul Verde a eliminat Maroc la CAN 2021. Favoritul clar. Surpriza turneului.","Muzica Morna din Capul Verde e UNESCO — melancolie de om departe de casă. La fel ca jucătorii lor.","Capul Verde e format din 10 insule vulcanice în Oceanul Atlantic. Mici, dar cu voință mare.","Vântul bate constant în Capul Verde. Mingea zboară altfel acolo — avantaj local.","Cea mai faimoasă capverdiană e Cesária Évora, cântăreața de Morna. Fotbalul e al doilea export cultural."],
   "Cehia":["Panenka a inventat lovitura cu chip la Euro \'76, contra lui Sepp Maier. Faimă eternă dintr-o secundă de curaj.","Cehia bea mai multă bere decât orice altă țară. Prioritățile, clare.","Petr Čech a purtat cască de hochei toată cariera după o fractură de craniu. Cel mai recognoscibil portar din epocă.","Praga e numită Orașul de Aur. 700 de ani de arhitectură medievală pe un singur mal de râu.","Kafka s-a născut la Praga. A scris despre absurd. Un meci de fotbal ceh conține uneori exact asta.","Cehia produce Pilsner Urquell — berea originală de tip pils. Exportul lor cel mai valoros.","Pavel Nedvěd a luat Balonul de Aur în 2003. Singurul ceh care a ajuns acolo.","Cehia are mai mult de 3.000 de castele. Mai multe decât orice altă țară din lume."],
   "Coasta de Fildes":["Drogba a negociat un armistițiu în războiul civil de acasă. Fotbalul a oprit un conflict. Mă, la propriu.","Coasta de Fildes scoate 40% din cacaoul mondial. Ciocolata din toată lumea are rădăcini acolo.","Didier Drogba a marcat 65 de goluri pentru Coasta de Fildeș. Legendă națională, nu doar fotbalistică.","Yaya Touré a luat Premier League, La Liga și CAN. Trei titluri, trei continente diferite.","Abidjan e cel mai mare oraș francofon din Africa de Vest. Cosmopolit, vivace, fotbalist.","Coasta de Fildeș are două capitale: Yamoussoukro (oficial) și Abidjan (real). Ca în fotbal — ce scrie pe hârtie și ce e pe teren.","Coasta de Fildeș are cea mai mare basilică din lume ca dimensiuni. Ambițioși la orice."],
@@ -933,10 +933,10 @@ const T_LIVE_FUNNY_AWAY=[
   (a,b,d,min)=>`🔴 ${b} ${d}-0 ${a} la ${min}'. Oaspeții au venit cu treaba făcută.`,
 ];
 const T_LIVE_FUNNY_DRAW=[
-  (a,b,min)=>`🔴 ${a} – ${b}: 0-0 la ${min}'. Dacă rămâne egal, jumătate din grup o să zică că a știut.`,
-  (a,b,min)=>`🔴 ${a} – ${b}: egal la ${min}'. Portarii muncesc. Atacanții, mai puțin.`,
-  (a,b,min)=>`🔴 ${a} 0-0 ${b} · ${min}' — Cineva din grup a pus X cu inima. Stă și respiră rar.`,
-  (a,b,min)=>`🔴 ${a} și ${b} se respectă prea mult la ${min}'. Tot 0-0.`,
+  (a,b,min)=>`🔴 ${a} – ${b}: 0-0 la ${min}'. Fotbalul există, golurile — mai puțin.`,
+  (a,b,min)=>`🔴 ${a} 0-0 ${b} · ${min}' — Portarii muncesc. Atacanții, mai puțin.`,
+  (a,b,min)=>`🔴 ${a} – ${b}: egal la ${min}'. Cel care a pus 0-0 stă calm și tace.`,
+  (a,b,min)=>`🔴 ${a} 0-0 ${b} la ${min}'. Mingea a atins bara de 2 ori și a rămas afară.`,
 ];
 
 
@@ -1137,19 +1137,54 @@ export function generateActivityFeed({
   const result=[];
   const push=item=>{if(item&&result.length<24)result.push(item);};// allow more, trim at end
 
-  // ── SLOT 1: LIVE cu scor + mesaj funny ───────────────────────────────────────
+  // ── SLOT 1: LIVE cu scor + legătură reală cu predicțiile jucătorilor ─────────
   liveMatches.slice(0,1).forEach(m=>{
     const sA=m.realScoreA??0,sB=m.realScoreB??0;
     const min=m.liveMinute??45;
-    let funny;
-    if(sA>sB)funny=_call(T_LIVE_FUNNY_HOME,[m.id,'lh'],m.teamA,m.teamB,sA-sB,min);
-    else if(sB>sA)funny=_call(T_LIVE_FUNNY_AWAY,[m.id,'la'],m.teamA,m.teamB,sB-sA,min);
-    else funny=_call(T_LIVE_FUNNY_DRAW,[m.id,'ld'],m.teamA,m.teamB,min);
     const scorersPart=[];
     if(m.homeScorers)scorersPart.push(`⚽ ${m.teamA}: ${m.homeScorers}`);
     if(m.awayScorers)scorersPart.push(`⚽ ${m.teamB}: ${m.awayScorers}`);
     const scorersText=scorersPart.length?` (${scorersPart.join(' · ')})`:'';
-    push({type:'live',text:`${funny}${scorersText}`});
+    const baseScore=`🔴 ${m.teamA} ${sA}-${sB} ${m.teamB} · ${min}'${scorersText}`;
+
+    // Predicțiile reale făcute pe acest meci
+    const preds=Object.entries(allPredictions)
+      .filter(([,up])=>up[m.id]||up[String(m.id)])
+      .map(([uid,up])=>{const p=up[m.id]||up[String(m.id)];return{nick:nickOf(uid),pA:Number(p.scoreA),pB:Number(p.scoreB)};});
+
+    if(preds.length===0){
+      push({type:'live',text:baseScore});return;
+    }
+
+    // Cine a nimerit exact scorul curent (live)
+    const exactNow=preds.filter(p=>p.pA===sA&&p.pB===sB);
+    if(exactNow.length>0){
+      const names=exactNow.map(p=>p.nick).join(' și ');
+      push({type:'live',text:`${baseScore} — ${names} ${exactNow.length>1?'au':'a'} pus exact scorul ăsta. Pe bune.`});
+      return;
+    }
+
+    // Cine e cel mai apropiat de scorul curent (distanță minimă)
+    const withDist=preds.map(p=>({...p,dist:Math.abs(p.pA-sA)+Math.abs(p.pB-sB)}));
+    withDist.sort((a,b)=>a.dist-b.dist);
+    const closest=withDist[0];
+    if(closest&&closest.dist<=1){
+      push({type:'live',text:`${baseScore} — ${closest.nick} a pus ${closest.pA}-${closest.pB}. Aproape, dacă rămâne așa.`});
+      return;
+    }
+
+    // Câți au pus exact rezultatul curent (1/X/2) chiar dacă nu scorul exact
+    const curOutcome=sA>sB?'1':sA<sB?'2':'X';
+    const onTrack=preds.filter(p=>{const po=p.pA>p.pB?'1':p.pA<p.pB?'2':'X';return po===curOutcome;});
+    if(onTrack.length>0&&onTrack.length<preds.length){
+      push({type:'live',text:`${baseScore} — ${onTrack.length} din ${preds.length} sunt pe direcția corectă acum.`});
+      return;
+    }
+    if(onTrack.length===0){
+      push({type:'live',text:`${baseScore} — Niciunul din grup nu e pe direcția asta. Toți recalculează.`});
+      return;
+    }
+    push({type:'live',text:baseScore});
   });
 
   // ── SLOT 2: post despre meciul următor — DOAR dacă e ceva interesant ─────────
@@ -1277,6 +1312,13 @@ export function generateActivityFeed({
   }
 
   // ── PREDICȚII din ultimele 3 meciuri terminate ───────────────────────────────
+  const T_UPSET=[
+    m=>`⚡ ${m}: nimeni n-a nimerit. Fotbalul a ignorat complet toate predicțiile.`,
+    m=>`⚡ ${m}: scor neprezis de nimeni. Ăsta e fotbalul — îți spune că nu știi nimic.`,
+    m=>`⚡ ${m}: toți au greșit. Uneori meciul face ce vrea, fără să întrebe pe nimeni.`,
+    m=>`⚡ ${m}: zero predicții corecte. Se întâmplă — fotbalul nu citește foaia de pronosticuri.`,
+    m=>`⚡ ${m}: nimeni n-a ghicit rezultatul. Grupul întreg a pierdut runda asta cu fotbalul.`,
+  ];
   const predItems=[];
   for(const match of latestFinished.slice(0,3)){
     if(predItems.length>=4)break;
@@ -1304,7 +1346,9 @@ export function generateActivityFeed({
       const text=_roll(nk,match.id,'mn-z')?_call(T_MAN_ZERO,[nk,match.id],nk):_roll(nk,match.id,'ci-z')?_call(T_CITE_ZERO,[nk,match.id],nk):_call(T_ZERO,[zeroes[0].uid,match.id,'z'],nk,mName);
       predItems.push({type:'miss',text});
     }
-    if(mp.length>=3&&mp.filter(p=>p.ok).length===0&&predItems.length<4)predItems.push({type:'upset',text:`⚡ ${mName}: niciun jucător n-a prezis rezultatul. Fotbalul a câștigat runda singur.`});
+    if(mp.length>=3&&mp.filter(p=>p.ok).length===0&&predItems.length<4){
+      predItems.push({type:'upset',text:_call(T_UPSET,[match.id,'up'],mName)});
+    }
   }
 
   // Garantez minim 2 lbItems — adaug lider + stare secundară dacă lipsesc
