@@ -1137,7 +1137,6 @@ export function generateActivityFeed({
   const result=[];
   const push=item=>{if(item&&result.length<20)result.push(item);};
   const pushCurQuotePair=(seed)=>{
-    // pattern: country → quote → country → quote (intercalated, never 2 same type in a row)
     const c1=curiosities.shift();
     const q1=nextStandalone(seed);
     const c2=curiosities.shift();
@@ -1148,20 +1147,24 @@ export function generateActivityFeed({
     if(q2)push(q2);
   };
 
-  // ── SLOT 1: LIVE (scor + mesaj funny în aceeași știre) ────────────────────────
+  // Helpers pentru predicțiile unui meci
+  const getMatchPreds=(m)=>{
+    return Object.entries(allPredictions)
+      .filter(([,up])=>up[m.id]||up[String(m.id)])
+      .map(([uid,up])=>{
+        const p=up[m.id]||up[String(m.id)];
+        return {uid,nick:nickOf(uid),pA:Number(p.scoreA),pB:Number(p.scoreB)};
+      });
+  };
+
+  // ── SLOT 1: LIVE cu scor + mesaj funny ───────────────────────────────────────
   liveMatches.slice(0,1).forEach(m=>{
     const sA=m.realScoreA??0,sB=m.realScoreB??0;
     const min=m.liveMinute??45;
-    const sc=m.homeScorers?m.homeScorers.split(',')[0].trim():'';
     let funny;
-    if(sA>sB){
-      funny=_call(T_LIVE_FUNNY_HOME,[m.id,'lh'],m.teamA,m.teamB,sA-sB,min);
-    }else if(sB>sA){
-      funny=_call(T_LIVE_FUNNY_AWAY,[m.id,'la'],m.teamA,m.teamB,sB-sA,min);
-    }else{
-      funny=_call(T_LIVE_FUNNY_DRAW,[m.id,'ld'],m.teamA,m.teamB,min);
-    }
-    // Always include scorers if available
+    if(sA>sB)funny=_call(T_LIVE_FUNNY_HOME,[m.id,'lh'],m.teamA,m.teamB,sA-sB,min);
+    else if(sB>sA)funny=_call(T_LIVE_FUNNY_AWAY,[m.id,'la'],m.teamA,m.teamB,sB-sA,min);
+    else funny=_call(T_LIVE_FUNNY_DRAW,[m.id,'ld'],m.teamA,m.teamB,min);
     const scorersPart=[];
     if(m.homeScorers)scorersPart.push(`⚽ ${m.teamA}: ${m.homeScorers}`);
     if(m.awayScorers)scorersPart.push(`⚽ ${m.teamB}: ${m.awayScorers}`);
@@ -1169,7 +1172,53 @@ export function generateActivityFeed({
     push({type:'live',text:`${funny}${scorersText}`});
   });
 
-  // ── SLOTS 2-3: PREDICȚII din meciurile recente ────────────────────────────────
+  // ── SLOTS 2-3: PREDICȚII meci live sau următor (SUS în feed) ─────────────────
+  const upcomingForPreds=liveMatches.length>0?liveMatches.slice(0,1):
+    (todayOff.length>0?todayOff.slice(0,1):(nextMatch?[nextMatch]:[]));
+
+  upcomingForPreds.forEach(m=>{
+    const preds=getMatchPreds(m);
+    if(preds.length===0)return;
+    const mName=`${m.teamA} vs ${m.teamB}`;
+
+    // Câți au pus predicție
+    if(preds.length>=3){
+      const names=preds.slice(0,3).map(p=>p.nick).join(', ');
+      const rest=preds.length>3?` și alți ${preds.length-3}`:'';
+      push({type:'preview_preds',text:`📋 ${names}${rest} au pus predicție la ${mName}.`});
+    }
+
+    // Predicții opuse în grup
+    const home=preds.filter(p=>p.pA>p.pB);
+    const away=preds.filter(p=>p.pB>p.pA);
+    const draw=preds.filter(p=>p.pA===p.pB);
+    if(home.length>0&&away.length>0){
+      push({type:'preview_split',text:`⚔️ La ${mName}: ${home.length} au pus ${m.teamA}, ${away.length} au pus ${m.teamB}${draw.length>0?`, ${draw.length} au pus egal`:''}.`});
+    } else if(draw.length===1&&preds.length>=3){
+      push({type:'preview_solo',text:_call(T_MAN_DRAW,[draw[0].nick,m.id],draw[0].nick)});
+    } else if(home.length===preds.length&&preds.length>=3){
+      push({type:'preview_consensus',text:`🤝 Toată lumea a pus ${m.teamA} la ${mName}. Curaj colectiv sau greșeală colectivă.`});
+    } else if(away.length===preds.length&&preds.length>=3){
+      push({type:'preview_consensus',text:`🤝 Toată lumea a pus ${m.teamB} la ${mName}. Dacă greșesc toți, greșesc împreună.`});
+    }
+  });
+
+  // Preview meci următor dacă nu e live
+  if(liveMatches.length===0){
+    const T_PRE=[
+      (a,b)=>`🔜 ${a} – ${b} urmează. Care e în fața porții, s-o înscrie.`,
+      (a,b)=>`🔜 ${a} vs ${b}: simplu pe hârtie, complicat la cartonașe.`,
+      (a,b)=>`🔜 ${a} – ${b}: un gol în minutul 88 strică o seară întreagă.`,
+      (a,b)=>`🔜 ${a} – ${b}: dacă pui 0-0, ai nevoie de curaj sau de noroc cu acte.`,
+      (a,b)=>`🔜 ${a} vs ${b}: cine a pus, a pus. Cine n-a pus — îl doare mai târziu.`,
+    ];
+    const previewTargets=todayOff.length>0?todayOff.slice(0,1):(nextMatch?[nextMatch]:[]);
+    previewTargets.forEach(m=>{
+      push({type:'preview',text:_call(T_PRE,[m.id,'pre'],m.teamA,m.teamB)});
+    });
+  }
+
+  // ── SLOTS 4-5: PREDICȚII din ultimul meci terminat ───────────────────────────
   let predSlots=0;
   for(const match of latestFinished){
     if(predSlots>=2)break;
@@ -1177,12 +1226,10 @@ export function generateActivityFeed({
     const mp=mpreds(match.id,match);
     const exact=mp.filter(p=>p.exact);
     const zeroes=mp.filter(p=>p.pts===0);
-    const allSameOutcome=mp.length>=3&&new Set(mp.map(p=>p.pOutcome)).size===1;
     const soloX=mp.filter(p=>p.pOutcome==='X');
     const opposed=mp.filter(p=>p.pOutcome==='1');
     const opposedB=mp.filter(p=>p.pOutcome==='2');
 
-    // Scor exact (1 jucător)
     if(exact.length===1&&predSlots<2){
       const nk=exact[0].nick;
       const text=_roll(nk,match.id,'mn-ex')
@@ -1191,24 +1238,16 @@ export function generateActivityFeed({
           ?_call(T_CITE_EXACT,[nk,match.id],nk)
           :_call(T_EXACT,[nk,match.id,'ex'],nk,mName);
       push({type:'exact',text});predSlots++;
-    }
-    // Scor exact (2+ jucători)
-    else if(exact.length>=2&&predSlots<2){
+    }else if(exact.length>=2&&predSlots<2){
       const names=exact.slice(0,3).map(e=>e.nick).join(' și ');
       push({type:'exact',text:_call(T_EXACT_MULTI,[names,match.id],names,mName)});predSlots++;
-    }
-    // Doi jucători cu predicții opuse
-    else if(opposed.length>=1&&opposedB.length>=1&&predSlots<2){
+    }else if(opposed.length>=1&&opposedB.length>=1&&predSlots<2){
       const nA=opposed[0].nick,nB=opposedB[0].nick;
       push({type:'banter',text:`🎯 ${nA} a pus ${match.teamA}, ${nB} a pus ${match.teamB}. Fotbalul a ales — și cineva a avut dreptate.`});
       predSlots++;
+    }else if(soloX.length===1&&mp.length>=3&&predSlots<2){
+      push({type:'banter',text:_call(T_MAN_DRAW,[soloX[0].nick,match.id],soloX[0].nick)});predSlots++;
     }
-    // Jucător solo cu X (egal)
-    else if(soloX.length===1&&mp.length>=3&&predSlots<2){
-      const nk=soloX[0].nick;
-      push({type:'banter',text:_call(T_MAN_DRAW,[nk,match.id],nk)});predSlots++;
-    }
-    // Zero puncte (1 jucător)
     if(zeroes.length===1&&predSlots<2){
       const nk=zeroes[0].nick;
       const text=_roll(nk,match.id,'mn-z')
@@ -1218,14 +1257,13 @@ export function generateActivityFeed({
           :_call(T_ZERO,[zeroes[0].uid,match.id,'z'],nk,mName);
       push({type:'miss',text});predSlots++;
     }
-    // Nimeni n-a nimerit rezultatul
     if(mp.length>=3&&mp.filter(p=>p.ok).length===0&&predSlots<2){
       push({type:'upset',text:`⚡ ${mName}: niciun jucător n-a prezis rezultatul. Fotbalul a câștigat runda singur.`});predSlots++;
     }
   }
 
-  // ── SLOTS 4-7: 2 curiozități + 2 citate (intercalate) PRIMA rundă ────────────
-  pushCurQuotePair(Date.now()%1000);
+  // ── SLOTS 6-9: curiozități + citate (intercalate) PRIMA rundă ────────────────
+  pushCurQuotePair(hourSeed%1000);
 
   // ── SLOTS 8-9: CLASAMENT ──────────────────────────────────────────────────────
   let lbAdded=0;
@@ -1392,29 +1430,7 @@ export function generateActivityFeed({
   pushCurQuotePair((Date.now()%1000)+500);
 
   // ── SLOT pentru preview meci următor ─────────────────────────────────────────
-  const T_PRE=[
-    (a,b)=>`🔜 ${a} – ${b} urmează. Care e în fața porții, s-o înscrie.`,
-    (a,b)=>`🔜 ${a} vs ${b}: simplu pe hârtie, complicat la cartonașe.`,
-    (a,b)=>`🔜 ${a} – ${b}: un gol în minutul 88 strică o seară întreagă.`,
-    (a,b)=>`🔜 ${a} – ${b}: dacă pui 0-0, ai nevoie de curaj sau de noroc cu acte.`,
-    (a,b)=>`🔜 ${a} – ${b} în curând. Predicțiile sunt blocate sau în ultimele minute.`,
-    (a,b)=>`🔜 ${a} vs ${b}: cine a pus, a pus. Cine n-a pus — îl doare mai târziu.`,
-  ];
-  const previewTargets=todayOff.length>0?todayOff.slice(0,2):(nextMatch?[nextMatch]:[]);
-  previewTargets.forEach(m=>{
-    push({type:'preview',text:_call(T_PRE,[m.id,'pre'],m.teamA,m.teamB)});
-    // FIX 2: Show how many predictions were made on this match
-    const mp=Object.entries(allPredictions)
-      .filter(([,up])=>up[m.id]||up[String(m.id)])
-      .map(([uid])=>nickOf(uid));
-    if(mp.length>0){
-      const names=mp.slice(0,3).join(', ');
-      const rest=mp.length>3?` și alți ${mp.length-3}`:'';
-      push({type:'preview_preds',text:`📋 ${names}${rest} au pus predicție la ${m.teamA} vs ${m.teamB}.`});
-    }
-  });
-
-  // ── SLOTS finale: încă 2 curiozități + 2 citate (intercalate) ────────────────
+  // ── SLOTS finale: curiozități + citate (intercalate) ────────────────────────
   pushCurQuotePair((Date.now()%1000)+1000);
 
   // ── DRAMA de meci (dacă mai e loc) ───────────────────────────────────────────
