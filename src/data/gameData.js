@@ -841,22 +841,22 @@ const M_SCORER=[
   (m,s)=>`⚽ ${m}: ${s} a decis ziua, restul au fost detalii.`,
 ];
 // ── MATCH DRAMA — picks from pearl pools, real data, no raw scorer dumps ────
-const _matchDrama=(name,sA,sB,hSc,aSc,cards,corners)=>{
+const _matchDrama=(name,sA,sB,hSc,aSc,cards,corners,matchId)=>{
   const t=sA+sB; const items=[];
 
-  if(t>=5)items.push(_p14(M_MANY,name,t)(name,t));
-  else if(t===0)items.push(_p14(M_ZERO,name)(name));
-  else if(t===1)items.push(_p14(M_ONE,name)(name));
-  else if(sA!==sB)items.push(_p14(M_WITHSCORE,name,sA,sB)(name,sA,sB));
-  else items.push(_p14(M_NOSCORE,name)(name));
+  if(t>=5)items.push(_p14(M_MANY,name,t,matchId,'g')(name,t));
+  else if(t===0)items.push(_p14(M_ZERO,name,matchId,'g')(name));
+  else if(t===1)items.push(_p14(M_ONE,name,matchId,'g')(name));
+  else if(sA!==sB)items.push(_p14(M_WITHSCORE,name,sA,sB,matchId,'g')(name,sA,sB));
+  else items.push(_p14(M_NOSCORE,name,matchId,'g')(name));
 
   if(hSc||aSc){
     const first=(hSc||aSc||'').split(',')[0].trim();
-    items.push(_p14(M_SCORER,name,first)(name,first));
+    items.push(_p14(M_SCORER,name,first,matchId,'sc')(name,first));
   }
 
-  if(cards>=6)items.push(_p14(M_CARDS,name,cards)(name,cards));
-  if(corners>=10)items.push(_p14(M_CORNERS,name,corners)(name,corners));
+  if(cards>=6)items.push(_p14(M_CARDS,name,cards,matchId,'cd')(name,cards));
+  if(corners>=10)items.push(_p14(M_CORNERS,name,corners,matchId,'cr')(name,corners));
 
   return items;
 };
@@ -896,7 +896,7 @@ export function generateActivityFeed({
   const todayMatches=matches.filter(m=>!m.isFinished&&!m.isLive&&_isWCM14(m)&&isToday(m.time));
   const nextMatch=matches.filter(m=>!m.isFinished&&!m.isLive&&_isWCM14(m))
     .sort((a,b)=>new Date(a.time)-new Date(b.time))[0];
-  const latestFinished=finishedMatches.slice(0,2);
+  const latestFinished=finishedMatches.slice(0,3);
 
   [...liveMatches,...latestFinished,...todayMatches].forEach(m=>{
     if(_isWCM14(m)){ctxTeams.add(_n14(m.teamA));ctxTeams.add(_n14(m.teamB));}
@@ -945,7 +945,7 @@ export function generateActivityFeed({
     const mp=mpreds(match.id,match);
     const exact=mp.filter(p=>p.exact);
 
-    const items=_matchDrama(mName,sA,sB,match.homeScorers,match.awayScorers,rCards??0,corners??0);
+    const items=_matchDrama(mName,sA,sB,match.homeScorers,match.awayScorers,rCards??0,corners??0,match.id);
     items.forEach((text,i)=>ev('match_drama',text,BASE+1-i*0.1));
 
     if(isWC){
