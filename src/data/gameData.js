@@ -1079,12 +1079,20 @@ export function generateActivityFeed({
 
   const ctxTeams=new Set();
   const finishedMatches=[...matches.filter(m=>m.isFinished)]
-    .sort((a,b)=>new Date(b.time)-new Date(a.time));
+    // Sort by finishedAt if available, else by kickoff time — most recently finished first
+    .sort((a,b)=>{
+      const tA=a.finishedAt?new Date(a.finishedAt):new Date(a.time);
+      const tB=b.finishedAt?new Date(b.finishedAt):new Date(b.time);
+      return tB-tA;
+    });
   const liveMatches=matches.filter(m=>m.isLive);
   const latestFinished=finishedMatches.slice(0,3);
+  // FIX 2: next match = soonest upcoming, includes matches starting within 3 hours
+  const now3h=Date.now()+3*3600000;
   const nextMatch=matches.filter(m=>!m.isFinished&&!m.isLive&&_isWCM14(m))
     .sort((a,b)=>new Date(a.time)-new Date(b.time))[0];
-  const todayOff=matches.filter(m=>_isWCM14(m)&&!m.isFinished&&!m.isLive&&isToday(m.time));
+  const todayOff=matches.filter(m=>_isWCM14(m)&&!m.isFinished&&!m.isLive&&isToday(m.time))
+    .sort((a,b)=>new Date(a.time)-new Date(b.time));
 
   [...liveMatches,...latestFinished,...todayOff].forEach(m=>{
     if(_isWCM14(m)){ctxTeams.add(_n14(m.teamA));ctxTeams.add(_n14(m.teamB));}
@@ -1311,17 +1319,74 @@ export function generateActivityFeed({
         push({type:'lead',text});lbAdded++;
       }
     }
-    // Al doilea slot — locul 2 sau 3
-    if(lbAdded<2&&leaderboard[1]){
+    // Starea curentă — apare mereu indiferent de prevLeaderboard
+    if(lbAdded<2&&L&&S){
+      // Lider detașat
+      if(gap>=100){
+        const text=_roll(L.nickname,hourSeed,'mn-lhx')
+          ?_call(T_MAN_LEAD,[L.nickname,hourSeed,'lhx'],L.nickname)
+          :_call(T_LEAD_HUGE,[L.nickname,gap,'lhx'],L.nickname,gap);
+        push({type:'lead',text});lbAdded++;
+      }
+      // Cursă strânsă
+      else if(gap>0&&gap<=25){
+        const text=_roll(L.nickname,S.nickname,hourSeed,'ci-close')
+          ?_call(T_CITE_CLOSE,[L.nickname,S.nickname,hourSeed,'cl'],L.nickname,S.nickname)
+          :_call(T_GAPCHASE,[L.nickname,S.nickname,hourSeed,'gc'],L.nickname,S.nickname);
+        push({type:'chase',text});lbAdded++;
+      }
+      // Lider normal
+      else{
+        const text=_roll(L.nickname,hourSeed,'mn-lead2')
+          ?_call(T_MAN_LEAD,[L.nickname,hourSeed,'mnl2'],L.nickname)
+          :_call(T_LEAD,[L.nickname,hourSeed,'lead2'],L.nickname);
+        push({type:'lead',text});lbAdded++;
+      }
+    }
+
+    // FIX 3+4: Al doilea slot — rotează între mai multe tipuri bazat pe hourSeed
+    if(lbAdded<2&&n>=2){
+      const slotType=hourSeed%6;
       const e2=leaderboard[1];
       const e3=leaderboard[2];
-      if(e3&&e2.points-e3.points<=15){
+      const eLast=leaderboard[n-1];
+      const eSecLast=n>=2?leaderboard[n-2]:null;
+
+      // FIX 5: Best of round — jucătorul cu cele mai multe puncte din ultimul meci
+      const roundScores=[];
+      latestFinished.slice(0,1).forEach(match=>{
+        Object.entries(allPredictions).forEach(([uid,up])=>{
+          const p=up[match.id]||up[String(match.id)];if(!p)return;
+          const pts=calcPoints(p,match)||0;
+          if(pts>0)roundScores.push({nick:nickOf(uid),pts,matchName:`${match.teamA} vs ${match.teamB}`});
+        });
+      });
+      roundScores.sort((a,b)=>b.pts-a.pts);
+      const topRound=roundScores[0];
+
+      if(slotType===0&&topRound&&topRound.pts>=100){
+        push({type:'round_best',text:`🏆 ${topRound.nick} a luat ${topRound.pts} puncte la ${topRound.matchName}. Etapa lui.`});lbAdded++;
+      }else if(slotType===1&&e3&&e2.points-e3.points<=20){
         push({type:'chase',text:_call(T_GAPCHASE,[e2.nickname,e3.nickname,hourSeed,'gc23'],e2.nickname,e3.nickname)});lbAdded++;
+      }else if(slotType===2&&eLast){
+        const text=_roll(eLast.nickname,hourSeed,'mn-last')
+          ?_call(T_MAN_LAST,[eLast.nickname,hourSeed,'mnl'],eLast.nickname)
+          :`📉 ${eLast.nickname} e ultimul cu ${eLast.points} puncte. Mai e timp.`;
+        push({type:'rank',text});lbAdded++;
+      }else if(slotType===3&&topRound){
+        push({type:'round_best',text:`⚡ ${topRound.nick}: ${topRound.pts} puncte din ultimul meci. Cel mai bun din grupul ăsta azi.`});lbAdded++;
+      }else if(slotType===4&&e2){
+        // FIX 4: locul 2 cu manea sau citat
+        const text=_roll(e2.nickname,hourSeed,'mn-e2')
+          ?_call(T_MAN_RISE,[e2.nickname,hourSeed,'mnr2'],e2.nickname)
+          :`🥈 ${e2.nickname} pe locul 2 cu ${e2.points} puncte. La ${gap} de primul.`;
+        push({type:'rank',text});lbAdded++;
       }else{
+        // Default: top 3 clasament
         push({type:'rank',text:`📊 Top 3: ${leaderboard.slice(0,3).map((e,i)=>`${i+1}. ${e.nickname} (${e.points}pts)`).join(' · ')}`});lbAdded++;
       }
     }
-  }
+  } // end if(n>=2)
 
   // ── SLOTS 10-13: 2 curiozități + 2 citate (intercalate) A DOUA rundă ─────────
   pushCurQuotePair((Date.now()%1000)+500);
@@ -1332,10 +1397,21 @@ export function generateActivityFeed({
     (a,b)=>`🔜 ${a} vs ${b}: simplu pe hârtie, complicat la cartonașe.`,
     (a,b)=>`🔜 ${a} – ${b}: un gol în minutul 88 strică o seară întreagă.`,
     (a,b)=>`🔜 ${a} – ${b}: dacă pui 0-0, ai nevoie de curaj sau de noroc cu acte.`,
+    (a,b)=>`🔜 ${a} – ${b} în curând. Predicțiile sunt blocate sau în ultimele minute.`,
+    (a,b)=>`🔜 ${a} vs ${b}: cine a pus, a pus. Cine n-a pus — îl doare mai târziu.`,
   ];
-  const previewTargets=todayOff.length>0?todayOff.slice(0,1):(nextMatch?[nextMatch]:[]);
+  const previewTargets=todayOff.length>0?todayOff.slice(0,2):(nextMatch?[nextMatch]:[]);
   previewTargets.forEach(m=>{
     push({type:'preview',text:_call(T_PRE,[m.id,'pre'],m.teamA,m.teamB)});
+    // FIX 2: Show how many predictions were made on this match
+    const mp=Object.entries(allPredictions)
+      .filter(([,up])=>up[m.id]||up[String(m.id)])
+      .map(([uid])=>nickOf(uid));
+    if(mp.length>0){
+      const names=mp.slice(0,3).join(', ');
+      const rest=mp.length>3?` și alți ${mp.length-3}`:'';
+      push({type:'preview_preds',text:`📋 ${names}${rest} au pus predicție la ${m.teamA} vs ${m.teamB}.`});
+    }
   });
 
   // ── SLOTS finale: încă 2 curiozități + 2 citate (intercalate) ────────────────
