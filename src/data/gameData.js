@@ -10,7 +10,7 @@ export { getGroupLabel };
 // Admin sets real results here. In production: replace with Supabase query.
 export let FINISHED_RESULTS = {};
 
-export const LOCK_BEFORE_MS = 30 * 60 * 1000; // 30 min before kickoff
+export const LOCK_BEFORE_MS = 0; // TEMP: lock disabled for late submission, REVERT to 30*60*1000 ASAP
 
 // ─── ADMIN EMAILS ─────────────────────────────────────────────────────────────
 // Only users whose email appears here can access admin mode.
