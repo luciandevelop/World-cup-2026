@@ -667,6 +667,25 @@ const T_EXACT=[
   (n,m)=>`🎯 ${n} a avut o zi în care fotbalul l-a ascultat la ${m}.`,
 ];
 
+const T_UP_BIG=[
+  (n,d,r)=>`📈 ${n} a sărit ${d} locuri într-o etapă. Pe locul ${r} acum - cineva să-i verifice motorul.`,
+  (n,d,r)=>`📈 ${n} a urcat ${d} poziții dintr-un foc. Locul ${r}. Restul încă procesează ce s-a întâmplat.`,
+  (n,d,r)=>`📈 ${d} locuri într-o etapă pentru ${n}. Pe ${r} acum. Ăsta nu e progres, e teleportare.`,
+  (n,d,r)=>`📈 ${n} a recuperat ${d} poziții. Locul ${r}. Cine a pariat contra lui, regretă acum.`,
+];
+const T_UP_SMALL=[
+  (n,d,r)=>`📈 ${n} a urcat ${d} ${d===1?'loc':'locuri'}. Pe ${r} acum, pas cu pas, fără explozii.`,
+  (n,d,r)=>`📈 ${n}: +${d} ${d===1?'poziție':'poziții'}, pe ${r}. Mic, dar contează.`,
+];
+const T_DOWN_BIG=[
+  (n,d,r)=>`📉 ${n} a căzut ${d} locuri într-o etapă. Pe ${r} acum. De la lift direct pe scări, fără opriri.`,
+  (n,d,r)=>`📉 ${d} poziții pierdute pentru ${n}. Pe ${r}. Asta nu e cădere, e prăbușire controlată.`,
+  (n,d,r)=>`📉 ${n} a coborât ${d} locuri dintr-o mișcare. Pe ${r}. Clasamentul nu glumește azi.`,
+];
+const T_DOWN_SMALL=[
+  (n,d,r)=>`📉 ${n} a pierdut ${d} ${d===1?'loc':'locuri'}. Pe ${r} acum, fără dramă mare.`,
+  (n,d,r)=>`📉 ${n}: -${d} ${d===1?'poziție':'poziții'}, pe ${r}. Se recuperează la următoarea etapă.`,
+];
 const T_UP=[
   n=>`📈 Clasamentul l-a găsit pe ${n} mai sus decât îl lăsase.`,
   n=>`📈 ${n} a urcat fără să ceară voie.`,
@@ -728,6 +747,21 @@ const T_DOWN=[
   n=>`📉 ${n} a coborât pas cu pas, fără scuze publice.`,
 ];
 
+const T_LEAD_HUGE=[
+  (n,g)=>`👑 ${n} a luat tronul. La ${g} puncte avans, nu-l mai prinzi nici cu trenul din China.`,
+  (n,g)=>`👑 ${n} conduce cu ${g} puncte. Restul aleargă, el deja s-a întors din vacanță.`,
+  (n,g)=>`👑 ${n} e lider cu ${g} puncte diferență. Asta nu e cursă, e monolog.`,
+  (n,g)=>`👑 ${n} a fugit cu ${g} puncte avans. Următorul concurs e cine ajunge al doilea.`,
+  (n,g)=>`👑 ${n} pe primul loc, ${g} puncte distanță. Trimite-i o vedere, nu-l ajungi din alergat.`,
+  (n,g)=>`👑 ${n} conduce cu ${g} puncte. La diferența asta, mai degrabă schimbă liga decât locul.`,
+];
+const T_LEAD_CLOSE=[
+  (n,g)=>`👑 ${n} a luat tronul, dar la doar ${g} puncte. Coroana e fierbinte, nu calmă.`,
+  (n,g)=>`👑 ${n} e lider cu ${g} puncte. Un meci prost și pierde și parola de la tron.`,
+  (n,g)=>`👑 ${n} conduce cu ${g} puncte diferență. Asta nu e avans, e împrumut pe credit.`,
+  (n,g)=>`👑 ${n} a urcat în vârf, dar ${g} puncte nu-i siguranță, e doar avans temporar.`,
+  (n,g)=>`👑 ${n} pe primul loc cu ${g} puncte. La cât e de strâns, se poate schimba la fluierul ăsta.`,
+];
 const T_LEAD=[
   n=>`👑 Liderul respiră. ${n} suflă în ceafă.`,
   n=>`👑 Locul 1 nu mai e liber. Nici liniștit.`,
@@ -742,6 +776,7 @@ const T_LEAD=[
   n=>`👑 ${n} a ajuns lider fără anunț prealabil.`,
   n=>`👑 ${n} domină clasamentul de parcă l-ar fi construit el.`,
 ];
+
 
 const T_GAPCHASE=[
   (a,b)=>`⚔️ Diferența dintre ${a} și ${b} e atât de mică încât și fluierul arbitrului ar putea-o schimba.`,
@@ -994,7 +1029,12 @@ export function generateActivityFeed({
       const prev=prevLeaderboard.find(p=>p.nickname===entry.nickname);if(!prev)return;
       const delta=prev.rank-entry.rank,nick=entry.nickname;
       if(entry.rank===1&&prev.rank>1){
-        ev('lead',_c14(T_LEAD,[nick,'lead'],nick),11);rc++;
+        const second=leaderboard[1];
+        const gapNow=second?entry.points-second.points:0;
+        if(gapNow>=100)ev('lead',_c14(T_LEAD_HUGE,[nick,gapNow,'lh'],nick,gapNow),11);
+        else if(gapNow>0&&gapNow<=30)ev('lead',_c14(T_LEAD_CLOSE,[nick,gapNow,'lc'],nick,gapNow),11);
+        else ev('lead',_c14(T_LEAD,[nick,'lead'],nick),11);
+        rc++;
       }
       if(prev.rank===1&&entry.rank>1&&rc<2){
         ev('fall',`${nick} a coborât de pe tron fără ceremonie.`,10);rc++;
@@ -1005,13 +1045,30 @@ export function generateActivityFeed({
       if(entry.rank>3&&prev.rank<=3&&rc<2){
         ev('top3_exit',`${nick} a ieșit din Top 3. Locul ${entry.rank}.`,9);rc++;
       }
-      if(delta>=2&&entry.rank>1&&rc<2){ev('rank_up',_c14(T_UP,[nick,delta,entry.rank,'up'],nick),8);rc++;}
-      if(delta<=-2&&rc<2){ev('rank_down',_c14(T_DOWN,[nick,Math.abs(delta),entry.rank,'dn'],nick),7);rc++;}
+      if(delta>=3&&entry.rank>1&&rc<2){
+        ev('rank_up',_c14(T_UP_BIG,[nick,delta,entry.rank,'ub'],nick,delta,entry.rank),8);rc++;
+      }else if(delta>=2&&entry.rank>1&&rc<2){
+        ev('rank_up',_c14(T_UP_SMALL,[nick,delta,entry.rank,'us'],nick,delta,entry.rank),8);rc++;
+      }
+      if(delta<=-3&&rc<2){
+        ev('rank_down',_c14(T_DOWN_BIG,[nick,Math.abs(delta),entry.rank,'db'],nick,Math.abs(delta),entry.rank),7);rc++;
+      }else if(delta<=-2&&rc<2){
+        ev('rank_down',_c14(T_DOWN_SMALL,[nick,Math.abs(delta),entry.rank,'ds'],nick,Math.abs(delta),entry.rank),7);rc++;
+      }
     });
     const L=leaderboard[0],S=leaderboard[1],pL=prevLeaderboard[0],pS=prevLeaderboard[1];
     if(L&&S&&pL&&pS){
       const gap=L.points-S.points,pg=pL.points-pS.points;
       if(gap<pg&&gap>0&&gap<=15)ev('chase',_c14(T_GAPCHASE,[L.nickname,S.nickname,'gc'],L.nickname,S.nickname),8);
+    }
+  }
+  // Standalone dominant-leader / tight-race callouts — fire even with no rank change this round
+  if(n>=2&&rc<2){
+    const L=leaderboard[0],S=leaderboard[1];
+    if(L&&S){
+      const gap=L.points-S.points;
+      if(gap>=150)ev('lead_huge',_c14(T_LEAD_HUGE,[L.nickname,gap,'lhx'],L.nickname,gap),6);
+      else if(gap>0&&gap<=20)ev('chase',_c14(T_GAPCHASE,[L.nickname,S.nickname,'gcx'],L.nickname,S.nickname),6);
     }
   }
 
@@ -1022,7 +1079,7 @@ export function generateActivityFeed({
     .sort((a,b)=>(b.priority-a.priority)||(b.ts-a.ts));
 
   const BANTER_T=new Set(['exact','miss','near']);
-  const LB_T=new Set(['lead','fall','top3','top3_exit','rank_up','rank_down','gap','chase']);
+  const LB_T=new Set(['lead','fall','top3','top3_exit','rank_up','rank_down','gap','chase','lead_huge']);
   const tc={};const pc={};const result=[];
   const cb=bucket=>[...bucket].reduce((s,t)=>s+(tc[t]||0),0);
 
