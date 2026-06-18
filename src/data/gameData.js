@@ -754,6 +754,15 @@ const T_GAPCHASE=[
   (a,b)=>`⚔️ Distanța dintre ${a} și ${b} se poate șterge cu un singur meci bun.`,
 ];
 
+const T_EXACT_MULTI=[
+  (names,m)=>`${names}. Toți au citit ${m} ca pe foaia de examen.`,
+  (names,m)=>`${names} au nimerit ${m} din prima. Coincidență sau metodă, alegeți voi.`,
+  (names,m)=>`${names} - cu scorul exact la ${m}. Cineva a copiat sau e doar talent dublu.`,
+  (names,m)=>`${names} au văzut ${m} înainte să se joace. Restul grupului, doar după.`,
+  (names,m)=>`${names}: scor exact la ${m} pentru fiecare. Etapa asta a avut profeți, nu pronosticatori.`,
+  (names,m)=>`La ${m}, ${names} au pus aceeași cifră exactă. Fie au vorbit, fie au talent identic.`,
+];
+
 const M_NOSCORE=[
   m=>`⚽ ${m}: N-au avut ocazii în afară de goluri.`,
   m=>`⚽ ${m}: Apărarea a fost impecabilă dacă ignorăm scorul.`,
@@ -785,7 +794,16 @@ const M_ZERO=[
 const M_ONE=[
   m=>`⚽ ${m}: 1 gol. Care era în fața porții, a marcat o singură dată. A fost de ajuns.`,
   m=>`⚽ ${m}: un singur gol a hotărât tot. Restul, doar speranțe.`,
-  m=>`⚽ ${m}: 1 gol și 89 de minute în care nimeni n-a mai vrut să rite nimic.`,
+  m=>`⚽ ${m}: 1 gol și 89 de minute în care nimeni n-a mai vrut să riște nimic.`,
+  m=>`⚽ ${m}: 1-0 sec, ca un răspuns dat din prima încercare.`,
+  m=>`⚽ ${m}: un gol a fost suficient. Restul timpului a fost administrare pură.`,
+  m=>`⚽ ${m}: 1 gol, dar de calitatea aia care face tot meciul să pară planificat.`,
+  m=>`⚽ ${m}: un singur moment a contat. Restul, alergat și transpirat fără folos.`,
+  m=>`⚽ ${m}: 1 gol. Cine l-a prins exact merită felicitări, nu invidie.`,
+  m=>`⚽ ${m}: scor minimal, emoție maximă. Asta e diferența dintre 1-0 și 0-0.`,
+  m=>`⚽ ${m}: 1 gol de aur, restul de la 90 de minute - umplutură tactică.`,
+  m=>`⚽ ${m}: un gol și o apărare care a apărat exact cât a trebuit, nu mai mult.`,
+  m=>`⚽ ${m}: 1-0. Diferența dintre câștigător și pierzător a fost o secundă bună.`,
 ];
 const M_MANY=[
   (m,t)=>`⚽ ${m}: ${t} goluri. Apărările au luat o pauză de cafea simultan.`,
@@ -798,6 +816,14 @@ const M_WITHSCORE=[
   (m,sA,sB)=>`⚽ ${m}: ${sA}-${sB}. Cine a citit forma a avut noroc azi.`,
   (m,sA,sB)=>`⚽ ${m}: ${sA}-${sB}. Tabela nu minte, restul interpretează.`,
   (m,sA,sB)=>`⚽ ${m}: ${sA}-${sB}. Simplu de scris, greu de prezis.`,
+  (m,sA,sB)=>`⚽ ${m}: ${sA}-${sB}. Diferența pe tabelă e mai mică decât diferența pe teren.`,
+  (m,sA,sB)=>`⚽ ${m}: ${sA}-${sB}. Unul a vrut meciul ăsta mai mult. S-a și văzut.`,
+  (m,sA,sB)=>`⚽ ${m}: ${sA}-${sB}. Predicțiile cu scor mic au plâns puțin pe interior.`,
+  (m,sA,sB)=>`⚽ ${m}: ${sA}-${sB}. Cifrele astea spun mai mult decât orice analiză de 90 de minute.`,
+  (m,sA,sB)=>`⚽ ${m}: ${sA}-${sB}. Un rezultat care nu lasă loc de discuții lungi la cafea.`,
+  (m,sA,sB)=>`⚽ ${m}: ${sA}-${sB}. Asta e genul de scor care confirmă ce ziceau toți și nimeni n-a crezut.`,
+  (m,sA,sB)=>`⚽ ${m}: ${sA}-${sB}. Cine a mizat exact pe asta, are dreptul la o seară bună.`,
+  (m,sA,sB)=>`⚽ ${m}: ${sA}-${sB}. Diferența de pe teren s-a tradus corect pe hârtie, pentru variație.`,
 ];
 const M_CARDS=[
   (m,c)=>`🟨 ${m}: ${c} cartonașe. Arbitrul a avut meci individual.`,
@@ -933,7 +959,7 @@ export function generateActivityFeed({
       ev('exact',_c14(T_EXACT,[exact[0].nick,match.id,'ex'],exact[0].nick,mName),BASE+2);predCount++;
     }else if(exact.length>=2&&predCount<PCAP){
       const names=exact.slice(0,3).map(e=>e.nick).join(' și ');
-      ev('exact',`${names}. Amândoi au citit ${mName} ca pe foaia de examen.`,BASE+2);predCount++;
+      ev('exact',_c14(T_EXACT_MULTI,[names,match.id,'exm'],names,mName),BASE+2);predCount++;
     }
     const zeroes=mp.filter(p=>p.pts===0);
     if(zeroes.length===1&&predCount<PCAP){
