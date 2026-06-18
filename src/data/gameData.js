@@ -790,13 +790,154 @@ const T_GAPCHASE=[
 ];
 
 const T_EXACT_MULTI=[
-  (names,m)=>`${names}. Toți au citit ${m} ca pe foaia de examen.`,
-  (names,m)=>`${names} au nimerit ${m} din prima. Coincidență sau metodă, alegeți voi.`,
-  (names,m)=>`${names} - cu scorul exact la ${m}. Cineva a copiat sau e doar talent dublu.`,
-  (names,m)=>`${names} au văzut ${m} înainte să se joace. Restul grupului, doar după.`,
-  (names,m)=>`${names}: scor exact la ${m} pentru fiecare. Etapa asta a avut profeți, nu pronosticatori.`,
-  (names,m)=>`La ${m}, ${names} au pus aceeași cifră exactă. Fie au vorbit, fie au talent identic.`,
+  (names,m)=>`🎯 ${names} au nimerit ${m} din prima. Talent dublu sau au vorbit — oricum, puncte.`,
+  (names,m)=>`🎯 ${names}: scor exact la ${m} pentru fiecare. Etapa asta a avut profeți.`,
+  (names,m)=>`🎯 ${names} au pus aceeași cifră exactă la ${m}. Cineva din grup știe fotbal.`,
+  (names,m)=>`🎯 ${names} au văzut ${m} înainte să se joace. Restul grupului, doar după.`,
+  (names,m)=>`🎯 La ${m}, ${names} au lovit exact. Felicitări, invidie sănătoasă din rest.`,
+  (names,m)=>`🎯 ${names} — scor exact la ${m}. Fie au calculat, fie au ghicit divin.`,
 ];
+
+// ── MANELE — aprobate, fără autor în text ─────────────────────────────────────
+const T_MAN_EXACT=[
+  n=>`🎤 ${n}: "Am norocul scris în frunte" — e norocul lui.`,
+  n=>`🎤 ${n}: "Talent ca la 50 Cent" — a zis, și a nimerit exact.`,
+  n=>`🎤 ${n}: "Am noroc în toate" — a zis, și chiar a nimerit tot.`,
+  n=>`🎤 ${n}: "Sus paharul" — meritat, după scorul exact.`,
+  n=>`🎤 ${n}: "A venit și ziua mea" — în sfârșit a nimerit.`,
+];
+const T_MAN_ZERO=[
+  n=>`🎤 ${n}: "Supărat, supărat sunt, doamne, iarăși supărat."`,
+  n=>`🎤 ${n}: "Of, viața mea" — după un meci ratat.`,
+  n=>`🎤 ${n}: "Orice om greșește" — a zis, după 0 puncte la rând.`,
+  n=>`🎤 ${n}: "Stau la geam plângând, poate astăzi ai să vii" — tot speră.`,
+  n=>`🎤 ${n}: "De-aș avea cât am pierdut" — la puncte, nu la bani.`,
+  n=>`🎤 ${n}: "Stau în noapte și-mi blestem amarul, plouă și mi-e dor."`,
+];
+const T_MAN_LEAD=[
+  n=>`🎤 ${n}: "Lumea vorbește de mine" — a zis, când a ajuns lider.`,
+  n=>`🎤 ${n}: "Sunt pe primul loc în top" — și chiar e.`,
+  n=>`🎤 ${n}: "Cu banii îmi place să mă joc, eu sunt pe primul loc."`,
+  n=>`🎤 ${n}: "Eee, aaa, văd mai bine lumea, de pe Burj Khalifa."`,
+  n=>`🎤 ${n}: "Când vă văd m-apucă mila, că nu vă duce bila, nu sunteți buni de nimica."`,
+  n=>`🎤 ${n}: "Fake-urile astea mă invidiază, Adidașii mei Gucci nu se demodează."`,
+  n=>`🎤 ${n}: "Cât mă poți plăti să-ți dau mintea mea o zi, să poți să produci bani mulți zi de zi."`,
+  n=>`🎤 ${n}: "Ce mor dușmanii mei, că n-au valoarea mea și nici puterea mea."`,
+  n=>`🎤 ${n}: "Dușmanii mei n-au valoare nici cât e bocul de sare."`,
+  n=>`🎤 ${n}: "Nu stați în fața la boss."`,
+];
+const T_MAN_RISE=[
+  n=>`🎤 ${n}: "Uită-te la asta man, zici că e aeroplan, avion american" — +locuri într-o etapă.`,
+  n=>`🎤 ${n}: "Am plecat de jos, am ajuns pe tron."`,
+  n=>`🎤 ${n}: "Greu m-am ridicat" — dar a ajuns sus, în cele din urmă.`,
+];
+const T_MAN_FALL=[
+  n=>`🎤 ${n}: "Ce a fost nu va mai fi" — tronul are alt nume acum.`,
+  n=>`🎤 ${n}: "S-a rupt lanțul de iubire, și-a început a rugini" — depășit pe ultima sută.`,
+  n=>`🎤 ${n}: "Aș face orice să te mai pot avea, chiar dacă ești acum cu altcineva."`,
+];
+const T_MAN_LAST=[
+  n=>`🎤 ${n}: "Supărat, supărat sunt, doamne, iarăși supărat."`,
+  n=>`🎤 ${n}: "Stau în noapte și-mi blestem amarul, plouă și mi-e dor."`,
+  n=>`🎤 ${n}: "De-aș avea cât am pierdut."`,
+];
+const T_MAN_PASSED=[
+  (a,b)=>`🎤 ${a}: "Fără tine nu pot sta" — i-a zis lui ${b}, care l-a depășit cu un singur punct.`,
+];
+const T_MAN_DRAW=[
+  n=>`🎤 ${n} a pus egal: "Să iubești două femei, să nu știi pe care o vrei."`,
+];
+const T_MAN_EQUAL=[
+  (a,b)=>`🎤 ${a} și ${b}: "Baby împarte totul cu mine, haide să ne pierdem în mulțime" — același punctaj după meci.`,
+];
+const T_MAN_SOLO=[
+  n=>`🎤 ${n}: "Am în capul meu doar fantezii, baby" — singurul din grup cu altă predicție.`,
+];
+
+// ── CITATE FOTBAL RO — cu context de clasament/predicție ──────────────────────
+const T_CITE_EXACT=[
+  n=>`📢 ${n} a citit meciul ca un patron care a pus pariu pe el și a și câștigat.`,
+  n=>`📢 ${n}: "La bulanu' meu o să dau și gol" — scor exact pe noroc pur.`,
+  n=>`📢 Genul de predicție care merită conferință de presă, nu doar puncte. Bravo, ${n}.`,
+];
+const T_CITE_ZERO=[
+  n=>`📢 ${n} a jucat-o stil "pase scurte și pe sus, ai n-ai mingea, tragi la poartă" — n-a intrat.`,
+  n=>`📢 ${n}: genul de reacție de "du-te bă la șah, aici era fotbal."`,
+  n=>`📢 ${n} a explicat ce-a vrut să facă, exact ca un patron supărat la conferință.`,
+  n=>`📢 ${n}: "Putea fi și mai bine" — spus după o predicție ratată total.`,
+];
+const T_CITE_LEAD=[
+  n=>`📢 ${n} joacă pe logica "dacă marcăm un gol la început, putem juca și la 0-0."`,
+  n=>`📢 ${n}: "Meritul e 50% al meciului, 50% al formei, dar cel mai mare merit e al meu."`,
+];
+const T_CITE_RISE=[
+  n=>`📢 ${n}: "Muncesc 24 de ore pe zi, iar uneori chiar și noaptea" — și a urcat în clasament.`,
+];
+const T_CITE_CLOSE=[
+  (a,b)=>`📢 Diferența dintre ${a} și ${b}: "Calificarea este și posibilă, și imposibilă."`,
+];
+
+// ── CITATE STANDALONE — cu autor, fără context specific ───────────────────────
+const T_CITE_STANDALONE=[
+  `💬 "Omul este o persoană umană." — Hagi`,
+  `💬 "Viața e frumoasă, dar merită trăită." — Hagi`,
+  `💬 "Să fie bine, ca să nu fie rău." — Hagi`,
+  `💬 "La anul vine un an nou și alt an." — Hagi`,
+  `💬 "Eu m-am născut să fiu învingător, nu să exist." — Hagi`,
+  `💬 "Copii, mergeți la școală, că și școala e bună la ceva!" — Hagi`,
+  `💬 "Din când în când mai aud și ce se aude prin autocar, când vorbesc cu voce tare." — Hagi`,
+  `💬 "Matematică, nu, nu zic că am descoperit-o eu. 55 de jucători în 5 ani, deci sunt 10 jucători pe an." — Hagi`,
+  `💬 "Nimeni nu s-a născut cel mai bun. Hagi e cel mai bun de când s-a născut." — Hagi`,
+  `💬 "Decarul nu poate să poarte decât numărul 10." — Hagi`,
+  `💬 "Dacă marcăm un gol la început, pe urmă putem să jucăm și la 0-0." — Becali`,
+  `💬 "Becali e un brand. Eu la Avicola Iași pot să fac pui Gigi Becali, dacă vreau." — Becali`,
+  `💬 "Dumnezeu e cel mai tare serviciu de informații din lume — știe tot, chiar și-un fir de păr." — Becali`,
+  `💬 "Mie nu-mi place să citesc, că-mi lăcrimează ochii, mă dor ochii." — Becali`,
+  `💬 "Da cine e domle Nichita Stănescu ăsta? A adus mai mulți bani decât mine în România?" — Becali`,
+  `💬 "Dacă îmi dai un deget, îți dau toată mâna. Dacă îmi iei un deget, îți tai mâna." — Becali`,
+  `💬 "Dom'le, eu muncesc 24 de ore pe zi, iar uneori chiar și noaptea!" — Mitică Dragomir`,
+  `💬 "Am ajuns la o vârstă la care mi-am dat seama că trebuie să fiu cinstit." — Mitică Dragomir`,
+  `💬 "Familia e sfântă, pe când patria... cum să vă spun, patria e sacră." — Mitică Dragomir`,
+  `💬 "La bulanu' meu o să dau și gol dacă o să mă convoacă!" — Claudiu Răducanu`,
+  `💬 "Aș vrea să stau într-un bloc-notes." — Claudiu Răducanu`,
+  `💬 "Filosofia este o transcendentală propedeutică pentru sufletul bântuit de moarte al românului." — Cornel Dinu`,
+  `💬 "Este incontestabilă fortuirea ca românul să fie un ștrasnic luptător sârb." — Cornel Dinu`,
+  `💬 "Muncitor Nicoliță, foarte muncitor, dar terenul de fotbal nu e șantier." — Cornel Dinu`,
+  `💬 "Greu să faci vultur dintr-un jucător cu nume de vânat." — Cornel Dinu`,
+  `💬 "Putea fi 3-3!" — Ioan Sdrobiș, după un 8-1`,
+  `💬 "Suporterii noștri sunt 80% din București și 40% din provincie." — Ionel Dănciulescu`,
+  `💬 "Nu mi-e frică, dar mă tem!" — Marin Condescu`,
+  `💬 "Singura echipă care poate prinde CFR-ul din urmă este DNA!" — Adrian Porumboiu`,
+  `💬 "N-avea cum să-mi rupă Fane capu', am gât flexibil, sunt ca inspectorul Gadget." — Mihai Stoica`,
+  `💬 "Dacă ar fi să scoatem primele 30 de minute, cred că am fi putut fi câștigători." — Adi Ilie`,
+  `💬 "Focusul trebuie să fie pentru ceea ce e aici. Ceea ce e aici te duce acolo." — Bogdan Lobonț`,
+  `💬 "Sunt pesimist. Cred că putem învinge Olanda." — Nicolae Mitea`,
+  `💬 "Pase scurte și pe sus, ai n-ai mingea, tragi la poartă!" — Gabi Stan`,
+  `💬 "Du-te bă la șah! Du-te la șah!" — Petre Grigoraș`,
+  `💬 "La examen mi-a căzut Comuna din Paris, dar le-am spus să-mi schimbe subiectul, că nu prea le am cu geografia." — Rica Răducanu`,
+  `💬 "Cred că dacă înscriam mai multe goluri decât ei, câștigam." — Gabi Tamaș`,
+];
+
+// ── LIVE FUNNY — mesaje amuzante pentru scor live ─────────────────────────────
+const T_LIVE_FUNNY_HOME=[
+  (a,b,d,min)=>`🔴 ${a} conduce ${d}-0 la ${min}'. ${b} mai are timp — sau nu.`,
+  (a,b,d,min)=>`🔴 ${a} ${d} sus la ${min}'. ${b} recalculează tactica din mers.`,
+  (a,b,d,min)=>`🔴 ${d} gol${d>1?'uri':''} pentru ${a} la ${min}'. Portarul lui ${b} are o seară lungă.`,
+  (a,b,d,min)=>`🔴 ${a} conduce cu ${d}. ${b} mai are ${90-min} minute să-și amintească de ce joacă fotbal.`,
+];
+const T_LIVE_FUNNY_AWAY=[
+  (a,b,d,min)=>`🔴 ${b} conduce ${d}-0 la ${min}'. ${a} are nevoie de un miracol sau de un arbitru bun.`,
+  (a,b,d,min)=>`🔴 ${b} ${d} sus la ${min}'. Cine a pus victoria gazdei — mai respiră?`,
+  (a,b,d,min)=>`🔴 ${d} gol${d>1?'uri':''} pentru ${b} la ${min}'. ${a} nu a primit memo-ul.`,
+  (a,b,d,min)=>`🔴 ${b} conduce cu ${d} la ${min}'. ${a} încă se uită după un colț de ieșire.`,
+];
+const T_LIVE_FUNNY_DRAW=[
+  (a,b,min)=>`🔴 Egal la ${min}'. ${a} și ${b} se respectă prea mult sau nu se poate mai mult.`,
+  (a,b,min)=>`🔴 0-0 la ${min}'. Cineva din grup a pus X cu inima. Stă și respiră rar.`,
+  (a,b,min)=>`🔴 Egal la ${min}'. Portarii au muncit. Atacanții, mai puțin.`,
+  (a,b,min)=>`🔴 ${a} – ${b}: 0-0 la ${min}'. Dacă rămâne egal, jumătate din grup o să zică că a știut.`,
+];
+
 
 const M_NOSCORE=[
   m=>`⚽ ${m}: N-au avut ocazii în afară de goluri.`,
@@ -827,18 +968,18 @@ const M_ZERO=[
   m=>`🥊 ${m}: 0-0. Mingea a fost prezentă. Golul, nu.`,
 ];
 const M_ONE=[
-  m=>`⚽ ${m}: 1 gol. Care era în fața porții, a marcat o singură dată. A fost de ajuns.`,
-  m=>`⚽ ${m}: un singur gol a hotărât tot. Restul, doar speranțe.`,
+  m=>`⚽ ${m}: 1 gol. Cine l-a prins exact are tot dreptul să nu zică nimic și să zâmbească.`,
+  m=>`⚽ ${m}: 1-0 sec. Un gol, o victorie, fără discuții.`,
   m=>`⚽ ${m}: 1 gol și 89 de minute în care nimeni n-a mai vrut să riște nimic.`,
-  m=>`⚽ ${m}: 1-0 sec, ca un răspuns dat din prima încercare.`,
-  m=>`⚽ ${m}: un gol a fost suficient. Restul timpului a fost administrare pură.`,
-  m=>`⚽ ${m}: 1 gol, dar de calitatea aia care face tot meciul să pară planificat.`,
-  m=>`⚽ ${m}: un singur moment a contat. Restul, alergat și transpirat fără folos.`,
-  m=>`⚽ ${m}: 1 gol. Cine l-a prins exact merită felicitări, nu invidie.`,
-  m=>`⚽ ${m}: scor minimal, emoție maximă. Asta e diferența dintre 1-0 și 0-0.`,
-  m=>`⚽ ${m}: 1 gol de aur, restul de la 90 de minute - umplutură tactică.`,
-  m=>`⚽ ${m}: un gol și o apărare care a apărat exact cât a trebuit, nu mai mult.`,
-  m=>`⚽ ${m}: 1-0. Diferența dintre câștigător și pierzător a fost o secundă bună.`,
+  m=>`⚽ ${m}: un singur moment a contat. Cine l-a văzut venind, a câștigat etapa.`,
+  m=>`⚽ ${m}: 1-0. La câte ocazii au fost, scorul putea fi altul. N-a fost.`,
+  m=>`⚽ ${m}: un gol a decis totul. Restul, 89 de minute de atmosferă.`,
+  m=>`⚽ ${m}: 1 gol. Suficient pentru 3 puncte, suficient pentru o predicție bună.`,
+  m=>`⚽ ${m}: 1-0. Mingea a intrat o singură dată. A fost de ajuns.`,
+  m=>`⚽ ${m}: scor minimal, emoție maximă.`,
+  m=>`⚽ ${m}: un gol a făcut diferența. Restul a fost muncă și transpirat.`,
+  m=>`⚽ ${m}: 1-0. Cine a prezis asta a dormit bine în seara aia.`,
+  m=>`⚽ ${m}: 1 gol, în minutul potrivit. Fotbalul e uneori simplu de tot.`,
 ];
 const M_MANY=[
   (m,t)=>`⚽ ${m}: ${t} goluri. Apărările au luat o pauză de cafea simultan.`,
@@ -900,11 +1041,21 @@ export function generateActivityFeed({
   leaderboard=[],prevLeaderboard=[],finishedResults={},
   allPredictions={},allUsers={},matches=[],
 }={}) {
-  const events=[];let seq=0;
-  const ev=(type,text,priority=5)=>
-    events.push({id:`feed_${Date.now()}_${seq++}`,type,icon:'',text,ts:Date.now(),priority});
   const nickOf=uid=>allUsers[uid]?.nickname||uid;
   const n=leaderboard.length;
+
+  const _pick=(arr,...seeds)=>{
+    const h=Math.abs(seeds.reduce((a,s)=>((a*31)+(String(s).charCodeAt(0)|0))|0,7));
+    return arr[h%arr.length];
+  };
+  const _call=(arr,seeds,...args)=>{
+    const fn=_pick(arr,...seeds);
+    return typeof fn==='function'?fn(...args):String(fn);
+  };
+  const _roll=(...seeds)=>{
+    const h=Math.abs(seeds.reduce((a,s)=>((a*31)+(String(s).charCodeAt(0)|0))|0,11));
+    return (h%100)<22;
+  };
 
   const mpreds=(matchId,match)=>{
     const out=[];
@@ -913,9 +1064,10 @@ export function generateActivityFeed({
       const pts=calcPoints(p,match)||0;
       const pA=Number(p.scoreA),pB=Number(p.scoreB);
       const rA=Number(match.realScoreA),rB=Number(match.realScoreB);
+      const outcome=rA>rB?'1':rA<rB?'2':'X';
+      const pOutcome=pA>pB?'1':pA<pB?'2':'X';
       out.push({uid,nick:nickOf(uid),pts,exact:pA===rA&&pB===rB,
-        ok:(rA>rB?'1':rA<rB?'2':'X')===(pA>pB?'1':pA<pB?'2':'X'),
-        pCards:p.possession!=null?Number(p.possession):null,pA,pB});
+        ok:outcome===pOutcome,outcome,pOutcome,pA,pB});
     });
     return out;
   };
@@ -928,12 +1080,12 @@ export function generateActivityFeed({
   const finishedMatches=[...matches.filter(m=>m.isFinished)]
     .sort((a,b)=>new Date(b.time)-new Date(a.time));
   const liveMatches=matches.filter(m=>m.isLive);
-  const todayMatches=matches.filter(m=>!m.isFinished&&!m.isLive&&_isWCM14(m)&&isToday(m.time));
+  const latestFinished=finishedMatches.slice(0,3);
   const nextMatch=matches.filter(m=>!m.isFinished&&!m.isLive&&_isWCM14(m))
     .sort((a,b)=>new Date(a.time)-new Date(b.time))[0];
-  const latestFinished=finishedMatches.slice(0,3);
+  const todayOff=matches.filter(m=>_isWCM14(m)&&!m.isFinished&&!m.isLive&&isToday(m.time));
 
-  [...liveMatches,...latestFinished,...todayMatches].forEach(m=>{
+  [...liveMatches,...latestFinished,...todayOff].forEach(m=>{
     if(_isWCM14(m)){ctxTeams.add(_n14(m.teamA));ctxTeams.add(_n14(m.teamB));}
   });
   if(nextMatch){ctxTeams.add(_n14(nextMatch.teamA));ctxTeams.add(_n14(nextMatch.teamB));}
@@ -942,159 +1094,246 @@ export function generateActivityFeed({
     const canon=_n14(team);
     if(!_isOff14(team)||!ctxTeams.has(canon))return null;
     const facts=CUR14[canon];if(!facts||!facts.length)return null;
-    return _p14(facts,canon,seed);
+    return _pick(facts,canon,seed);
   };
 
-  // ── BLOCK A: LIVE ────────────────────────────────────────────────────────────
-  liveMatches.forEach(m=>{
+  // ── Collect curiosities (country facts) for pattern slots ────────────────────
+  const curiosities=[];
+  const usedCurTeams=new Set();
+  const addCur=(team,seed)=>{
+    const canon=_n14(team);
+    if(usedCurTeams.has(canon))return;
+    const f=ctxFact(team,seed);
+    if(f){curiosities.push({type:'curiosity',text:`🌍 ${f}`});usedCurTeams.add(canon);}
+  };
+  liveMatches.forEach(m=>{addCur(m.teamA,m.id);addCur(m.teamB,m.id+50);});
+  latestFinished.forEach(m=>{addCur(m.teamA,m.id+100);addCur(m.teamB,m.id+150);});
+  if(nextMatch){addCur(nextMatch.teamA,nextMatch.id+200);addCur(nextMatch.teamB,nextMatch.id+250);}
+  todayOff.slice(0,2).forEach(m=>{addCur(m.teamA,m.id+300);addCur(m.teamB,m.id+350);});
+
+  // ── Collect standalone quotes for pattern slots ───────────────────────────────
+  const standalonePool=T_CITE_STANDALONE.slice();
+  const seenStandalone=new Set();
+  const nextStandalone=(seed)=>{
+    const idx=Math.abs(seed)%standalonePool.length;
+    const shifted=standalonePool.slice(idx).concat(standalonePool.slice(0,idx));
+    for(const s of shifted){if(!seenStandalone.has(s)){seenStandalone.add(s);return{type:'quote',text:s};}}
+    return{type:'quote',text:shifted[0]};
+  };
+
+  // ── Build result array in fixed order ────────────────────────────────────────
+  const result=[];
+  const push=item=>{if(item&&result.length<20)result.push(item);};
+  const pushCurQuotePair=(seed)=>{
+    // pattern: country → quote → country → quote (intercalated, never 2 same type in a row)
+    const c1=curiosities.shift();
+    const q1=nextStandalone(seed);
+    const c2=curiosities.shift();
+    const q2=nextStandalone(seed+1);
+    if(c1)push(c1);
+    if(q1)push(q1);
+    if(c2)push(c2);
+    if(q2)push(q2);
+  };
+
+  // ── SLOT 1: LIVE (scor + mesaj funny în aceeași știre) ────────────────────────
+  liveMatches.slice(0,1).forEach(m=>{
     const sA=m.realScoreA??0,sB=m.realScoreB??0;
-    const parts=[];
-    if(m.liveMinute!=null)parts.push(`${m.liveMinute}'`);
-    if(m.homeScorers)parts.push(`⚽ ${m.teamA}: ${m.homeScorers}`);
-    if(m.awayScorers)parts.push(`⚽ ${m.teamB}: ${m.awayScorers}`);
-    if(m.liveCards)parts.push(`🟨 ${m.liveCards}`);
-    if(m.liveCorners)parts.push(`🚩 ${m.liveCorners}`);
-    const det=parts.length?` (${parts.join(' · ')})`:'';
-    ev('live',`🔴 LIVE: ${m.teamA} ${sA}–${sB} ${m.teamB}${det}`,11);
-    if(sA>sB&&m.liveMinute)ev('live_hype',`${m.teamA} conduce cu ${sA-sB}. ${m.teamB} mai are ${90-m.liveMinute} minute să schimbe povestea.`,10);
-    else if(sB>sA&&m.liveMinute)ev('live_hype',`${m.teamB} conduce cu ${sB-sA}. ${m.teamA} încă speră, nu mai mult.`,10);
-    else if(m.liveMinute>70)ev('live_hype',`Egal în ${m.liveMinute}'. Care marchează acum, scrie seara.`,10);
-    else ev('live_hype',`${m.teamA} ${sA}-${sB} ${m.teamB}. Nimic decis încă.`,10);
-    const f=ctxFact(m.teamA,m.id)||ctxFact(m.teamB,m.id+99);
-    if(f)ev('curiosity',f,5);
+    const min=m.liveMinute??45;
+    const sc=m.homeScorers?m.homeScorers.split(',')[0].trim():'';
+    let text;
+    if(sA>sB){
+      text=_call(T_LIVE_FUNNY_HOME,[m.id,'lh'],m.teamA,m.teamB,sA-sB,min);
+    }else if(sB>sA){
+      text=_call(T_LIVE_FUNNY_AWAY,[m.id,'la'],m.teamA,m.teamB,sB-sA,min);
+    }else{
+      text=_call(T_LIVE_FUNNY_DRAW,[m.id,'ld'],m.teamA,m.teamB,min);
+    }
+    if(sc)text+=` ⚽ ${sc}.`;
+    push({type:'live',text});
   });
 
-  // ── BLOCK B: LAST 2 FINISHED — dominate the feed ────────────────────────────
-  let predCount=0; const PCAP=3;
+  // ── SLOTS 2-3: PREDICȚII din meciurile recente ────────────────────────────────
+  let predSlots=0;
+  for(const match of latestFinished){
+    if(predSlots>=2)break;
+    const mName=`${match.teamA} vs ${match.teamB}`;
+    const mp=mpreds(match.id,match);
+    const exact=mp.filter(p=>p.exact);
+    const zeroes=mp.filter(p=>p.pts===0);
+    const allSameOutcome=mp.length>=3&&new Set(mp.map(p=>p.pOutcome)).size===1;
+    const soloX=mp.filter(p=>p.pOutcome==='X');
+    const opposed=mp.filter(p=>p.pOutcome==='1');
+    const opposedB=mp.filter(p=>p.pOutcome==='2');
 
-  latestFinished.forEach((match,idx)=>{
-    const BASE=idx===0?10:9;
+    // Scor exact (1 jucător)
+    if(exact.length===1&&predSlots<2){
+      const nk=exact[0].nick;
+      const text=_roll(nk,match.id,'mn-ex')
+        ?_call(T_MAN_EXACT,[nk,match.id],nk)
+        :_roll(nk,match.id,'ci-ex')
+          ?_call(T_CITE_EXACT,[nk,match.id],nk)
+          :_call(T_EXACT,[nk,match.id,'ex'],nk,mName);
+      push({type:'exact',text});predSlots++;
+    }
+    // Scor exact (2+ jucători)
+    else if(exact.length>=2&&predSlots<2){
+      const names=exact.slice(0,3).map(e=>e.nick).join(' și ');
+      push({type:'exact',text:_call(T_EXACT_MULTI,[names,match.id],names,mName)});predSlots++;
+    }
+    // Doi jucători cu predicții opuse
+    else if(opposed.length>=1&&opposedB.length>=1&&predSlots<2){
+      const nA=opposed[0].nick,nB=opposedB[0].nick;
+      push({type:'banter',text:`🎯 ${nA} a pus ${match.teamA}, ${nB} a pus ${match.teamB}. Fotbalul a ales — și cineva a avut dreptate.`});
+      predSlots++;
+    }
+    // Jucător solo cu X (egal)
+    else if(soloX.length===1&&mp.length>=3&&predSlots<2){
+      const nk=soloX[0].nick;
+      push({type:'banter',text:_call(T_MAN_DRAW,[nk,match.id],nk)});predSlots++;
+    }
+    // Zero puncte (1 jucător)
+    if(zeroes.length===1&&predSlots<2){
+      const nk=zeroes[0].nick;
+      const text=_roll(nk,match.id,'mn-z')
+        ?_call(T_MAN_ZERO,[nk,match.id],nk)
+        :_roll(nk,match.id,'ci-z')
+          ?_call(T_CITE_ZERO,[nk,match.id],nk)
+          :_call(T_ZERO,[zeroes[0].uid,match.id,'z'],nk,mName);
+      push({type:'miss',text});predSlots++;
+    }
+    // Nimeni n-a nimerit rezultatul
+    if(mp.length>=3&&mp.filter(p=>p.ok).length===0&&predSlots<2){
+      push({type:'upset',text:`⚡ ${mName}: niciun jucător n-a prezis rezultatul. Fotbalul a câștigat runda singur.`});predSlots++;
+    }
+  }
+
+  // ── SLOTS 4-7: 2 curiozități + 2 citate (intercalate) PRIMA rundă ────────────
+  pushCurQuotePair(Date.now()%1000);
+
+  // ── SLOTS 8-9: CLASAMENT ──────────────────────────────────────────────────────
+  let lbAdded=0;
+  if(n>=2){
+    const L=leaderboard[0],S=leaderboard[1];
+    const gap=L&&S?L.points-S.points:0;
+
+    // Lider detașat fără schimbare de rang (permanent)
+    if(lbAdded<2&&gap>=150){
+      const text=_roll(L.nickname,'mn-lhx')
+        ?_call(T_MAN_LEAD,[L.nickname,'lhx'],L.nickname)
+        :_call(T_LEAD_HUGE,[L.nickname,gap,'lhx'],L.nickname,gap);
+      push({type:'lead',text});lbAdded++;
+    }
+    // Cursă strânsă (permanent)
+    else if(lbAdded<2&&gap>0&&gap<=20){
+      const text=_roll(L.nickname,S.nickname,'ci-close')
+        ?_call(T_CITE_CLOSE,[L.nickname,S.nickname,'cl'],L.nickname,S.nickname)
+        :_call(T_GAPCHASE,[L.nickname,S.nickname,'gc'],L.nickname,S.nickname);
+      push({type:'chase',text});lbAdded++;
+    }
+
+    if(prevLeaderboard.length>0){
+      leaderboard.forEach(entry=>{
+        if(lbAdded>=2)return;
+        const prev=prevLeaderboard.find(p=>p.nickname===entry.nickname);if(!prev)return;
+        const delta=prev.rank-entry.rank,nick=entry.nickname;
+        // Lider nou
+        if(entry.rank===1&&prev.rank>1){
+          const gapNow=S?entry.points-S.points:0;
+          let text;
+          if(_roll(nick,'mn-lead'))text=_call(T_MAN_LEAD,[nick,'mnl'],nick);
+          else if(gapNow>=100)text=_call(T_LEAD_HUGE,[nick,gapNow,'lh'],nick,gapNow);
+          else if(gapNow>0&&gapNow<=30)text=_call(T_LEAD_CLOSE,[nick,gapNow,'lc'],nick,gapNow);
+          else text=_call(T_LEAD,[nick,'lead'],nick);
+          push({type:'lead',text});lbAdded++;
+        }
+        // Cădere de pe tron
+        if(prev.rank===1&&entry.rank>1&&lbAdded<2){
+          const text=_roll(nick,'mn-fall')
+            ?_call(T_MAN_FALL,[nick,'mnf'],nick)
+            :`📉 ${nick} a coborât de pe tron. "Ce a fost nu va mai fi."`;
+          push({type:'fall',text});lbAdded++;
+        }
+        // Intrare top 3
+        if(entry.rank<=3&&prev.rank>3&&lbAdded<2){
+          push({type:'top3',text:`🏅 ${nick} a intrat în Top 3. Podiumul nu mai are loc liber.`});lbAdded++;
+        }
+        // Ieșire top 3
+        if(entry.rank>3&&prev.rank<=3&&lbAdded<2){
+          push({type:'top3_exit',text:`📉 ${nick} a ieșit din Top 3. Acum e pe locul ${entry.rank}.`});lbAdded++;
+        }
+        // Urcare mare
+        if(delta>=3&&entry.rank>1&&lbAdded<2){
+          const text=_roll(nick,'mn-rise')
+            ?_call(T_MAN_RISE,[nick,delta,'mnr'],nick)
+            :_roll(nick,'ci-rise')
+              ?_call(T_CITE_RISE,[nick,'cir'],nick)
+              :_call(T_UP_BIG,[nick,delta,entry.rank,'ub'],nick,delta,entry.rank);
+          push({type:'rank_up',text});lbAdded++;
+        }else if(delta>=2&&entry.rank>1&&lbAdded<2){
+          push({type:'rank_up',text:_call(T_UP_SMALL,[nick,delta,entry.rank,'us'],nick,delta,entry.rank)});lbAdded++;
+        }
+        // Coborâre mare
+        if(delta<=-3&&lbAdded<2){
+          push({type:'rank_down',text:_call(T_DOWN_BIG,[nick,Math.abs(delta),entry.rank,'db'],nick,Math.abs(delta),entry.rank)});lbAdded++;
+        }else if(delta<=-2&&lbAdded<2){
+          push({type:'rank_down',text:_call(T_DOWN_SMALL,[nick,Math.abs(delta),entry.rank,'ds'],nick,Math.abs(delta),entry.rank)});lbAdded++;
+        }
+        // Depășire la limită (1 punct)
+        if(delta===1&&entry.rank>1&&lbAdded<2){
+          const beaten=prevLeaderboard.find(p=>p.rank===entry.rank);
+          if(beaten){
+            const text=_call(T_MAN_PASSED,[nick,beaten.nickname,'mp'],nick,beaten.nickname);
+            push({type:'rank_up',text});lbAdded++;
+          }
+        }
+        // Doi jucători la același punctaj
+        const twin=leaderboard.find(e2=>e2.nickname!==entry.nickname&&e2.points===entry.points&&e2.rank===entry.rank);
+        if(twin&&entry.nickname<twin.nickname&&lbAdded<2){
+          push({type:'equal',text:_call(T_MAN_EQUAL,[nick,twin.nickname,'eq'],nick,twin.nickname)});lbAdded++;
+        }
+      });
+    }
+  }
+
+  // ── SLOTS 10-13: 2 curiozități + 2 citate (intercalate) A DOUA rundă ─────────
+  pushCurQuotePair((Date.now()%1000)+500);
+
+  // ── SLOT pentru preview meci următor ─────────────────────────────────────────
+  const T_PRE=[
+    (a,b)=>`🔜 ${a} – ${b} urmează. Care e în fața porții, s-o înscrie.`,
+    (a,b)=>`🔜 ${a} vs ${b}: simplu pe hârtie, complicat la cartonașe.`,
+    (a,b)=>`🔜 ${a} – ${b}: un gol în minutul 88 strică o seară întreagă.`,
+    (a,b)=>`🔜 ${a} – ${b}: dacă pui 0-0, ai nevoie de curaj sau de noroc cu acte.`,
+  ];
+  const previewTargets=todayOff.length>0?todayOff.slice(0,1):(nextMatch?[nextMatch]:[]);
+  previewTargets.forEach(m=>{
+    push({type:'preview',text:_call(T_PRE,[m.id,'pre'],m.teamA,m.teamB)});
+  });
+
+  // ── SLOTS finale: încă 2 curiozități + 2 citate (intercalate) ────────────────
+  pushCurQuotePair((Date.now()%1000)+1000);
+
+  // ── DRAMA de meci (dacă mai e loc) ───────────────────────────────────────────
+  for(const match of latestFinished){
+    if(result.length>=18)break;
     const mName=`${match.teamA} vs ${match.teamB}`;
     const sA=Number(match.realScoreA??0),sB=Number(match.realScoreB??0);
     const rCards=match.realPossession!=null?Number(match.realPossession):null;
+    const rCornT=match.realCorners!=null?Number(match.realCorners):null;
     const rCornH=match.realHomeCorners!=null?Number(match.realHomeCorners):null;
     const rCornA=match.realAwayCorners!=null?Number(match.realAwayCorners):null;
-    const rCornT=match.realCorners!=null?Number(match.realCorners):null;
     const corners=rCornT??(rCornH!=null&&rCornA!=null?rCornH+rCornA:null);
-    const isWC=_isWCM14(match);
-    const mp=mpreds(match.id,match);
-    const exact=mp.filter(p=>p.exact);
-
     const items=_matchDrama(mName,sA,sB,match.homeScorers,match.awayScorers,rCards??0,corners??0,match.id);
-    items.forEach((text,i)=>ev('match_drama',text,BASE+1-i*0.1));
-
-    if(isWC){
-      [match.teamA,match.teamB].forEach((team,i)=>{
-        const f=ctxFact(team,match.id+i*100);
-        if(f)ev('curiosity',f,BASE-0.5);
-      });
-    }
-
-    if(exact.length===1&&predCount<PCAP){
-      ev('exact',_c14(T_EXACT,[exact[0].nick,match.id,'ex'],exact[0].nick,mName),BASE+2);predCount++;
-    }else if(exact.length>=2&&predCount<PCAP){
-      const names=exact.slice(0,3).map(e=>e.nick).join(' și ');
-      ev('exact',_c14(T_EXACT_MULTI,[names,match.id,'exm'],names,mName),BASE+2);predCount++;
-    }
-    const zeroes=mp.filter(p=>p.pts===0);
-    if(zeroes.length===1&&predCount<PCAP){
-      ev('miss',_c14(T_ZERO,[zeroes[0].uid,match.id,'z'],zeroes[0].nick,mName),BASE-2);predCount++;
-    }
-    if(mp.length>=3&&mp.filter(p=>p.ok).length===0)
-      ev('upset',`${mName}: niciun jucător n-a prezis rezultatul. Fotbalul a câștigat etapa fără ajutor.`,BASE);
-  });
-
-  // ── BLOCK C: TODAY / NEXT ────────────────────────────────────────────────────
-  const T_PRE=[
-    (a,b)=>`${a} – ${b} azi. Care e în fața porții, s-o înscrie.`,
-    (a,b)=>`${a} vs ${b}: simplu pe hârtie, complicat la cartonașe.`,
-    (a,b)=>`${a} – ${b}: un gol în minutul 88 strică o seară întreagă.`,
-    (a,b)=>`${a} – ${b}: dacă pui 0-0, ai nevoie de curaj sau de noroc cu acte.`,
-  ];
-  const todayOff=matches.filter(m=>_isWCM14(m)&&!m.isFinished&&!m.isLive&&isToday(m.time));
-  todayOff.slice(0,2).forEach(m=>{
-    ev('preview',_c14(T_PRE,[m.id,'pre'],m.teamA,m.teamB),3);
-    [m.teamA,m.teamB].forEach((t,i)=>{const f=ctxFact(t,m.id+i*200);if(f)ev('curiosity',f,3);});
-  });
-  if(nextMatch&&todayOff.length===0){
-    ev('preview',_c14(T_PRE,[nextMatch.id,'nxt'],nextMatch.teamA,nextMatch.teamB),3);
-    [nextMatch.teamA,nextMatch.teamB].forEach((t,i)=>{const f=ctxFact(t,nextMatch.id+i*300);if(f)ev('curiosity',f,3);});
+    items.forEach(text=>push({type:'match_drama',text}));
   }
 
-  // ── BLOCK D: LEADERBOARD — max 2 ─────────────────────────────────────────────
-  let rc=0;
-  if(prevLeaderboard.length>0&&n>=2){
-    leaderboard.forEach(entry=>{
-      if(rc>=2)return;
-      const prev=prevLeaderboard.find(p=>p.nickname===entry.nickname);if(!prev)return;
-      const delta=prev.rank-entry.rank,nick=entry.nickname;
-      if(entry.rank===1&&prev.rank>1){
-        const second=leaderboard[1];
-        const gapNow=second?entry.points-second.points:0;
-        if(gapNow>=100)ev('lead',_c14(T_LEAD_HUGE,[nick,gapNow,'lh'],nick,gapNow),11);
-        else if(gapNow>0&&gapNow<=30)ev('lead',_c14(T_LEAD_CLOSE,[nick,gapNow,'lc'],nick,gapNow),11);
-        else ev('lead',_c14(T_LEAD,[nick,'lead'],nick),11);
-        rc++;
-      }
-      if(prev.rank===1&&entry.rank>1&&rc<2){
-        ev('fall',`${nick} a coborât de pe tron fără ceremonie.`,10);rc++;
-      }
-      if(entry.rank<=3&&prev.rank>3&&rc<2){
-        ev('top3',`${nick} a intrat în Top 3. Podiumul nu mai are loc liber.`,9);rc++;
-      }
-      if(entry.rank>3&&prev.rank<=3&&rc<2){
-        ev('top3_exit',`${nick} a ieșit din Top 3. Locul ${entry.rank}.`,9);rc++;
-      }
-      if(delta>=3&&entry.rank>1&&rc<2){
-        ev('rank_up',_c14(T_UP_BIG,[nick,delta,entry.rank,'ub'],nick,delta,entry.rank),8);rc++;
-      }else if(delta>=2&&entry.rank>1&&rc<2){
-        ev('rank_up',_c14(T_UP_SMALL,[nick,delta,entry.rank,'us'],nick,delta,entry.rank),8);rc++;
-      }
-      if(delta<=-3&&rc<2){
-        ev('rank_down',_c14(T_DOWN_BIG,[nick,Math.abs(delta),entry.rank,'db'],nick,Math.abs(delta),entry.rank),7);rc++;
-      }else if(delta<=-2&&rc<2){
-        ev('rank_down',_c14(T_DOWN_SMALL,[nick,Math.abs(delta),entry.rank,'ds'],nick,Math.abs(delta),entry.rank),7);rc++;
-      }
-    });
-    const L=leaderboard[0],S=leaderboard[1],pL=prevLeaderboard[0],pS=prevLeaderboard[1];
-    if(L&&S&&pL&&pS){
-      const gap=L.points-S.points,pg=pL.points-pS.points;
-      if(gap<pg&&gap>0&&gap<=15)ev('chase',_c14(T_GAPCHASE,[L.nickname,S.nickname,'gc'],L.nickname,S.nickname),8);
-    }
-  }
-  // Standalone dominant-leader / tight-race callouts — fire even with no rank change this round
-  if(n>=2&&rc<2){
-    const L=leaderboard[0],S=leaderboard[1];
-    if(L&&S){
-      const gap=L.points-S.points;
-      if(gap>=150)ev('lead_huge',_c14(T_LEAD_HUGE,[L.nickname,gap,'lhx'],L.nickname,gap),6);
-      else if(gap>0&&gap<=20)ev('chase',_c14(T_GAPCHASE,[L.nickname,S.nickname,'gcx'],L.nickname,S.nickname),6);
-    }
-  }
-
-  // ── FINAL — dedup, sort, enforce mix ────────────────────────────────────────
+  // Deduplicate by text
   const seen=new Set();
-  const deduped=events
-    .filter(e=>{if(seen.has(e.text))return false;seen.add(e.text);return true;})
-    .sort((a,b)=>(b.priority-a.priority)||(b.ts-a.ts));
-
-  const BANTER_T=new Set(['exact','miss','near']);
-  const LB_T=new Set(['lead','fall','top3','top3_exit','rank_up','rank_down','gap','chase','lead_huge']);
-  const tc={};const pc={};const result=[];
-  const cb=bucket=>[...bucket].reduce((s,t)=>s+(tc[t]||0),0);
-
-  for(const e of deduped){
-    if(result.length>=20)break;
-    if(BANTER_T.has(e.type)&&cb(BANTER_T)>=4)continue;
-    if(LB_T.has(e.type)&&cb(LB_T)>=2)continue;
-    const r2=result.slice(-2).map(x=>x.type);
-    if(r2.length===2&&r2[0]===e.type&&r2[1]===e.type)continue;
-    let pm=null;leaderboard.forEach(p=>{if(e.text.includes(p.nickname))pm=p.nickname;});
-    if(pm){const c=pc[pm]||0;if(c>=2&&e.type!=='exact')continue;pc[pm]=c+1;}
-    result.push(e);tc[e.type]=(tc[e.type]||0)+1;
-  }
-  for(const e of deduped){if(result.length>=20)break;if(!result.find(x=>x.id===e.id))result.push(e);}
-  return result.slice(0,20);
+  return result
+    .filter(e=>{if(!e||!e.text)return false;if(seen.has(e.text))return false;seen.add(e.text);return true;})
+    .slice(0,20)
+    .map((e,i)=>({id:`feed_${Date.now()}_${i}`,type:e.type,icon:'',text:e.text,ts:Date.now(),priority:20-i}));
 }
 
 
