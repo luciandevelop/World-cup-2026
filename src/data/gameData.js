@@ -920,22 +920,22 @@ const T_CITE_STANDALONE=[
 
 // ── LIVE FUNNY — mesaje amuzante pentru scor live ─────────────────────────────
 const T_LIVE_FUNNY_HOME=[
-  (a,b,d,min)=>`🔴 ${a} conduce ${d}-0 la ${min}'. ${b} mai are timp — sau nu.`,
-  (a,b,d,min)=>`🔴 ${a} ${d} sus la ${min}'. ${b} recalculează tactica din mers.`,
-  (a,b,d,min)=>`🔴 ${d} gol${d>1?'uri':''} pentru ${a} la ${min}'. Portarul lui ${b} are o seară lungă.`,
-  (a,b,d,min)=>`🔴 ${a} conduce cu ${d}. ${b} mai are ${90-min} minute să-și amintească de ce joacă fotbal.`,
+  (a,b,d,min)=>`🔴 ${a} ${d}–0 ${b} · ${min}' — ${b} mai are ${90-min} minute să-și amintească de ce joacă fotbal.`,
+  (a,b,d,min)=>`🔴 ${a} conduce cu ${d} la ${min}'. ${b} recalculează tactica din mers.`,
+  (a,b,d,min)=>`🔴 ${a} ${d}-0 la ${min}'. Portarul lui ${b} are o seară lungă.`,
+  (a,b,d,min)=>`🔴 ${a} conduce ${d}-0 la ${min}'. ${b} caută un colț de ieșire.`,
 ];
 const T_LIVE_FUNNY_AWAY=[
-  (a,b,d,min)=>`🔴 ${b} conduce ${d}-0 la ${min}'. ${a} are nevoie de un miracol sau de un arbitru bun.`,
-  (a,b,d,min)=>`🔴 ${b} ${d} sus la ${min}'. Cine a pus victoria gazdei — mai respiră?`,
-  (a,b,d,min)=>`🔴 ${d} gol${d>1?'uri':''} pentru ${b} la ${min}'. ${a} nu a primit memo-ul.`,
-  (a,b,d,min)=>`🔴 ${b} conduce cu ${d} la ${min}'. ${a} încă se uită după un colț de ieșire.`,
+  (a,b,d,min)=>`🔴 ${b} conduce ${d}-0 la ${min}' pe terenul lui ${a}. Cine a pus victoria gazdei — mai respiră?`,
+  (a,b,d,min)=>`🔴 ${a} 0–${d} ${b} · ${min}' — ${a} nu a primit memo-ul înainte de meci.`,
+  (a,b,d,min)=>`🔴 ${b} conduce cu ${d} la ${min}'. ${a} încă se uită după un plan B.`,
+  (a,b,d,min)=>`🔴 ${b} ${d}-0 ${a} la ${min}'. Oaspeții au venit cu treaba făcută.`,
 ];
 const T_LIVE_FUNNY_DRAW=[
-  (a,b,min)=>`🔴 Egal la ${min}'. ${a} și ${b} se respectă prea mult sau nu se poate mai mult.`,
-  (a,b,min)=>`🔴 0-0 la ${min}'. Cineva din grup a pus X cu inima. Stă și respiră rar.`,
-  (a,b,min)=>`🔴 Egal la ${min}'. Portarii au muncit. Atacanții, mai puțin.`,
   (a,b,min)=>`🔴 ${a} – ${b}: 0-0 la ${min}'. Dacă rămâne egal, jumătate din grup o să zică că a știut.`,
+  (a,b,min)=>`🔴 ${a} – ${b}: egal la ${min}'. Portarii muncesc. Atacanții, mai puțin.`,
+  (a,b,min)=>`🔴 ${a} 0-0 ${b} · ${min}' — Cineva din grup a pus X cu inima. Stă și respiră rar.`,
+  (a,b,min)=>`🔴 ${a} și ${b} se respectă prea mult la ${min}'. Tot 0-0.`,
 ];
 
 
