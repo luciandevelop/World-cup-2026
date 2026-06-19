@@ -1189,7 +1189,15 @@ export function generateActivityFeed({
 
   // ── SLOT 2: post despre meciul următor — DOAR dacă e ceva interesant ─────────
   const upcomingForPreds=liveMatches.length>0?liveMatches.slice(0,1):
-    (todayOff.length>0?todayOff.slice(0,1):(nextMatch?[nextMatch]:[]));
+    (()=>{
+      // DOAR meciuri cu predicțiile deja BLOCATE (sub 30 min până la start), nu înainte
+      const locked=matches.filter(m=>{
+        if(!_isWCM14(m)||m.isFinished||m.isLive)return false;
+        const lockState=matchLockState(m);
+        return lockState.state==='locked'&&(new Date(m.time)-Date.now())>-15*60000;
+      }).sort((a,b)=>new Date(a.time)-new Date(b.time));
+      return locked.slice(0,1);
+    })();
   upcomingForPreds.forEach(m=>{
     const preds=Object.entries(allPredictions)
       .filter(([,up])=>up[m.id]||up[String(m.id)])
@@ -1331,8 +1339,21 @@ export function generateActivityFeed({
     const opposedB=mp.filter(p=>p.pOutcome==='2');
     if(exact.length===1){
       const nk=exact[0].nick;
-      const text=_roll(nk,match.id,'mn-ex')?_call(T_MAN_EXACT,[nk,match.id],nk):_roll(nk,match.id,'ci-ex')?_call(T_CITE_EXACT,[nk,match.id],nk):_call(T_EXACT,[nk,match.id,'ex'],nk,mName);
-      predItems.push({type:'exact',text});
+      // Verifică dacă jucătorul a și urcat în clasament odată cu asta
+      const entry=leaderboard.find(e=>e.nickname===nk);
+      const prevEntry=prevLeaderboard.find(p=>p.nickname===nk);
+      const rankJump=entry&&prevEntry?prevEntry.rank-entry.rank:0;
+
+      if(entry&&rankJump>=2){
+        // Combo: scor exact + salt mare în clasament — mesaj special, mereu cu manea/citat
+        const flavor=_roll(nk,match.id,'combo')
+          ?_call(T_MAN_EXACT,[nk,match.id,'cb'],nk)
+          :_call(T_CITE_EXACT,[nk,match.id,'cb'],nk);
+        predItems.push({type:'exact',text:`🎯🔥 ${nk} a nimerit exact ${mName} ȘI a sărit ${rankJump} locuri — e pe ${entry.rank} acum! ${flavor}`});
+      }else{
+        const text=_roll(nk,match.id,'mn-ex')?_call(T_MAN_EXACT,[nk,match.id],nk):_roll(nk,match.id,'ci-ex')?_call(T_CITE_EXACT,[nk,match.id],nk):_call(T_EXACT,[nk,match.id,'ex'],nk,mName);
+        predItems.push({type:'exact',text});
+      }
     }else if(exact.length>=2){
       const names=exact.slice(0,3).map(e=>e.nick).join(' și ');
       predItems.push({type:'exact',text:_call(T_EXACT_MULTI,[names,match.id],names,mName)});
