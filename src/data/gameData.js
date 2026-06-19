@@ -371,7 +371,7 @@ const _n14=t=>_A14[t]??t;
 const _WC14=new Set(["Africa de Sud","Algeria","Anglia","Arabia Saudita","Argentina","Australia","Austria","Belgia","Bosnia","Brazilia","Canada","Capul Verde","Cehia","Coasta de Fildes","Columbia","Coreea de Sud","Croatia","Curacao","Ecuador","Egipt","Elvetia","Franta","Germania","Ghana","Haiti","Iordania","Irak","Iran","Japonia","Maroc","Mexic","Norvegia","Noua Zeelanda","Olanda","Panama","Paraguay","Portugalia","Qatar","RD Congo","SUA","Scotia","Senegal","Spania","Suedia","Tunisia","Turcia","Uruguay","Uzbekistan"]);
 const _isOff14=t=>_WC14.has(_n14(t));
 const _isWCM14=m=>m&&m.id>=1&&m.id<=72;
-const _p14=(arr,...seeds)=>{const h=Math.abs(seeds.reduce((a,s)=>((a*31)+(String(s).charCodeAt(0)|0))|0,7));return arr[h%arr.length];};
+const _p14=(arr,...seeds)=>{let h=7;for(const s of seeds){const str=String(s);for(let i=0;i<str.length;i++){h=((h*31)+str.charCodeAt(i))|0;}}h=Math.abs(h);return arr[h%arr.length];};
 const _c14=(arr,seeds,...args)=>{const fn=_p14(arr,...seeds);return typeof fn==='function'?fn(...args):String(fn);};
 
 const CUR14={
@@ -1046,7 +1046,14 @@ export function generateActivityFeed({
   const n=leaderboard.length;
 
   const _pick=(arr,...seeds)=>{
-    const h=Math.abs(seeds.reduce((a,s)=>((a*31)+(String(s).charCodeAt(0)|0))|0,7));
+    let h=7;
+    for(const s of seeds){
+      const str=String(s);
+      for(let i=0;i<str.length;i++){
+        h=((h*31)+str.charCodeAt(i))|0;
+      }
+    }
+    h=Math.abs(h);
     return arr[h%arr.length];
   };
   const _call=(arr,seeds,...args)=>{
@@ -1054,7 +1061,14 @@ export function generateActivityFeed({
     return typeof fn==='function'?fn(...args):String(fn);
   };
   const _roll=(...seeds)=>{
-    const h=Math.abs(seeds.reduce((a,s)=>((a*31)+(String(s).charCodeAt(0)|0))|0,11));
+    let h=11;
+    for(const s of seeds){
+      const str=String(s);
+      for(let i=0;i<str.length;i++){
+        h=((h*31)+str.charCodeAt(i))|0;
+      }
+    }
+    h=Math.abs(h);
     return (h%100)<45;
   };
 
@@ -1089,8 +1103,10 @@ export function generateActivityFeed({
   const latestFinished=finishedMatches.slice(0,3);
   // FIX 2: next match = soonest upcoming, includes matches starting within 3 hours
   const now3h=Date.now()+3*3600000;
-  const nextMatch=matches.filter(m=>!m.isFinished&&!m.isLive&&_isWCM14(m))
-    .sort((a,b)=>new Date(a.time)-new Date(b.time))[0];
+  const upcomingSorted=matches.filter(m=>!m.isFinished&&!m.isLive&&_isWCM14(m))
+    .sort((a,b)=>new Date(a.time)-new Date(b.time));
+  const nextMatch=upcomingSorted[0];
+  const next2Matches=upcomingSorted.slice(0,2);
   const todayOff=matches.filter(m=>_isWCM14(m)&&!m.isFinished&&!m.isLive&&isToday(m.time))
     .sort((a,b)=>new Date(a.time)-new Date(b.time));
 
@@ -1117,41 +1133,59 @@ export function generateActivityFeed({
   const hourSeed=Math.floor(Date.now()/3600000);
   const curiosities=[];
   const usedCurTeams=new Set();
-  const addCur=(team,seed)=>{
+  // FIX: pentru rotație reală (80%+ schimbare pe oră), seed-ul de selecție a faptului
+  // folosește DOAR hourSeed (nu seed fix + hourSeed), ca aceeași echipă să aibă un fapt
+  // complet diferit la fiecare oră, nu doar un index ușor deplasat.
+  const addCur=(team,seedTag)=>{
     const canon=_n14(team);
     if(usedCurTeams.has(canon))return;
-    const f=ctxFact(team,seed+hourSeed);
+    const f=ctxFact(team,hourSeed*13+seedTag);
     if(f){curiosities.push({type:'curiosity',text:`🌍 ${f}`});usedCurTeams.add(canon);}
   };
-  liveMatches.forEach(m=>{addCur(m.teamA,m.id);addCur(m.teamB,m.id+50);});
-  latestFinished.forEach(m=>{addCur(m.teamA,m.id+100);addCur(m.teamB,m.id+150);});
-  if(nextMatch){addCur(nextMatch.teamA,nextMatch.id+200);addCur(nextMatch.teamB,nextMatch.id+250);}
-  todayOff.slice(0,2).forEach(m=>{addCur(m.teamA,m.id+300);addCur(m.teamB,m.id+350);});
+  liveMatches.forEach((m,i)=>{addCur(m.teamA,i*2);addCur(m.teamB,i*2+1);});
+  latestFinished.forEach((m,i)=>{addCur(m.teamA,i*2+10);addCur(m.teamB,i*2+11);});
+  if(nextMatch){addCur(nextMatch.teamA,20);addCur(nextMatch.teamB,21);}
+  todayOff.slice(0,2).forEach((m,i)=>{addCur(m.teamA,i*2+30);addCur(m.teamB,i*2+31);});
   // FIX: garantez minim 6 curiozități — completez din toate echipele calificate disponibile
-  // în CUR14, rotind pe hourSeed, dacă meciurile curente nu oferă suficiente echipe unice
+  // în CUR14, rotind pe hourSeed, dacă meciurile curente nu oferă suficiente echipe unice.
+  // ORDINEA echipelor de fallback se schimbă complet la fiecare oră (shuffle real pe hourSeed),
+  // nu doar un index decalat — asta garantează schimbare masivă de conținut, nu cosmetică.
   if(curiosities.length<6){
     const allTeamNames=Object.keys(CUR14);
-    const rotatedTeams=[...allTeamNames].sort((a,b)=>{
-      const ha=Math.abs((hourSeed+a.length)*31%97);
-      const hb=Math.abs((hourSeed+b.length)*31%97);
-      return ha-hb;
-    });
-    for(const team of rotatedTeams){
+    // Shuffle determinist bazat pe hourSeed — Fisher-Yates cu seed
+    const shuffled=[...allTeamNames];
+    let seedState=hourSeed;
+    const nextRand=()=>{seedState=(seedState*1103515245+12345)&0x7fffffff;return seedState/0x7fffffff;};
+    for(let i=shuffled.length-1;i>0;i--){
+      const j=Math.floor(nextRand()*(i+1));
+      [shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];
+    }
+    for(const team of shuffled){
       if(curiosities.length>=6)break;
       const canon=_n14(team);
       if(usedCurTeams.has(canon))continue;
-      const f=anyFact(team,team.length*7+hourSeed);
+      const f=anyFact(team,hourSeed*17+team.length);
       if(f){curiosities.push({type:'curiosity',text:`🌍 ${f}`});usedCurTeams.add(canon);}
     }
   }
 
   // ── Collect standalone quotes for pattern slots ───────────────────────────────
-  const standalonePool=T_CITE_STANDALONE.slice();
+  // FIX: shuffle complet al pool-ului de citate pe baza hourSeed, nu doar un index deplasat —
+  // garantează că setul de 6 citate folosite e diferit substanțial de la o oră la alta.
+  const standalonePool=(()=>{
+    const arr=T_CITE_STANDALONE.slice();
+    let seedState=hourSeed*7+3;
+    const nextRand=()=>{seedState=(seedState*1103515245+12345)&0x7fffffff;return seedState/0x7fffffff;};
+    for(let i=arr.length-1;i>0;i--){
+      const j=Math.floor(nextRand()*(i+1));
+      [arr[i],arr[j]]=[arr[j],arr[i]];
+    }
+    return arr;
+  })();
   const seenStandalone=new Set();
   const nextStandalone=(seed)=>{
-    // Rotate based on hourSeed + local seed so different quotes appear each hour
-    const startIdx=(hourSeed*7+Math.abs(seed))%standalonePool.length;
-    const shifted=standalonePool.slice(startIdx).concat(standalonePool.slice(0,startIdx));
+    const idx=Math.abs(seed)%standalonePool.length;
+    const shifted=standalonePool.slice(idx).concat(standalonePool.slice(0,idx));
     for(const s of shifted){if(!seenStandalone.has(s)){seenStandalone.add(s);return{type:'quote',text:s};}}
     return{type:'quote',text:shifted[0]};
   };
@@ -1209,6 +1243,23 @@ export function generateActivityFeed({
     }
     push({type:'live',text:baseScore});
   });
+
+  // ── SLOT NOU: preview pentru următoarele 2 meciuri programate ────────────────
+  if(next2Matches.length>0){
+    const matchList=next2Matches.map(m=>{
+      const time=new Date(m.time);
+      const hh=String(time.getHours()).padStart(2,'0');
+      const mm=String(time.getMinutes()).padStart(2,'0');
+      return `${m.teamA}-${m.teamB} (${hh}:${mm})`;
+    }).join(' · ');
+    const T_NEXT2=[
+      l=>`📅 Urmează: ${l}. Pregătiți predicțiile, ceasul nu așteaptă.`,
+      l=>`📅 Pe radar: ${l}. Cine n-a pus încă, are timp limitat.`,
+      l=>`📅 Următoarele meciuri: ${l}. Etapa nu se oprește.`,
+      l=>`📅 Vin din scurt: ${l}. Verificați predicțiile înainte de blocare.`,
+    ];
+    push({type:'next2',text:_call(T_NEXT2,[hourSeed,'n2'],matchList)});
+  }
 
   // ── SLOT 2: post despre meciul următor — DOAR dacă e ceva interesant ─────────
   const upcomingForPreds=liveMatches.length>0?liveMatches.slice(0,1):
