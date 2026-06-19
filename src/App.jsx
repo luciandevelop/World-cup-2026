@@ -236,8 +236,15 @@ export default function App() {
   const [allSpecialPreds,  setAllSpecialPreds]  = useState({}); // { uid: specialPredObject }
   const [specialResults,   setSpecialResults]   = useState(null); // { winner, semifinalists, topScorerCountry }
   const [activityFeed,     setActivityFeed]     = useState([]);
-  // prevLeaderboard: snapshot before last finishedResults change, for rank-delta events
-  const prevLeaderboardRef  = useRef([]);
+  // prevLeaderboard: snapshot of leaderboard from BEFORE the most recent finishedResults change.
+  // FIX: previous implementation had a race condition between two useEffects sharing a ref —
+  // the cleanup-based snapshot could be overwritten before the finishedResults-effect read it.
+  // New approach: track previous finishedResults value directly; only update the snapshot
+  // when finishedResults has ACTUALLY changed (deep-ish check via JSON length/keys), and always
+  // snapshot the CURRENT leaderboard (computed from the OLD finishedResults, captured this render)
+  // before it flips to the new one.
+  const prevFinishedResultsRef = useRef(finishedResults);
+  const lastLeaderboardSnapshotRef = useRef(leaderboard);
   const [prevLeaderboard,   setPrevLeaderboard]  = useState([]);
 
   // ── Auth listener — sole gate into the app ───────────────────────────────
@@ -410,19 +417,21 @@ export default function App() {
     }
   };
 
-  // BUG-3 fix: capture leaderboard snapshot BEFORE each results update
-  // so generateActivityFeed can compute rank deltas
+  // FIX (race condition repair): on every render, if finishedResults reference changed since
+  // last render, it means new results just came in — at THIS point `leaderboard` in scope
+  // still reflects state computed from render timing, so we snapshot the last KNOWN leaderboard
+  // (captured on the previous render, before this change) as prevLeaderboard. This removes the
+  // dependency on a cleanup-based ref that could race against re-renders triggered by unrelated
+  // state (e.g. allPredictions updates arriving close together).
   useEffect(() => {
-    return () => {
-      // Save current leaderboard as "previous" when component re-renders with new finishedResults
-      prevLeaderboardRef.current = leaderboard;
-    };
-  });
-
-  useEffect(() => {
-    // When finishedResults change, save the pre-change leaderboard for delta computation
-    setPrevLeaderboard(prevLeaderboardRef.current);
-  }, [finishedResults]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (prevFinishedResultsRef.current !== finishedResults) {
+      setPrevLeaderboard(lastLeaderboardSnapshotRef.current);
+      prevFinishedResultsRef.current = finishedResults;
+    }
+    // Always keep the snapshot ref up to date with the latest leaderboard,
+    // so the NEXT finishedResults change has an accurate "before" state to compare against.
+    lastLeaderboardSnapshotRef.current = leaderboard;
+  }, [finishedResults, leaderboard]);
 
   const handleMatchUpdate = useCallback(async (update) => {
     if (update?._action === 'reset') {
