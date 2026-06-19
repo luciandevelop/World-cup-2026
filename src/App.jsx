@@ -244,7 +244,7 @@ export default function App() {
   // snapshot the CURRENT leaderboard (computed from the OLD finishedResults, captured this render)
   // before it flips to the new one.
   const prevFinishedResultsRef = useRef(finishedResults);
-  const lastLeaderboardSnapshotRef = useRef(leaderboard);
+  const lastLeaderboardSnapshotRef = useRef([]);
   const [prevLeaderboard,   setPrevLeaderboard]  = useState([]);
 
   // ── Auth listener — sole gate into the app ───────────────────────────────
