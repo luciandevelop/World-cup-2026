@@ -1055,7 +1055,7 @@ export function generateActivityFeed({
   };
   const _roll=(...seeds)=>{
     const h=Math.abs(seeds.reduce((a,s)=>((a*31)+(String(s).charCodeAt(0)|0))|0,11));
-    return (h%100)<22;
+    return (h%100)<45;
   };
 
   const mpreds=(matchId,match)=>{
@@ -1351,7 +1351,7 @@ export function generateActivityFeed({
           :_call(T_CITE_EXACT,[nk,match.id,'cb'],nk);
         predItems.push({type:'exact',text:`🎯🔥 ${nk} a nimerit exact ${mName} ȘI a sărit ${rankJump} locuri — e pe ${entry.rank} acum! ${flavor}`});
       }else{
-        const text=_roll(nk,match.id,'mn-ex')?_call(T_MAN_EXACT,[nk,match.id],nk):_roll(nk,match.id,'ci-ex')?_call(T_CITE_EXACT,[nk,match.id],nk):_call(T_EXACT,[nk,match.id,'ex'],nk,mName);
+        const text=_roll(nk,match.id,'mn-ex',1)?_call(T_MAN_EXACT,[nk,match.id],nk):_roll(nk,match.id,'ci-ex',2)?_call(T_CITE_EXACT,[nk,match.id],nk):_call(T_EXACT,[nk,match.id,'ex'],nk,mName);
         predItems.push({type:'exact',text});
       }
     }else if(exact.length>=2){
