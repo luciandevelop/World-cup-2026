@@ -378,6 +378,16 @@ export default function App() {
   const streak      = myEntry?.exactScores || 0;
 
   // Regenerate activity feed whenever leaderboard or results change (useMemo for perf)
+  // FIX: hourSeed inside generateActivityFeed only changes if the memo recomputes.
+  // Without a time-based dependency, the feed stayed frozen for hours when no other
+  // state (leaderboard, predictions, etc.) changed — this tick forces a recompute
+  // every 5 minutes so rotating manele/quotes/curiosities actually rotate over time.
+  const [feedTick, setFeedTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setFeedTick(t => t + 1), 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const activityFeedComputed = useMemo(() => generateActivityFeed({
     leaderboard,
     prevLeaderboard,
@@ -385,7 +395,7 @@ export default function App() {
     allPredictions,
     allUsers,
     matches: liveMatches,
-  }), [leaderboard, prevLeaderboard, finishedResults, allPredictions, allUsers]); // eslint-disable-line react-hooks/exhaustive-deps
+  }), [leaderboard, prevLeaderboard, finishedResults, allPredictions, allUsers, feedTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleSavePrediction = async (id, pred) => {
