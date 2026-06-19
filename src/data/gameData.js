@@ -1105,6 +1105,12 @@ export function generateActivityFeed({
     const facts=CUR14[canon];if(!facts||!facts.length)return null;
     return _pick(facts,canon,seed);
   };
+  // Pentru fallback (completare la 6 curiozități): nu mai verific ctxTeams, doar că echipa e validă
+  const anyFact=(team,seed=0)=>{
+    const canon=_n14(team);
+    const facts=CUR14[canon];if(!facts||!facts.length)return null;
+    return _pick(facts,canon,seed);
+  };
 
   // ── Collect curiosities (country facts) for pattern slots ────────────────────
   // Seed includes current hour so facts rotate every hour, not stuck on same one
@@ -1121,6 +1127,23 @@ export function generateActivityFeed({
   latestFinished.forEach(m=>{addCur(m.teamA,m.id+100);addCur(m.teamB,m.id+150);});
   if(nextMatch){addCur(nextMatch.teamA,nextMatch.id+200);addCur(nextMatch.teamB,nextMatch.id+250);}
   todayOff.slice(0,2).forEach(m=>{addCur(m.teamA,m.id+300);addCur(m.teamB,m.id+350);});
+  // FIX: garantez minim 6 curiozități — completez din toate echipele calificate disponibile
+  // în CUR14, rotind pe hourSeed, dacă meciurile curente nu oferă suficiente echipe unice
+  if(curiosities.length<6){
+    const allTeamNames=Object.keys(CUR14);
+    const rotatedTeams=[...allTeamNames].sort((a,b)=>{
+      const ha=Math.abs((hourSeed+a.length)*31%97);
+      const hb=Math.abs((hourSeed+b.length)*31%97);
+      return ha-hb;
+    });
+    for(const team of rotatedTeams){
+      if(curiosities.length>=6)break;
+      const canon=_n14(team);
+      if(usedCurTeams.has(canon))continue;
+      const f=anyFact(team,team.length*7+hourSeed);
+      if(f){curiosities.push({type:'curiosity',text:`🌍 ${f}`});usedCurTeams.add(canon);}
+    }
+  }
 
   // ── Collect standalone quotes for pattern slots ───────────────────────────────
   const standalonePool=T_CITE_STANDALONE.slice();
@@ -1243,10 +1266,10 @@ export function generateActivityFeed({
     pushLb({type:'lead',text:leadText});
 
     // ── SLOT FIX 2+3: Comparații directe "cine a depășit pe cine" — mereu 2, mereu cu manea/citat ──
-    // Construiesc o listă de perechi adiacente în clasament (locul k vs locul k+1) cu diferență mică/medie,
-    // astfel încât mereu există ceva real de zis, nu doar la schimbări de prevLeaderboard.
+    // Construiesc o listă de perechi adiacente în clasament (locul k vs locul k+1), EXCLUZÂND
+    // perechea cu liderul (locul 1 vs 2), ca să nu se repete conținutul cu slotul de lider de mai sus.
     const pairs=[];
-    for(let i=0;i<n-1;i++){
+    for(let i=1;i<n-1;i++){
       const a=leaderboard[i],b=leaderboard[i+1];
       pairs.push({a,b,diff:a.points-b.points,idx:i});
     }
@@ -1265,12 +1288,12 @@ export function generateActivityFeed({
       const prevA=prevLeaderboard.find(p=>p.nickname===a.nickname);
       const realPassed=prevA&&prevA.rank>a.rank;
       let text;
-      if(realPassed&&_roll(a.nickname,hourSeed,'mn-passed')){
+      if(realPassed&&_roll(a.nickname,hourSeed,pr.idx,'mn-passed')){
         text=_call(T_MAN_RISE,[a.nickname,hourSeed,pr.idx,'pass-mn'],a.nickname);
-      }else if(_roll(a.nickname,b.nickname,hourSeed,pr.idx,'mn-h2h')){
-        text=`🎤 ${a.nickname} e cu ${diff} puncte peste ${b.nickname}. ${_call(T_MAN_LEAD,[a.nickname,hourSeed,pr.idx,'h2h-mn'],a.nickname)}`;
       }else if(_roll(a.nickname,b.nickname,hourSeed,pr.idx,'ci-h2h')){
-        text=`${_call(T_CITE_EXACT,[a.nickname,hourSeed,pr.idx,'h2h-ci'],a.nickname)} La ${diff} puncte de ${b.nickname}.`;
+        text=`📢 ${a.nickname} e cu ${diff} puncte peste ${b.nickname}. ${_call(T_CITE_EXACT,[a.nickname,hourSeed,pr.idx,'h2h-ci'],a.nickname)}`;
+      }else if(_roll(b.nickname,a.nickname,hourSeed,pr.idx,'mn-last-h2h')){
+        text=`🎤 ${b.nickname} e cu ${diff} puncte sub ${a.nickname}. ${_call(T_MAN_LAST,[b.nickname,hourSeed,pr.idx,'h2h-last'],b.nickname)}`;
       }else{
         text=diff<=20
           ?`⚔️ ${a.nickname} (loc ${a.rank}) și ${b.nickname} (loc ${b.rank}) sunt la ${diff} puncte distanță. Orice etapă poate schimba ordinea.`
