@@ -1358,24 +1358,32 @@ export function generateActivityFeed({
   }
 
   // ── STRUCTURA FINALĂ: intercalat curiozitate→citat→lb/pred→curiozitate→citat→lb/pred ──
-  // Adaug prima știre de predicție/meci recent
-  if(predItems.length>0)push(predItems.shift());
+  // Helper: dacă predItems s-a epuizat, completez sloturile cu citat/curiozitate extra în loc să las gol
+  const predOrFiller=(seedExtra)=>{
+    if(predItems.length>0)return predItems.shift();
+    const extraC=curiosities.shift();
+    if(extraC)return extraC;
+    return nextStandalone(hourSeed*7+seedExtra);
+  };
+
+  // Adaug prima știre de predicție/meci recent (sau filler dacă nu există)
+  push(predOrFiller(100));
 
   // Runda 1: curiozitate → citat → clasament
   const c1=curiosities.shift();if(c1)push(c1);
   const q1=nextStandalone(hourSeed*3);if(q1)push(q1);
   if(lbItems.length>0)push(lbItems.shift());
 
-  // A doua știre predicție dacă există
-  if(predItems.length>0)push(predItems.shift());
+  // A doua știre predicție dacă există (sau filler)
+  push(predOrFiller(200));
 
   // Runda 2: curiozitate → citat → clasament
   const c2=curiosities.shift();if(c2)push(c2);
   const q2=nextStandalone(hourSeed*3+1);if(q2)push(q2);
   if(lbItems.length>0)push(lbItems.shift());
 
-  // A treia știre predicție/upset
-  if(predItems.length>0)push(predItems.shift());
+  // A treia știre predicție/upset (sau filler)
+  push(predOrFiller(300));
 
   // Runda 3: curiozitate → citat → clasament
   const c3=curiosities.shift();if(c3)push(c3);
@@ -1394,6 +1402,25 @@ export function generateActivityFeed({
     const corners=rCornT??(rCornH!=null&&rCornA!=null?rCornH+rCornA:null);
     const items=_matchDrama(mName,sA,sB,match.homeScorers,match.awayScorers,rCards??0,corners??0,match.id);
     items.forEach(text=>{if(result.length<12)push({type:'match_drama',text});});
+  }
+
+  // FIX FINAL: dacă tot mai sunt sub 12 sloturi (meciuri/predicții insuficiente),
+  // completez cu citate standalone suplimentare sau curiozități rotite, ca să nu rămână feedul scurt.
+  let fillExtra=400;
+  while(result.length<12&&fillExtra<450){
+    const extra=curiosities.shift()||nextStandalone(hourSeed*11+fillExtra);
+    if(extra){
+      // Evit duplicate verificând dacă textul deja există în result
+      const exists=result.some(r=>r.text===extra.text);
+      if(!exists)push(extra);
+    }
+    fillExtra++;
+    if(curiosities.length===0&&fillExtra>410){
+      // Adaug citate suplimentare din alte poziții ale pool-ului standalone
+      const fallbackQuote=T_CITE_STANDALONE[(hourSeed+fillExtra)%T_CITE_STANDALONE.length];
+      const exists2=result.some(r=>r.text===fallbackQuote);
+      if(!exists2)push({type:'quote',text:fallbackQuote});
+    }
   }
 
   // Deduplicate by text and return 12 items
