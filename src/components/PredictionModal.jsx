@@ -9,11 +9,12 @@ import { useState } from 'react';
 import { ScoreInput, StepInput, PossessionInput } from './UI.jsx';
 import { formatKickoffRO, matchLockState, calcBreakdown } from '../data/gameData.js';
 
-export default function PredictionModal({ match, existing, onSave, onClose }) {
+export default function PredictionModal({ match, existing, onSave, onClose, allUserPredictions = {} }) {
   const [sA,   setSA]   = useState(existing?.scoreA   ?? 1);
   const [sB,   setSB]   = useState(existing?.scoreB   ?? 1);
   const [poss, setPoss] = useState(existing?.possession ?? 4);
   const [corn, setCorn] = useState(existing?.corners   ?? 9);
+  const [useJoker, setUseJoker] = useState(existing?.usedJoker === true);
   const [saved,   setSaved]   = useState(false);
   const [saving,  setSaving]  = useState(false);
   const [errMsg,  setErrMsg]  = useState('');
@@ -26,6 +27,18 @@ export default function PredictionModal({ match, existing, onSave, onClose }) {
     ? calcBreakdown(existing, match)
     : null;
 
+  // ── JOKER ELIGIBILITY (per plan section C) ──────────────────────────────────
+  const JOKER_ELIGIBLE_STAGES = ['R32', 'R16', 'QF'];
+  const isJokerEligibleStage = JOKER_ELIGIBLE_STAGES.includes(match.stage);
+  // Count jokers already used across ALL of this user's predictions, excluding
+  // this same match (so re-saving the same match doesn't double-count itself).
+  const jokersUsedElsewhere = Object.entries(allUserPredictions)
+    .filter(([mid]) => Number(mid) !== match.id)
+    .filter(([, p]) => p?.usedJoker === true)
+    .length;
+  const jokersRemaining = Math.max(0, 2 - jokersUsedElsewhere - (useJoker ? 1 : 0));
+  const canUseJoker = isJokerEligibleStage && isEditable && (jokersUsedElsewhere < 2 || useJoker);
+
   const result = sA > sB ? match.teamA : sA < sB ? match.teamB : 'Egal';
 
   const handleSave = async () => {
@@ -33,7 +46,14 @@ export default function PredictionModal({ match, existing, onSave, onClose }) {
     setSaving(true);
     setErrMsg('');
     try {
-      await onSave(match.id, { scoreA: sA, scoreB: sB, possession: poss, corners: corn });
+      const payload = { scoreA: sA, scoreB: sB, possession: poss, corners: corn };
+      // Only set usedJoker explicitly when relevant — keeps old predictions
+      // (which never had this field) unaffected and avoids writing it on
+      // matches where joker isn't even eligible (group/SF/THIRD_PLACE/FINAL).
+      if (isJokerEligibleStage) {
+        payload.usedJoker = useJoker === true;
+      }
+      await onSave(match.id, payload);
       setSaved(true);
       setTimeout(onClose, 600);
     } catch (e) {
@@ -135,20 +155,50 @@ export default function PredictionModal({ match, existing, onSave, onClose }) {
           <div style={{ marginBottom:14,padding:'10px 14px',background:'rgba(0,229,160,0.06)',border:'1px solid rgba(0,229,160,0.15)',borderRadius:10 }}>
             <div style={{ fontSize:10,color:'rgba(0,229,160,0.6)',letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:6,fontWeight:700 }}>Puncte câștigate</div>
             {[
-              { label:'Scor exact', pts: breakdown.exactScore   ? 100 : 0 },
-              { label:'Câștigător', pts: breakdown.correctWinner ? 30  : 0 },
-              { label:'Cartonașe', pts: breakdown.possessionPts || 0 },
-              { label:'Cornere',    pts: breakdown.cornersPts    || 0 },
+              { label:'Scor exact', pts: breakdown.exactScore ? 100 : 0 },
+              { label:'Câștigător', pts: breakdown.correctRes  ? 50  : 0 },
+              { label:'Cartonașe', pts: breakdown.possession  || 0 },
+              { label:'Cornere',    pts: breakdown.corners     || 0 },
             ].map(r => r.pts > 0 && (
               <div key={r.label} style={{ display:'flex',justifyContent:'space-between',marginBottom:3 }}>
                 <span style={{ fontSize:11,color:'rgba(255,255,255,0.45)' }}>{r.label}</span>
                 <span style={{ fontSize:11,fontWeight:700,color:'#00E5A0',fontFamily:"'DM Mono',monospace" }}>+{r.pts}</span>
               </div>
             ))}
-            <div style={{ borderTop:'1px solid rgba(255,255,255,0.06)',marginTop:6,paddingTop:6,display:'flex',justifyContent:'space-between' }}>
-              <span style={{ fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.5)' }}>Total</span>
+            <div style={{ borderTop:'1px solid rgba(255,255,255,0.06)',marginTop:6,paddingTop:6,display:'flex',justifyContent:'space-between',alignItems:'center' }}>
+              <span style={{ fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.5)' }}>
+                Total{breakdown.multiplier === 2 ? (
+                  <span style={{ marginLeft:6,fontSize:10,fontWeight:800,color:'#FF6B00',background:'rgba(255,107,0,0.12)',padding:'2px 6px',borderRadius:6 }}>
+                    {breakdown.isAutoDoubleStage ? '×2 ALL OR NOTHING' : '×2 JOKER'}
+                  </span>
+                ) : null}
+              </span>
               <span style={{ fontSize:16,fontWeight:900,color:'#fff',fontFamily:"'DM Mono',monospace" }}>+{breakdown.total} pts</span>
             </div>
+          </div>
+        )}
+
+        {/* Joker (per plan section C) — only shown for R32/R16/QF, while open */}
+        {isJokerEligibleStage && isEditable && (
+          <div style={{ marginBottom:14,padding:'12px 14px',background:useJoker?'rgba(255,107,0,0.1)':'rgba(255,255,255,0.03)',border:useJoker?'1px solid rgba(255,107,0,0.35)':'1px solid rgba(255,255,255,0.06)',borderRadius:12,transition:'all 0.2s' }}>
+            {jokersUsedElsewhere < 2 || useJoker ? (
+              <button
+                onClick={() => setUseJoker(v => !v)}
+                style={{ width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:'none',border:'none',cursor:'pointer',padding:0 }}
+              >
+                <span style={{ fontSize:13,fontWeight:700,color:useJoker?'#FF6B00':'rgba(255,255,255,0.6)' }}>
+                  🔥 Activează Joker x2
+                </span>
+                <span style={{ fontSize:11,fontWeight:700,color:useJoker?'#FF6B00':'rgba(255,255,255,0.35)',fontFamily:"'DM Mono',monospace" }}>
+                  Jokere rămase: {jokersRemaining}/2
+                </span>
+              </button>
+            ) : (
+              <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between' }}>
+                <span style={{ fontSize:13,fontWeight:700,color:'rgba(255,255,255,0.25)' }}>🔥 Joker</span>
+                <span style={{ fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.25)' }}>Jokere epuizate</span>
+              </div>
+            )}
           </div>
         )}
 
