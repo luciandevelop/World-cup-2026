@@ -170,11 +170,25 @@ export function calcBreakdown(pred, match) {
 
   // Perfect prediction: exact score + exact cards + exact corners = 200 total (not additive bonus)
   const isPerfect = exactScore === 100 && possession === 15 && corners === 15;
-  const total = isPerfect ? 200 : exactScore + correctRes + totalGoals + possession + corners;
+  const baseTotal = isPerfect ? 200 : exactScore + correctRes + totalGoals + possession + corners;
+
+  // ── KNOCKOUT MULTIPLIERS ─────────────────────────────────────────────────────
+  // "All or Nothing": automatic x2 for SF / THIRD_PLACE / FINAL — no user choice.
+  // Joker: optional x2 for R32 / R16 / QF — only if user explicitly activated it
+  // on THIS specific prediction (pred.usedJoker === true). These two NEVER stack
+  // because Joker is only allowed on R32/R16/QF, and All-or-Nothing only on
+  // SF/THIRD_PLACE/FINAL — mutually exclusive stages by design.
+  const AUTO_DOUBLE_STAGES = ['SF', 'THIRD_PLACE', 'FINAL'];
+  const JOKER_ELIGIBLE_STAGES = ['R32', 'R16', 'QF'];
+  const isAutoDoubleStage = AUTO_DOUBLE_STAGES.includes(match.stage);
+  const isJokerUsed = JOKER_ELIGIBLE_STAGES.includes(match.stage) && pred.usedJoker === true;
+  const multiplier = isAutoDoubleStage ? 2 : isJokerUsed ? 2 : 1;
+  const total = baseTotal * multiplier;
 
   return {
     exactScore, correctRes, totalGoals, possession, corners, total,
     isPerfect,
+    baseTotal, multiplier, isAutoDoubleStage, isJokerUsed,
     // Debug breakdown strings
     _debug: {
       rA, rB, pA, pB, realRes, predRes,
