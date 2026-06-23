@@ -618,7 +618,7 @@ export default function App() {
 
       {/* ── Modals ── */}
       {predictingMatch && (
-        <PredictionModal match={predictingMatch} existing={predictions[predictingMatch.id]} onSave={handleSavePrediction} onClose={()=>setPredictingMatch(null)}/>
+        <PredictionModal match={predictingMatch} existing={predictions[predictingMatch.id]} onSave={handleSavePrediction} onClose={()=>setPredictingMatch(null)} allUserPredictions={predictions}/>
       )}
       {perfectHit && <PerfectHitOverlay pts={perfectHit.pts} onDone={()=>setPerfectHit(null)}/>}
       {showProfile && (
