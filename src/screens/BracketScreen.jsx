@@ -435,6 +435,33 @@ export default function BracketScreen() {
         <ThirdsPanel allThirds={allThirds} qualifiedThirds={qualifiedThirds}/>
         <QualificationBanner/>
 
+        {/* ── Reguli speciale faza eliminatorie ── */}
+        <div style={{ marginTop:12, marginBottom:4, padding:'12px 14px', background:'linear-gradient(135deg,rgba(74,158,255,0.07),rgba(74,158,255,0.02))', border:'1px solid rgba(74,158,255,0.18)', borderRadius:13 }}>
+          <div style={{ fontSize:10, fontWeight:800, color:'#4A9EFF', letterSpacing:'0.08em', textTransform:'uppercase', marginBottom:9 }}>
+            ⚡ Reguli speciale — Eliminatorii
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
+            <div style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
+              <div style={{ fontSize:16, flexShrink:0 }}>🔥</div>
+              <div>
+                <div style={{ fontSize:12, fontWeight:700, color:'#fff', marginBottom:2 }}>All or Nothing</div>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,0.4)', lineHeight:1.45 }}>
+                  La semifinale, finala mică și finala mare, punctele tuturor se dublează automat.
+                </div>
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
+              <div style={{ fontSize:16, flexShrink:0 }}>🃏</div>
+              <div>
+                <div style={{ fontSize:12, fontWeight:700, color:'#fff', marginBottom:2 }}>Joker-e (×2)</div>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,0.4)', lineHeight:1.45 }}>
+                  2 joker-e per jucător, de folosit pe orice meci din optimi, 16imi sau sferturi — dublează punctele tale de la meciul ales. Nu sunt valabile la semifinale/finale (acolo e deja All or Nothing).
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {view === 'list' ? (
           <RoundListView r32={r32} champion={champion}/>
         ) : (

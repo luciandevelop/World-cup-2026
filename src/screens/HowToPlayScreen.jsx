@@ -144,6 +144,23 @@ function HowToPlayScreen() {
         ))}
       </div>
 
+      {/* ── ELIMINATION PHASE SPECIAL RULES ── */}
+      <Divider label="Reguli speciale — Eliminatorii" />
+      <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
+        {[
+          { icon:"🔥", label:"All or Nothing", text:"La semifinale, finala mică și finala mare, punctele tuturor se dublează automat." },
+          { icon:"🃏", label:"Joker-e (×2)",    text:"2 joker-e per jucător, de folosit pe orice meci din optimi/16imi/sferturi — dublează punctele tale de la meciul ales. Nu sunt valabile la semifinale/finale." },
+        ].map((r,i)=>(
+          <div key={i} style={{ display:"flex",gap:10,alignItems:"flex-start",padding:"11px 13px",background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.05)",borderRadius:11 }}>
+            <span style={{ fontSize:16,flexShrink:0,marginTop:1 }}>{r.icon}</span>
+            <div>
+              <div style={{ fontSize:12,fontWeight:700,color:"#fff",marginBottom:2 }}>{r.label}</div>
+              <div style={{ fontSize:11,color:"#666",lineHeight:1.45 }}>{r.text}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* ── LIVE LEADERBOARD ── */}
       <Divider label="Clasament live" />
       <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
