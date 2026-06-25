@@ -122,6 +122,9 @@ export const ALL_MATCHES = [
   { id:71, group:"L", teamA:"Panama",        teamB:"Anglia",         flagA:"🇵🇦", flagB:"🏴󠁧󠁢󠁥󠁮󠁧󠁿", time:"2026-06-27T21:00:00Z", venue:"Miami"         }, // RO 28 Jun 00:00
   { id:72, group:"L", teamA:"Croatia",       teamB:"Ghana",          flagA:"🇭🇷", flagB:"🇬🇭", time:"2026-06-27T21:00:00Z", venue:"New York"      }, // RO 28 Jun 00:00
 
+  // ══ FAZA ELIMINATORIE — Șaisprezecimi (Round of 32) ════════════════════════
+  { id:73, group:"KO", stage:"R32", teamA:"Africa de Sud", teamB:"Canada", flagA:"🇿🇦", flagB:"🇨🇦", time:"2026-06-28T19:00:00Z", venue:"Los Angeles" }, // RO 28 Jun 22:00
+
 ];
 
 export const ALL_GROUPS = ["A","B","C","D","E","F","G","H","I","J","K","L"];
