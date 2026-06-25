@@ -1191,6 +1191,15 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
   // Alias used by all rendering logic below
   const groupedMatches = liveGroupedMatches;
 
+  // ── Knockout matches (group:"KO") — kept fully separate from A-L group logic
+  // on purpose: adding "KO" to ALL_GROUPS would create an unwanted "GRUPA KO"
+  // filter button and break GROUP_TEAMS computation. Instead, KO matches are
+  // simply appended to the "toate"/"mele" match list directly.
+  const koMatches = useMemo(() => {
+    const live = buildMatches(finishedResults);
+    return live.filter(m => m.group === "KO");
+  }, [finishedResults]);
+
   // All live matches (flat array, for friendMatches/myPred filtering)
   const allLiveMatches = useMemo(() => buildMatches(finishedResults), [finishedResults]); // official WC only
 
@@ -1450,7 +1459,7 @@ export default function MatchesScreen({ predictions, onPredict, finishedResults,
 
         {/* Group sections — upcoming only (finished shown in accordion above) */}
         {(tab === "toate" || tab === "mele") && groupFilter === "toate" && (() => {
-          const allM = visibleGroups.flatMap(g => groupedMatches[g] || []);
+          const allM = [...visibleGroups.flatMap(g => groupedMatches[g] || []), ...koMatches];
           const sorted = [...allM].sort((a, b) => new Date(a.time) - new Date(b.time));
           const filtered = tab === "mele" ? sorted.filter(m => predictions[m.id]) : sorted;
           if (filtered.length === 0) return null;
