@@ -414,16 +414,34 @@ function BracketView({ r32, champion }) {
 // ─── MAIN SCREEN ──────────────────────────────────────────────────────────────
 export default function BracketScreen() {
   const r32Raw = useMemo(() => buildKnockoutSlots(), []);
-  // VISUAL-ONLY OVERRIDE: slot m37 is "2° Gr.A vs 2° Gr.B" — South Africa
-  // (2nd, Group A) vs Canada (2nd, Group B) is now a confirmed fixture.
-  // This only changes what's DISPLAYED in this bracket view; it does not
-  // create or alter any prediction data. The real predictable match is
-  // numeric id 73 in matches.js, completely separate from this slot.
-  const r32 = useMemo(() => r32Raw.map(slot =>
-    slot.id === 'm37'
-      ? { ...slot, home: { team: 'Africa de Sud', flag: '🇿🇦' }, away: { team: 'Canada', flag: '🇨🇦' } }
-      : slot
-  ), [r32Raw]);
+  // VISUAL-ONLY OVERRIDE: confirmed qualified teams from Flashscore bracket,
+  // applied directly to the displayed slot objects. This does NOT touch
+  // gameData.js, does NOT create predictions, and does NOT affect the real
+  // predictable match (numeric id 73 in matches.js, separate from this).
+  // Unknown opponents are left untouched (still show as "3° pool..." etc.
+  // placeholders coming from buildKnockoutSlots' own null/label logic).
+  const r32 = useMemo(() => r32Raw.map(slot => {
+    switch (slot.id) {
+      case 'm33': // 1A vs 3(B/C/D/E/F) — 1A = Mexic confirmed, opponent still unknown
+        return { ...slot, home: { team: 'Mexic', flag: '🇲🇽' } };
+      case 'm34': // 1C vs 3(D/E/F) — 1C = Brazilia confirmed, opponent still unknown
+        return { ...slot, home: { team: 'Brazilia', flag: '🇧🇷' } };
+      case 'm35': // 1E vs 3(A/B/C/D) — 1E = Germania confirmed, opponent still unknown
+        return { ...slot, home: { team: 'Germania', flag: '🇩🇪' } };
+      case 'm37': // 2A vs 2B — both confirmed: Africa de Sud vs Canada
+        return { ...slot, home: { team: 'Africa de Sud', flag: '🇿🇦' }, away: { team: 'Canada', flag: '🇨🇦' } };
+      case 'm38': // 2C vs 2D — 2C = Maroc confirmed, 2D still unknown
+        return { ...slot, home: { team: 'Maroc', flag: '🇲🇦' } };
+      case 'm41': // 1B vs 3(G-L) — 1B = Elvetia confirmed, opponent still unknown
+        return { ...slot, home: { team: 'Elvetia', flag: '🇨🇭' } };
+      case 'm42': // 1D vs 3(I/J/K/L) — 1D = SUA confirmed, opponent still unknown
+        return { ...slot, home: { team: 'SUA', flag: '🇺🇸' } };
+      case 'm47': // 1I vs 1J — 1J = Argentina confirmed, 1I still unknown
+        return { ...slot, away: { team: 'Argentina', flag: '🇦🇷' } };
+      default:
+        return slot;
+    }
+  }), [r32Raw]);
   const { groupsCompleted, qualifiedThirds, allThirds } = useMemo(() => buildQualifiedTeams(), []);
   const [view, setView] = useState('list');
 
