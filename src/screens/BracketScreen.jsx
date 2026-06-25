@@ -167,11 +167,21 @@ function QualificationBanner() {
 }
 
 // ─── PROGRESS BAR ─────────────────────────────────────────────────────────────
-function GroupProgress({ finished, total, groupsCompleted, qualifiedThirds }) {
+// confirmedWinners/confirmedRunnersUp: VISUAL-ONLY override counts, matching
+// the manually-confirmed teams already shown in the bracket slots above
+// (Mexic, Brazilia, Germania, Elvetia, SUA, Argentina = 6 winners;
+// Africa de Sud, Canada, Maroc = 3 runners-up). These do NOT come from
+// buildQualifiedTeams() — that function still correctly requires full real
+// group completion and is untouched. This is purely a display counter fix.
+function GroupProgress({ finished, total, groupsCompleted, qualifiedThirds, confirmedWinners = 0, confirmedRunnersUp = 0 }) {
   const pct  = Math.round((finished / total) * 100);
   const done = finished === total;
   const thirdsCount = qualifiedThirds?.length || 0;
   const allDone = groupsCompleted?.length === 12;
+  // Use the larger of (real completed groups) vs (manually confirmed) so the
+  // counter never goes backward once buildQualifiedTeams catches up for real.
+  const winnersCount = Math.max(groupsCompleted?.length || 0, confirmedWinners);
+  const runnersUpCount = Math.max(groupsCompleted?.length || 0, confirmedRunnersUp);
 
   return (
     <div style={{ marginBottom:14 }}>
@@ -189,9 +199,9 @@ function GroupProgress({ finished, total, groupsCompleted, qualifiedThirds }) {
       {/* Qualification counts */}
       <div style={{ display:'flex', gap:6 }}>
         {[
-          { label:'Castigatoare grupe', value:groupsCompleted?.length||0, max:12, color:'#00E5A0' },
-          { label:'Locuri secunde',      value:groupsCompleted?.length||0, max:12, color:'#4A9EFF' },
-          { label:'Cele mai bune locuri 3', value:thirdsCount,             max:8,  color:'#FFD700' },
+          { label:'Castigatoare grupe', value:winnersCount,    max:12, color:'#00E5A0' },
+          { label:'Locuri secunde',      value:runnersUpCount, max:12, color:'#4A9EFF' },
+          { label:'Cele mai bune locuri 3', value:thirdsCount, max:8,  color:'#FFD700' },
         ].map((s,i) => (
           <div key={i} style={{ flex:1, padding:'6px 8px', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)', borderRadius:8, textAlign:'center' }}>
             <div style={{ fontSize:12, fontWeight:800, color:s.color, fontFamily:"'DM Mono',monospace" }}>{s.value}<span style={{ fontSize:9, color:'rgba(255,255,255,0.2)' }}>/{s.max}</span></div>
@@ -220,11 +230,11 @@ function RoundListView({ r32, champion }) {
   const [active, setActive] = useState('r32');
 
   const ROUND_DATA = {
-    r32: { matches:r32,                    label:'Optimi de Finală',   isFinal:false },
-    r16: { matches:mkEmpty(8,'r16','R32'), label:'16-imi de Finală',   isFinal:false },
-    qf:  { matches:mkEmpty(4,'qf','R16'),  label:'Sferturi de Finală', isFinal:false },
-    sf:  { matches:mkEmpty(2,'sf','SF'),   label:'Semifinale',         isFinal:false },
-    f:   { matches:mkEmpty(1,'f','Semi'),  label:'🏆 Finala',          isFinal:true  },
+    r32: { matches:r32,                       label:'Șaisprezecimi',      isFinal:false },
+    r16: { matches:mkEmpty(8,'r16','16-imi'), label:'Optimi de Finală',   isFinal:false },
+    qf:  { matches:mkEmpty(4,'qf','Optimi'),  label:'Sferturi de Finală', isFinal:false },
+    sf:  { matches:mkEmpty(2,'sf','Sferturi'),label:'Semifinale',         isFinal:false },
+    f:   { matches:mkEmpty(1,'f','Semifinală'),label:'🏆 Finala',         isFinal:true  },
   };
 
   // VISUAL-ONLY: third-place match (finala mică) for the Final tab. This is
@@ -240,8 +250,8 @@ function RoundListView({ r32, champion }) {
   };
 
   const TABS = [
-    { id:'r32', label:'Optimi'  },
-    { id:'r16', label:'16-imi'  },
+    { id:'r32', label:'16-imi'  },
+    { id:'r16', label:'Optimi'  },
     { id:'qf',  label:'Sferturi'},
     { id:'sf',  label:'Semi'    },
     { id:'f',   label:'🏆 Final'},
@@ -337,8 +347,8 @@ function RoundListView({ r32, champion }) {
 // Layout: R32-left → R16-left → QF-left → SF → FINAL → SF → QF-right → R16-right → R32-right
 // The Final is the rightmost "peak" — there is no continuation after it.
 function BracketView({ r32, champion }) {
-  const r16 = mkEmpty(8,'r16','Optimi');
-  const qf  = mkEmpty(4,'qf','16-imi');
+  const r16 = mkEmpty(8,'r16','16-imi');
+  const qf  = mkEmpty(4,'qf','Optimi');
   const sf  = mkEmpty(2,'sf','Sferturi');
   const fin = mkEmpty(1,'f','Semifinală');
 
@@ -366,10 +376,10 @@ function BracketView({ r32, champion }) {
       <div style={{ display:'flex', gap:10, alignItems:'center', minWidth:'max-content', padding:'4px 2px 4px' }}>
 
         {/* ── LEFT HALF ─────────────────────────────────── */}
-        <Col rounds={left.slice(0,4)} small title="Optimi A"/>
-        <Col rounds={left.slice(4,8)} small title="Optimi B"/>
+        <Col rounds={left.slice(0,4)} small title="16-imi A"/>
+        <Col rounds={left.slice(4,8)} small title="16-imi B"/>
         <Connector/>
-        <Col rounds={r16.slice(0,4)} title="16-imi A"/>
+        <Col rounds={r16.slice(0,4)} title="Optimi A"/>
         <Col rounds={qf.slice(0,2)}  title="Sferturi A"/>
         <Connector/>
 
@@ -400,10 +410,10 @@ function BracketView({ r32, champion }) {
         <Connector/>
         {/* ── RIGHT HALF ────────────────────────────────── */}
         <Col rounds={qf.slice(2,4)}  title="Sferturi B"/>
-        <Col rounds={r16.slice(4,8)} title="16-imi B"/>
+        <Col rounds={r16.slice(4,8)} title="Optimi B"/>
         <Connector/>
-        <Col rounds={right.slice(0,4)} small title="Optimi C"/>
-        <Col rounds={right.slice(4,8)} small title="Optimi D"/>
+        <Col rounds={right.slice(0,4)} small title="16-imi C"/>
+        <Col rounds={right.slice(4,8)} small title="16-imi D"/>
         {/* ── END — no columns after this ──────────────── */}
 
       </div>
@@ -481,7 +491,7 @@ export default function BracketScreen() {
 
       {/* Content */}
       <div style={{ padding:'12px 14px 0' }}>
-        <GroupProgress finished={finishedMatches} total={totalMatches} groupsCompleted={groupsCompleted} qualifiedThirds={qualifiedThirds}/>
+        <GroupProgress finished={finishedMatches} total={totalMatches} groupsCompleted={groupsCompleted} qualifiedThirds={qualifiedThirds} confirmedWinners={6} confirmedRunnersUp={3}/>
         <ThirdsPanel allThirds={allThirds} qualifiedThirds={qualifiedThirds}/>
         <QualificationBanner/>
 
