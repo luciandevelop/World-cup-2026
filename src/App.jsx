@@ -589,7 +589,7 @@ export default function App() {
       {/* ── Content ── */}
       <div style={{ flex:1,overflowY:'auto',paddingBottom:72 }}>
         {adminMode
-          ? <AdminScreen currentUser={user} finishedResults={finishedResults} onMatchUpdate={handleMatchUpdate} specialResultsInit={specialResults} allSpecialPreds={allSpecialPreds} allUsers={allUsers}/>
+          ? <AdminScreen currentUser={user} finishedResults={finishedResults} onMatchUpdate={handleMatchUpdate} specialResultsInit={specialResults} allSpecialPreds={allSpecialPreds} allUsers={allUsers} allPredictions={allPredictions}/>
           : tab==='matches'
           ? <MatchesScreen predictions={predictions} onPredict={setPredictingMatch} finishedResults={finishedResults} groupOverrides={groupOverrides} allPredictions={allPredictions} allUsers={allUsers} activityFeed={activityFeedComputed} user={user} specialResults={specialResults} allSpecialPreds={allSpecialPreds}/>
           : tab==='leaderboard'
