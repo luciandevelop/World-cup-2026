@@ -101,7 +101,7 @@ function AdminHelp({ open, onToggle }) {
   );
 }
 
-export default function AdminScreen({ currentUser, finishedResults, onMatchUpdate, specialResultsInit = null }) {
+export default function AdminScreen({ currentUser, finishedResults, onMatchUpdate, specialResultsInit = null, allUsers = {}, allPredictions = {} }) {
   const [sel,     setSel]    = useState(null);
   const [specialRes, setSpecialRes] = useState(
     specialResultsInit
@@ -133,6 +133,37 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
   const [showDebug,        setShowDebug]         = useState(false);
   const [groupOverrides,   setGroupOverrides]    = useState(() => loadGroupOverrides());
   const [lineupFormation, setLineupFormation] = useState('4-3-3');
+
+  // ── JOKER AUDIT (read-only) ───────────────────────────────────────────────
+  // Derives joker usage purely from existing prediction data. No new Firestore
+  // field/collection is created here — this only reads what PredictionModal
+  // already writes via the normal savePrediction flow.
+  const jokerAudit = useMemo(() => {
+    const JOKER_ELIGIBLE_STAGES = ['R32', 'R16', 'QF'];
+    const matchById = Object.fromEntries(MATCHES.map(m => [m.id, m]));
+
+    return Object.entries(allPredictions).map(([uid, preds]) => {
+      const nickname = allUsers[uid]?.nickname || uid;
+      const jokerMatches = Object.entries(preds || {})
+        .filter(([matchId, pred]) => {
+          // Defensive: ignore usedJoker on anything that isn't a real
+          // joker-eligible knockout stage, even if malformed data exists
+          // (e.g. a stray usedJoker:true on a group match).
+          if (pred?.usedJoker !== true) return false;
+          const m = matchById[Number(matchId)];
+          if (!m) return false; // unknown match id — ignore rather than guess
+          return JOKER_ELIGIBLE_STAGES.includes(m.stage);
+        })
+        .map(([matchId]) => {
+          const m = matchById[Number(matchId)];
+          return { matchId: Number(matchId), label: m ? `${m.teamA} – ${m.teamB}` : `#${matchId}` };
+        });
+      return { uid, nickname, count: jokerMatches.length, matches: jokerMatches };
+    })
+    .filter(row => row.count > 0 || allUsers[row.uid]) // show known users even at 0, skip ghost uids with 0
+    .sort((a, b) => b.count - a.count || a.nickname.localeCompare(b.nickname));
+  }, [allPredictions, allUsers]);
+
   const [lineupHome, setLineupHome] = useState('');
   const [lineupAway, setLineupAway] = useState('');
   const [lineupOfficial, setLineupOfficial] = useState(false);
@@ -643,7 +674,52 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
         })()}
       </div>
 
-      {/* Recalculate / Reset panel */}
+      {/* ── 🔥 AUDIT JOKER (read-only) ──────────────────────────────────────── */}
+      {/* Pure display panel — no buttons, no reset, no manual editing, no
+          Firestore writes. Everything below is derived from allPredictions
+          (already loaded) and the static MATCHES list (team names). */}
+      <div style={{ marginTop:10, padding:'10px 12px', background:'rgba(255,107,0,0.04)', border:'1px solid rgba(255,107,0,0.16)', borderRadius:10 }}>
+        <div style={{ fontSize:10, color:'rgba(255,107,0,0.7)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:8, fontWeight:700 }}>
+          🔥 Audit Joker
+        </div>
+        {jokerAudit.length === 0 ? (
+          <div style={{ fontSize:11, color:'rgba(255,255,255,0.25)', fontStyle:'italic' }}>
+            Niciun jucător înregistrat încă.
+          </div>
+        ) : (
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            {jokerAudit.map(row => {
+              const overLimit = row.count > 2;
+              return (
+                <div key={row.uid} style={{ padding:'7px 9px', background:'rgba(255,255,255,0.02)', borderRadius:8, border: overLimit ? '1px solid rgba(239,68,68,0.35)' : '1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{row.nickname}</span>
+                    <span style={{ fontSize:11, fontWeight:800, color: overLimit ? '#EF4444' : row.count > 0 ? '#FF6B00' : 'rgba(255,255,255,0.25)', fontFamily:"'DM Mono',monospace" }}>
+                      {row.count}/2 Joker-e
+                    </span>
+                  </div>
+                  {overLimit && (
+                    <div style={{ fontSize:10, color:'#EF4444', fontWeight:700, marginTop:3 }}>
+                      ⚠️ DEPĂȘIRE LIMITĂ: {row.count}/2
+                    </div>
+                  )}
+                  {row.matches.length > 0 && (
+                    <div style={{ marginTop:4, display:'flex', flexDirection:'column', gap:2 }}>
+                      {row.matches.map(m => (
+                        <div key={m.matchId} style={{ fontSize:10, color:'rgba(255,255,255,0.4)' }}>
+                          • {m.label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+
       <div style={{ display:'flex', gap:8, marginTop:10 }}>
         <button
           onClick={() => { onMatchUpdate?.({ _action:'recalc' }); setSaved(false); }}
