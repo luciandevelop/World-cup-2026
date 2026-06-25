@@ -391,7 +391,17 @@ function BracketView({ r32, champion }) {
 
 // ─── MAIN SCREEN ──────────────────────────────────────────────────────────────
 export default function BracketScreen() {
-  const r32 = useMemo(() => buildKnockoutSlots(), []);
+  const r32Raw = useMemo(() => buildKnockoutSlots(), []);
+  // VISUAL-ONLY OVERRIDE: slot m37 is "2° Gr.A vs 2° Gr.B" — South Africa
+  // (2nd, Group A) vs Canada (2nd, Group B) is now a confirmed fixture.
+  // This only changes what's DISPLAYED in this bracket view; it does not
+  // create or alter any prediction data. The real predictable match is
+  // numeric id 73 in matches.js, completely separate from this slot.
+  const r32 = useMemo(() => r32Raw.map(slot =>
+    slot.id === 'm37'
+      ? { ...slot, home: { team: 'Africa de Sud', flag: '🇿🇦' }, away: { team: 'Canada', flag: '🇨🇦' } }
+      : slot
+  ), [r32Raw]);
   const { groupsCompleted, qualifiedThirds, allThirds } = useMemo(() => buildQualifiedTeams(), []);
   const [view, setView] = useState('list');
 

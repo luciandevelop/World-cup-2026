@@ -370,15 +370,32 @@ function MatchCard({ match, prediction, onPredict, onDetail }) {
           <div style={{ position:"absolute", top:0, left:0, right:0, height:2, background:"linear-gradient(90deg,transparent,rgba(239,68,68,0.6),transparent)" }}/>
         )}
 
-        {/* Top row: status + pts */}
+        {/* Top row: status + stage label (KO only) + pts */}
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-          <StatusPill state={lockInfo.state}/>
+          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+            <StatusPill state={lockInfo.state}/>
+            {match.group === "KO" && (
+              <span style={{ fontSize:10, fontWeight:800, color:"#4A9EFF", background:"rgba(74,158,255,0.12)", border:"1px solid rgba(74,158,255,0.25)", padding:"2px 7px", borderRadius:6, letterSpacing:"0.03em" }}>
+                {match.stage === "R32" ? "ȘAISPREZECIMI" : match.stage === "R16" ? "OPTIMI" : match.stage === "QF" ? "SFERTURI" : match.stage === "SF" ? "SEMIFINALĂ" : match.stage === "THIRD_PLACE" ? "FINALA MICĂ" : match.stage === "FINAL" ? "FINALĂ" : match.stage}
+              </span>
+            )}
+          </div>
           {pts !== null && (
             <div style={{ fontSize:12, fontWeight:700, color:pts >= 100?"#FFD700":pts >= 50?"#00E5A0":"rgba(255,255,255,0.4)", fontFamily:"'DM Mono',monospace", background:pts >= 100?"rgba(255,215,0,0.08)":"transparent", padding:"1px 8px", borderRadius:4 }}>
               +{pts} pts
             </div>
           )}
         </div>
+
+        {/* Venue/date subline — shown for KO matches for extra clarity, since they're unfamiliar */}
+        {match.group === "KO" && (
+          <div style={{ fontSize:10, color:"rgba(255,255,255,0.35)", marginBottom:8, fontFamily:"'DM Mono',monospace" }}>
+            {new Date(match.time).toLocaleDateString("ro-RO",{timeZone:"Europe/Bucharest",weekday:"short",day:"2-digit",month:"short"})}
+            {" · "}
+            {new Date(match.time).toLocaleTimeString("ro-RO",{timeZone:"Europe/Bucharest",hour:"2-digit",minute:"2-digit"})} RO
+            {match.venue ? ` · ${match.venue}` : ""}
+          </div>
+        )}
 
         {/* Teams row */}
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
