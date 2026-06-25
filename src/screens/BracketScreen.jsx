@@ -227,6 +227,18 @@ function RoundListView({ r32, champion }) {
     f:   { matches:mkEmpty(1,'f','Semi'),  label:'🏆 Finala',          isFinal:true  },
   };
 
+  // VISUAL-ONLY: third-place match (finala mică) for the Final tab. This is
+  // purely a display object — it does NOT create a prediction, does NOT use
+  // numeric id 103, and does NOT touch gameData.js/scoring/Joker logic in any
+  // way. The real predictable third-place match (when implemented) must use
+  // numeric id 103 in matches.js, completely separate from this visual object.
+  const thirdPlaceMatch = {
+    id: 'm103_visual',
+    home: null, away: null,
+    homeLabel: 'Pierz. Semi', awayLabel: 'Pierz. Semi',
+    label: '🥉 FINALA MICĂ — 18 Iulie 2026',
+  };
+
   const TABS = [
     { id:'r32', label:'Optimi'  },
     { id:'r16', label:'16-imi'  },
@@ -263,6 +275,11 @@ function RoundListView({ r32, champion }) {
       {/* Final tab — special full-width layout */}
       {active === 'f' ? (
         <div>
+          {/* Third-place match (finala mică) — visual only, always shown above the main final */}
+          <div style={{ marginBottom:14 }}>
+            <MatchCard match={thirdPlaceMatch} isFinal={false}/>
+          </div>
+
           {champion ? (
             <ChampionCard team={champion.team} flag={champion.flag}/>
           ) : (
@@ -372,6 +389,11 @@ function BracketView({ r32, champion }) {
           ) : (
             <MatchCard match={{...fin[0], label:'🏆 FINALA'}} isFinal/>
           )}
+          {/* Third-place match (finala mică) — visual only, shown below the main final */}
+          <MatchCard
+            match={{ id:'m103_visual', home:null, away:null, homeLabel:'Pierz. Semi', awayLabel:'Pierz. Semi', label:'🥉 FINALA MICĂ' }}
+            isSmall
+          />
           <MatchCard match={sf[1]}/>
         </div>
 
