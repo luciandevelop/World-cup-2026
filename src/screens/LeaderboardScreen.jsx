@@ -112,6 +112,13 @@ function PlayerDetailModal({ nickname, avatarId, rank, points, exactScores,
                   </div>
                   {/* Total pts badge */}
                   <div style={{ textAlign:'right', flexShrink:0 }}>
+                    {/* Joker badge — display-only, same condition as MatchesScreen:
+                        usedJoker===true AND match.stage is a knockout stage. */}
+                    {pred.usedJoker === true && ['R32','R16','QF'].includes(m.stage) && (
+                      <div style={{ fontSize:9, fontWeight:800, color:"#FF6B00", background:"rgba(255,107,0,0.12)", border:"1px solid rgba(255,107,0,0.3)", padding:"1px 6px", borderRadius:6, letterSpacing:"0.02em", whiteSpace:"nowrap", marginBottom:3 }}>
+                        🔥 JOKER ×2
+                      </div>
+                    )}
                     <div style={{ fontSize:18, fontWeight:900, fontFamily:"'DM Mono',monospace",
                                   color: b?.total > 0 ? '#FFD700' : 'rgba(255,255,255,0.25)' }}>
                       {b?.total ?? '—'}

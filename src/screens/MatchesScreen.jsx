@@ -103,8 +103,18 @@ function FriendPredictionsPanel({ matches, allPredictions, allUsers, myPredictio
                         {isMe ? "⭐ " : ""}{u.nickname}
                       </span>
                       <div style={{ textAlign:"right" }}>
-                        <div style={{ fontSize:14, fontWeight:800, color:"#fff", fontFamily:"'DM Mono',monospace" }}>
-                          {pred.scoreA} – {pred.scoreB}
+                        <div style={{ display:"flex", alignItems:"center", justifyContent:"flex-end", gap:6 }}>
+                          {/* Joker badge — display-only. Shown only when usedJoker===true AND
+                              match.stage is a knockout stage (never on group matches, where
+                              stage is undefined and pred.usedJoker is never set anyway). */}
+                          {pred.usedJoker === true && ['R32','R16','QF'].includes(match.stage) && (
+                            <span style={{ fontSize:9, fontWeight:800, color:"#FF6B00", background:"rgba(255,107,0,0.12)", border:"1px solid rgba(255,107,0,0.3)", padding:"1px 6px", borderRadius:6, letterSpacing:"0.02em", whiteSpace:"nowrap" }}>
+                              🔥 JOKER ×2
+                            </span>
+                          )}
+                          <div style={{ fontSize:14, fontWeight:800, color:"#fff", fontFamily:"'DM Mono',monospace" }}>
+                            {pred.scoreA} – {pred.scoreB}
+                          </div>
                         </div>
                         {(pred.possession != null || pred.corners != null) && (
                           <div style={{ fontSize:10, color:"rgba(255,255,255,0.35)", fontFamily:"'DM Mono',monospace" }}>
