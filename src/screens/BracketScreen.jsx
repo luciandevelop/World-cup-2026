@@ -250,6 +250,38 @@ const R32_SLOT_INFO = {
 };
 const R32_IDS = Object.keys(R32_SLOT_INFO).map(Number).sort((a,b)=>a-b); // 73..88
 
+// Flags for every known team appearing in R32_SLOT_INFO (complete matches +
+// single-side known teams). Used so partial slots (e.g. Germania waiting for
+// an opponent) show a flag too, not just the 4 fully-confirmed matches.
+const R32_TEAM_FLAGS = {
+  'Africa de Sud': '🇿🇦', 'Canada': '🇨🇦',
+  'Brazilia': '🇧🇷', 'Japonia': '🇯🇵',
+  'Germania': '🇩🇪',
+  'Olanda': '🇳🇱', 'Maroc': '🇲🇦',
+  'Coasta de Fildes': '🇨🇮',
+  'Mexic': '🇲🇽',
+  'SUA': '🇺🇸', 'Bosnia': '🇧🇦',
+  'Elvetia': '🇨🇭',
+  'Australia': '🇦🇺',
+  'Argentina': '🇦🇷',
+};
+
+// Visual pairing order for the 16-imi tab: each row shows the two R32 matches
+// whose winners meet in the same Optimi (R16) slot, so users can find M73
+// next to M75 when Optimi says "Câșt. M73 vs Câșt. M75". This is purely a
+// display order — it does not change any winner mapping (R16_SLOTS below
+// remains the single source of truth for who actually plays whom).
+const R32_PAIR_ROWS = [
+  { left:73, right:75, r16:89 },
+  { left:74, right:77, r16:90 },
+  { left:76, right:78, r16:91 },
+  { left:79, right:80, r16:92 },
+  { left:83, right:84, r16:93 },
+  { left:81, right:82, r16:94 },
+  { left:86, right:88, r16:95 },
+  { left:85, right:87, r16:96 },
+];
+
 // R16: each slot references the two R32 match numbers that feed it.
 const R16_SLOTS = [
   { id:89, from:[73,75] },
@@ -301,12 +333,13 @@ function RoundListView({ confirmedR32, r32IdRange, champion }) {
     const awayKnown = !(/^[123]°/.test(info.away));
     return {
       id,
-      home: homeKnown ? { team: info.home, flag: confirmedR32[id]?.home?.flag || '' } : null,
-      away: awayKnown ? { team: info.away, flag: confirmedR32[id]?.away?.flag || '' } : null,
+      home: homeKnown ? { team: info.home, flag: R32_TEAM_FLAGS[info.home] || '' } : null,
+      away: awayKnown ? { team: info.away, flag: R32_TEAM_FLAGS[info.away] || '' } : null,
       homeLabel: info.home,
       awayLabel: info.away,
     };
   });
+  const r32ById = Object.fromEntries(r32.map(m => [m.id, m]));
 
   // R16 — winner-reference slots (89-96), with a small preview line.
   const r16 = R16_SLOTS.map(s => ({
@@ -401,6 +434,29 @@ function RoundListView({ confirmedR32, r32IdRange, champion }) {
             </div>
           )}
         </div>
+      ) : active === 'r32' ? (
+        <div>
+          {/* Round label */}
+          <div style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.55)', marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
+            {cur.label}
+            <span style={{ fontSize:10, color:'rgba(255,255,255,0.2)', fontWeight:400 }}>— {cur.matches.length} meciuri</span>
+          </div>
+          {/* Paired rows: left/right match whose winners meet in the same Optimi
+              (R16) slot, with a small label showing exactly which Optimi match
+              that is — so users can trace M73/M75 → M89 visually. Match number
+              badges (M73, M75, ...) appear on every card via the label prop. */}
+          {R32_PAIR_ROWS.map((row) => (
+            <div key={row.r16} style={{ marginBottom:12 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                <MatchCard match={{...r32ById[row.left],  label:`M${row.left}`}}  isFinal={false}/>
+                <MatchCard match={{...r32ById[row.right], label:`M${row.right}`}} isFinal={false}/>
+              </div>
+              <div style={{ fontSize:9.5, color:'rgba(0,229,160,0.45)', textAlign:'center', marginTop:5, fontWeight:600 }}>
+                câștigătoarele joacă în M{row.r16}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
         <div>
           {/* Round label */}
@@ -408,11 +464,11 @@ function RoundListView({ confirmedR32, r32IdRange, champion }) {
             {cur.label}
             <span style={{ fontSize:10, color:'rgba(255,255,255,0.2)', fontWeight:400 }}>— {cur.matches.length} meciuri</span>
           </div>
-          {/* 2-col grid for all non-final rounds */}
+          {/* 2-col grid for r16/qf/sf rounds — unchanged from before */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
             {cur.matches.map((m, i) => (
               <div key={m.id||i}>
-                <MatchCard match={{...m, label: active!=='r32' ? `M${m.id}` : undefined}} isFinal={false}/>
+                <MatchCard match={{...m, label:`M${m.id}`}} isFinal={false}/>
                 {/* Small preview line for R16, showing the R32 source teams when known */}
                 {active === 'r16' && m.preview && (
                   <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginTop:2, paddingLeft:4, lineHeight:1.4 }}>
