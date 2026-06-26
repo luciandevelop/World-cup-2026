@@ -226,8 +226,20 @@ const mkEmpty = (count, key, lbl) =>
   }));
 
 // ─── ROUND LIST VIEW — mobile primary ────────────────────────────────────────
-function RoundListView({ r32, champion }) {
+function RoundListView({ confirmedR32, r32IdRange, champion }) {
   const [active, setActive] = useState('r32');
+
+  // Build the 16-imi display list strictly in chronological numeric id order
+  // (73, 74, 75, ...88). Confirmed matches show real teams; unconfirmed ids
+  // render as empty placeholder rows, preserving their position so future
+  // confirmations slot in without reordering anything already shown.
+  const r32 = r32IdRange.map(id => {
+    const c = confirmedR32[id];
+    if (c) {
+      return { id, home: c.home, away: c.away, homeLabel: c.home.team, awayLabel: c.away.team, venue: c.venue, dateLabel: c.dateLabel };
+    }
+    return { id, home: null, away: null, homeLabel: '—', awayLabel: '—' };
+  });
 
   const ROUND_DATA = {
     r32: { matches:r32,                       label:'Șaisprezecimi',      isFinal:false },
@@ -423,35 +435,33 @@ function BracketView({ r32, champion }) {
 
 // ─── MAIN SCREEN ──────────────────────────────────────────────────────────────
 export default function BracketScreen() {
+  // SAFETY NOTE: buildKnockoutSlots()'s FIXED_PAIRINGS/THIRD_PLACE_SLOTS table
+  // is a provisional convention, NOT the official FIFA draw — confirmed during
+  // this session that slots like 'm38' don't actually match real fixtures
+  // (e.g. it pairs 2C vs 2D, not 1F vs 2C as the real draw produced). Rather
+  // than risk displaying a wrong pairing, the visual Round of 32 list below is
+  // built directly and independently from confirmed numeric match IDs (73-88,
+  // chronological reserved slots), with NO dependency on FIXED_PAIRINGS at all.
+  // This does not touch buildKnockoutSlots, buildQualifiedTeams, or any
+  // scoring/prediction logic — it is a separate, additive display list.
   const r32Raw = useMemo(() => buildKnockoutSlots(), []);
-  // VISUAL-ONLY OVERRIDE: confirmed qualified teams from Flashscore bracket,
-  // applied directly to the displayed slot objects. This does NOT touch
-  // gameData.js, does NOT create predictions, and does NOT affect the real
-  // predictable match (numeric id 73 in matches.js, separate from this).
-  // Unknown opponents are left untouched (still show as "3° pool..." etc.
-  // placeholders coming from buildKnockoutSlots' own null/label logic).
-  const r32 = useMemo(() => r32Raw.map(slot => {
-    switch (slot.id) {
-      case 'm33': // 1A vs 3(B/C/D/E/F) — 1A = Mexic confirmed, opponent still unknown
-        return { ...slot, home: { team: 'Mexic', flag: '🇲🇽' } };
-      case 'm34': // 1C vs 3(D/E/F) — 1C = Brazilia confirmed, opponent still unknown
-        return { ...slot, home: { team: 'Brazilia', flag: '🇧🇷' } };
-      case 'm35': // 1E vs 3(A/B/C/D) — 1E = Germania confirmed, opponent still unknown
-        return { ...slot, home: { team: 'Germania', flag: '🇩🇪' } };
-      case 'm37': // 2A vs 2B — both confirmed: Africa de Sud vs Canada
-        return { ...slot, home: { team: 'Africa de Sud', flag: '🇿🇦' }, away: { team: 'Canada', flag: '🇨🇦' } };
-      case 'm38': // 2C vs 2D — 2C = Maroc confirmed, 2D still unknown
-        return { ...slot, home: { team: 'Maroc', flag: '🇲🇦' } };
-      case 'm41': // 1B vs 3(G-L) — 1B = Elvetia confirmed, opponent still unknown
-        return { ...slot, home: { team: 'Elvetia', flag: '🇨🇭' } };
-      case 'm42': // 1D vs 3(I/J/K/L) — 1D = SUA confirmed, opponent still unknown
-        return { ...slot, home: { team: 'SUA', flag: '🇺🇸' } };
-      case 'm47': // 1I vs 1J — 1J = Argentina confirmed, 1I still unknown
-        return { ...slot, away: { team: 'Argentina', flag: '🇦🇷' } };
-      default:
-        return slot;
-    }
-  }), [r32Raw]);
+  const r32 = r32Raw; // unchanged — no slot-forcing override (removed, see note above)
+
+  // VISUAL-ONLY: officially confirmed Round of 32 fixtures, keyed by their
+  // reserved chronological numeric id (73-88). Unconfirmed ids are simply
+  // absent here and rendered as empty/placeholder rows below — adding a new
+  // confirmed match later only requires adding one entry to this object,
+  // never reordering existing ones.
+  const CONFIRMED_R32 = {
+    73: { home: { team: 'Africa de Sud', flag: '🇿🇦' }, away: { team: 'Canada', flag: '🇨🇦' }, venue: 'Los Angeles', dateLabel: '28 Iun' },
+    74: { home: { team: 'Brazilia',      flag: '🇧🇷' }, away: { team: 'Japonia', flag: '🇯🇵' }, venue: 'Houston',     dateLabel: '29 Iun' },
+    76: { home: { team: 'Olanda',        flag: '🇳🇱' }, away: { team: 'Maroc',   flag: '🇲🇦' }, venue: 'Monterrey',   dateLabel: '30 Iun' },
+    82: { home: { team: 'SUA',           flag: '🇺🇸' }, away: { team: 'Bosnia',  flag: '🇧🇦' }, venue: 'Santa Clara', dateLabel: '02 Iul' },
+  };
+  // Chronological reserved range — ids without a confirmed entry render as
+  // empty placeholder rows, preserving their position for future additions.
+  const R32_ID_RANGE = Array.from({ length: 16 }, (_, i) => 73 + i); // 73..88
+
   const { groupsCompleted, qualifiedThirds, allThirds } = useMemo(() => buildQualifiedTeams(), []);
   const [view, setView] = useState('list');
 
@@ -491,7 +501,15 @@ export default function BracketScreen() {
 
       {/* Content */}
       <div style={{ padding:'12px 14px 0' }}>
-        <GroupProgress finished={finishedMatches} total={totalMatches} groupsCompleted={groupsCompleted} qualifiedThirds={qualifiedThirds} confirmedWinners={6} confirmedRunnersUp={3}/>
+        {/* confirmedWinners/confirmedRunnersUp: VISUAL-ONLY manual counts.
+            Winners (7): Mexic(1A), Elvetia(1B), Brazilia(1C), SUA(1D), Germania(1E),
+                         Olanda(1F), Argentina(1J).
+            Runners-up (4): Africa de Sud(2A), Canada(2B), Maroc(2C), Japonia(2F).
+            Best-third-place counter intentionally stays at its real computed value
+            (0 unless buildQualifiedTeams has fully confirmed official data) — per
+            explicit instruction: Bosnia appearing in a confirmed exact match (id 82)
+            does NOT inflate the global best-third-place qualification counter. */}
+        <GroupProgress finished={finishedMatches} total={totalMatches} groupsCompleted={groupsCompleted} qualifiedThirds={qualifiedThirds} confirmedWinners={7} confirmedRunnersUp={4}/>
         <ThirdsPanel allThirds={allThirds} qualifiedThirds={qualifiedThirds}/>
         <QualificationBanner/>
 
@@ -523,7 +541,7 @@ export default function BracketScreen() {
         </div>
 
         {view === 'list' ? (
-          <RoundListView r32={r32} champion={champion}/>
+          <RoundListView confirmedR32={CONFIRMED_R32} r32IdRange={R32_ID_RANGE} champion={champion}/>
         ) : (
           <div>
             <div style={{ fontSize:11, color:'rgba(255,255,255,0.28)', marginBottom:10, display:'flex', alignItems:'center', gap:5 }}>
