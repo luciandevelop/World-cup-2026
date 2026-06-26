@@ -450,11 +450,36 @@ function RoundListView({ confirmedR32, r32IdRange, champion }) {
 // ─── BRACKET VIEW — horizontal, left-to-right, correct structure ──────────────
 // Layout: R32-left → R16-left → QF-left → SF → FINAL → SF → QF-right → R16-right → R32-right
 // The Final is the rightmost "peak" — there is no continuation after it.
-function BracketView({ r32, champion }) {
-  const r16 = mkEmpty(8,'r16','16-imi');
-  const qf  = mkEmpty(4,'qf','Optimi');
-  const sf  = mkEmpty(2,'sf','Sferturi');
-  const fin = mkEmpty(1,'f','Semifinală');
+function BracketView({ champion }) {
+  // Build every round directly from the confirmed roadmap data (same source
+  // used by the mobile list view), so the horizontal bracket shows the same
+  // confirmed teams immediately in their official slots. Layout itself
+  // (Connector, Col, left/center/right structure) is unchanged from before.
+  const r32 = R32_IDS.map(id => {
+    const info = R32_SLOT_INFO[id];
+    const homeKnown = !(/^[123]°/.test(info.home));
+    const awayKnown = !(/^[123]°/.test(info.away));
+    return {
+      id,
+      home: homeKnown ? { team: info.home, flag: '' } : null,
+      away: awayKnown ? { team: info.away, flag: '' } : null,
+      homeLabel: info.home,
+      awayLabel: info.away,
+    };
+  });
+  const r16 = R16_SLOTS.map(s => ({
+    id: s.id, home: null, away: null,
+    homeLabel: `Câșt. M${s.from[0]}`, awayLabel: `Câșt. M${s.from[1]}`,
+  }));
+  const qf = QF_SLOTS.map(s => ({
+    id: s.id, home: null, away: null,
+    homeLabel: `Câșt. M${s.from[0]}`, awayLabel: `Câșt. M${s.from[1]}`,
+  }));
+  const sf = SF_SLOTS.map(s => ({
+    id: s.id, home: null, away: null,
+    homeLabel: `Câșt. M${s.from[0]}`, awayLabel: `Câșt. M${s.from[1]}`,
+  }));
+  const fin = [{ id:104, home:null, away:null, homeLabel:'Câșt. M101', awayLabel:'Câșt. M102' }];
 
   const left  = r32.slice(0,8);
   const right = r32.slice(8,16);
@@ -505,7 +530,7 @@ function BracketView({ r32, champion }) {
           )}
           {/* Third-place match (finala mică) — visual only, shown below the main final */}
           <MatchCard
-            match={{ id:'m103_visual', home:null, away:null, homeLabel:'Pierz. Semi', awayLabel:'Pierz. Semi', label:'🥉 FINALA MICĂ' }}
+            match={{ id:103, home:null, away:null, homeLabel:'Pierz. M101', awayLabel:'Pierz. M102', label:'🥉 FINALA MICĂ' }}
             isSmall
           />
           <MatchCard match={sf[1]}/>
@@ -555,7 +580,7 @@ export default function BracketScreen() {
   const R32_ID_RANGE = Array.from({ length: 16 }, (_, i) => 73 + i); // 73..88
 
   const { groupsCompleted, qualifiedThirds, allThirds } = useMemo(() => buildQualifiedTeams(), []);
-  const [view, setView] = useState('list');
+  const [view, setView] = useState('bracket');
 
   const totalMatches    = MATCHES.length;
   const finishedMatches = MATCHES.filter(m => m.isFinished).length;
@@ -640,7 +665,7 @@ export default function BracketScreen() {
               <span style={{ fontSize:14 }}>←</span>
               Scroll stânga-dreapta pentru tabloul complet
             </div>
-            <BracketView r32={r32} champion={champion}/>
+            <BracketView champion={champion}/>
           </div>
         )}
 
