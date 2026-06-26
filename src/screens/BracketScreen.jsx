@@ -225,40 +225,125 @@ const mkEmpty = (count, key, lbl) =>
     homeLabel:`Câșt. ${lbl}`, awayLabel:`Câșt. ${lbl}`,
   }));
 
+// ─── KNOCKOUT ROADMAP — full numeric structure, R32 through Final ────────────
+// This is the complete visual roadmap (ids 73-104) as specified. It does NOT
+// create predictions or touch matches.js — purely a display structure mapping
+// each visual slot to its source matches (by winner/loser reference) so users
+// can follow the bracket path the way Flashscore shows it.
+const R32_SLOT_INFO = {
+  73: { home: 'Africa de Sud', away: 'Canada' },
+  74: { home: 'Brazilia', away: 'Japonia' },
+  75: { home: 'Germania', away: '3° Gr.A/B/C/D/F' },
+  76: { home: 'Olanda', away: 'Maroc' },
+  77: { home: 'Coasta de Fildes', away: '2° Gr.I' },
+  78: { home: '1° Gr.I', away: '3° Gr.C/D/F/G/H' },
+  79: { home: 'Mexic', away: '3° Gr.C/E/F/H/I' },
+  80: { home: '1° Gr.L', away: '3° Gr.E/H/I/J/K' },
+  81: { home: '1° Gr.G', away: '3° Gr.A/E/H/I/J' },
+  82: { home: 'SUA', away: 'Bosnia' },
+  83: { home: '1° Gr.H', away: '2° Gr.J' },
+  84: { home: '2° Gr.K', away: '2° Gr.L' },
+  85: { home: 'Elvetia', away: '3° Gr.E/F/G/I/J' },
+  86: { home: 'Australia', away: '2° Gr.G' },
+  87: { home: 'Argentina', away: '2° Gr.H' },
+  88: { home: '1° Gr.K', away: '3° Gr.D/E/I/J/L' },
+};
+const R32_IDS = Object.keys(R32_SLOT_INFO).map(Number).sort((a,b)=>a-b); // 73..88
+
+// R16: each slot references the two R32 match numbers that feed it.
+const R16_SLOTS = [
+  { id:89, from:[73,75] },
+  { id:90, from:[74,77] },
+  { id:91, from:[76,78] },
+  { id:92, from:[79,80] },
+  { id:93, from:[83,84] },
+  { id:94, from:[81,82] },
+  { id:95, from:[86,88] },
+  { id:96, from:[85,87] },
+];
+// QF: each slot references the two R16 match numbers that feed it.
+const QF_SLOTS = [
+  { id:97,  from:[89,90] },
+  { id:98,  from:[93,94] },
+  { id:99,  from:[91,92] },
+  { id:100, from:[95,96] },
+];
+// SF: each slot references the two QF match numbers that feed it.
+const SF_SLOTS = [
+  { id:101, from:[97,98] },
+  { id:102, from:[99,100] },
+];
+
+// Build a short preview string for a winner-reference slot, e.g.
+// "Africa de Sud / Canada" when the source match has known teams, or just
+// "M73" when nothing is known yet. Purely cosmetic — helps users follow the
+// path without the app pretending to know an unconfirmed team.
+const r32Preview = (matchNum) => {
+  const info = R32_SLOT_INFO[matchNum];
+  if (!info) return `M${matchNum}`;
+  const h = info.home.startsWith('1°') || info.home.startsWith('2°') || info.home.startsWith('3°') ? null : info.home;
+  const a = info.away.startsWith('1°') || info.away.startsWith('2°') || info.away.startsWith('3°') ? null : info.away;
+  if (h && a) return `${h} / ${a}`;
+  if (h) return `${h} / ?`;
+  return `M${matchNum}`;
+};
+
 // ─── ROUND LIST VIEW — mobile primary ────────────────────────────────────────
 function RoundListView({ confirmedR32, r32IdRange, champion }) {
   const [active, setActive] = useState('r32');
 
-  // Build the 16-imi display list strictly in chronological numeric id order
-  // (73, 74, 75, ...88). Confirmed matches show real teams; unconfirmed ids
-  // render as empty placeholder rows, preserving their position so future
-  // confirmations slot in without reordering anything already shown.
-  const r32 = r32IdRange.map(id => {
-    const c = confirmedR32[id];
-    if (c) {
-      return { id, home: c.home, away: c.away, homeLabel: c.home.team, awayLabel: c.away.team, venue: c.venue, dateLabel: c.dateLabel };
-    }
-    return { id, home: null, away: null, homeLabel: '—', awayLabel: '—' };
+  // R32 — strictly chronological numeric order 73..88. Complete matches show
+  // both teams; partial matches show the known team + a clear group placeholder;
+  // fully unknown matches show placeholders on both sides. No team is invented.
+  const r32 = R32_IDS.map(id => {
+    const info = R32_SLOT_INFO[id];
+    const homeKnown = !(/^[123]°/.test(info.home));
+    const awayKnown = !(/^[123]°/.test(info.away));
+    return {
+      id,
+      home: homeKnown ? { team: info.home, flag: confirmedR32[id]?.home?.flag || '' } : null,
+      away: awayKnown ? { team: info.away, flag: confirmedR32[id]?.away?.flag || '' } : null,
+      homeLabel: info.home,
+      awayLabel: info.away,
+    };
   });
 
+  // R16 — winner-reference slots (89-96), with a small preview line.
+  const r16 = R16_SLOTS.map(s => ({
+    id: s.id, home: null, away: null,
+    homeLabel: `Câșt. M${s.from[0]}`,
+    awayLabel: `Câșt. M${s.from[1]}`,
+    preview: `${r32Preview(s.from[0])}  vs  ${r32Preview(s.from[1])}`,
+  }));
+
+  // QF — winner-reference slots (97-100).
+  const qf = QF_SLOTS.map(s => ({
+    id: s.id, home: null, away: null,
+    homeLabel: `Câșt. M${s.from[0]}`,
+    awayLabel: `Câșt. M${s.from[1]}`,
+  }));
+
+  // SF — winner-reference slots (101-102).
+  const sf = SF_SLOTS.map(s => ({
+    id: s.id, home: null, away: null,
+    homeLabel: `Câșt. M${s.from[0]}`,
+    awayLabel: `Câșt. M${s.from[1]}`,
+  }));
+
   const ROUND_DATA = {
-    r32: { matches:r32,                       label:'Șaisprezecimi',      isFinal:false },
-    r16: { matches:mkEmpty(8,'r16','16-imi'), label:'Optimi de Finală',   isFinal:false },
-    qf:  { matches:mkEmpty(4,'qf','Optimi'),  label:'Sferturi de Finală', isFinal:false },
-    sf:  { matches:mkEmpty(2,'sf','Sferturi'),label:'Semifinale',         isFinal:false },
-    f:   { matches:mkEmpty(1,'f','Semifinală'),label:'🏆 Finala',         isFinal:true  },
+    r32: { matches:r32, label:'Șaisprezecimi',      isFinal:false },
+    r16: { matches:r16, label:'Optimi de Finală',   isFinal:false },
+    qf:  { matches:qf,  label:'Sferturi de Finală', isFinal:false },
+    sf:  { matches:sf,  label:'Semifinale',         isFinal:false },
+    f:   { matches:[{ id:104, home:null, away:null, homeLabel:'Câșt. M101', awayLabel:'Câșt. M102' }], label:'🏆 Finala', isFinal:true },
   };
 
-  // VISUAL-ONLY: third-place match (finala mică) for the Final tab. This is
-  // purely a display object — it does NOT create a prediction, does NOT use
-  // numeric id 103, and does NOT touch gameData.js/scoring/Joker logic in any
-  // way. The real predictable third-place match (when implemented) must use
-  // numeric id 103 in matches.js, completely separate from this visual object.
+  // M103 — finala mică (loser references from the 2 semifinals).
   const thirdPlaceMatch = {
-    id: 'm103_visual',
+    id: 103,
     home: null, away: null,
-    homeLabel: 'Pierz. Semi', awayLabel: 'Pierz. Semi',
-    label: '🥉 FINALA MICĂ — 18 Iulie 2026',
+    homeLabel: 'Pierz. M101', awayLabel: 'Pierz. M102',
+    label: '🥉 M103 — FINALA MICĂ',
   };
 
   const TABS = [
@@ -294,10 +379,10 @@ function RoundListView({ confirmedR32, r32IdRange, champion }) {
         })}
       </div>
 
-      {/* Final tab — special full-width layout */}
+      {/* Final tab — special full-width layout, shows M103 + M104 */}
       {active === 'f' ? (
         <div>
-          {/* Third-place match (finala mică) — visual only, always shown above the main final */}
+          {/* M103 — Finala mică, always shown above the main final */}
           <div style={{ marginBottom:14 }}>
             <MatchCard match={thirdPlaceMatch} isFinal={false}/>
           </div>
@@ -307,13 +392,12 @@ function RoundListView({ confirmedR32, r32IdRange, champion }) {
           ) : (
             <div>
               <div style={{ marginBottom:12, padding:'12px 14px', background:'rgba(212,175,55,0.05)', border:'1px solid rgba(212,175,55,0.12)', borderRadius:12 }}>
-                <div style={{ fontSize:11, color:'rgba(212,175,55,0.6)', marginBottom:4, fontWeight:700 }}>🏆 MAREA FINALĂ</div>
+                <div style={{ fontSize:11, color:'rgba(212,175,55,0.6)', marginBottom:4, fontWeight:700 }}>🏆 M104 — MAREA FINALĂ</div>
                 <div style={{ fontSize:12, color:'rgba(255,255,255,0.35)' }}>
                   Cei doi finaliști se vor decide după semifinale.
                 </div>
               </div>
-              {/* Single full-width final card */}
-              <MatchCard match={{...cur.matches[0], label:'🏆 FINALA — 19 Iulie 2026'}} isFinal/>
+              <MatchCard match={{...cur.matches[0], label:'🏆 M104 — FINALA MARE'}} isFinal/>
             </div>
           )}
         </div>
@@ -327,7 +411,15 @@ function RoundListView({ confirmedR32, r32IdRange, champion }) {
           {/* 2-col grid for all non-final rounds */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
             {cur.matches.map((m, i) => (
-              <MatchCard key={m.id||i} match={m} isFinal={false}/>
+              <div key={m.id||i}>
+                <MatchCard match={{...m, label: active!=='r32' ? `M${m.id}` : undefined}} isFinal={false}/>
+                {/* Small preview line for R16, showing the R32 source teams when known */}
+                {active === 'r16' && m.preview && (
+                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginTop:2, paddingLeft:4, lineHeight:1.4 }}>
+                    {m.preview}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </div>
