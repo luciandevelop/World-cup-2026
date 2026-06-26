@@ -124,6 +124,9 @@ export const ALL_MATCHES = [
 
   // ══ FAZA ELIMINATORIE — Șaisprezecimi (Round of 32) ════════════════════════
   { id:73, group:"KO", stage:"R32", teamA:"Africa de Sud", teamB:"Canada", flagA:"🇿🇦", flagB:"🇨🇦", time:"2026-06-28T19:00:00Z", venue:"Los Angeles" }, // RO 28 Jun 22:00
+  { id:74, group:"KO", stage:"R32", teamA:"Brazilia", teamB:"Japonia", flagA:"🇧🇷", flagB:"🇯🇵", time:"2026-06-29T17:00:00Z", venue:"Houston" }, // RO 29 Jun 20:00
+  { id:76, group:"KO", stage:"R32", teamA:"Olanda", teamB:"Maroc", flagA:"🇳🇱", flagB:"🇲🇦", time:"2026-06-30T01:00:00Z", venue:"Monterrey" }, // RO 30 Jun 04:00
+  { id:82, group:"KO", stage:"R32", teamA:"SUA", teamB:"Bosnia", flagA:"🇺🇸", flagB:"🇧🇦", time:"2026-07-02T00:00:00Z", venue:"Santa Clara" }, // RO 02 Jul 03:00
 
 ];
 
