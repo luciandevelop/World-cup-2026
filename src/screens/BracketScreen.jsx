@@ -272,9 +272,9 @@ const R32_TEAM_FLAGS = {
 // display order — it does not change any winner mapping (R16_SLOTS below
 // remains the single source of truth for who actually plays whom).
 const R32_PAIR_ROWS = [
-  { left:73, right:75, r16:89 },
+  { left:73, right:76, r16:89 },
   { left:74, right:77, r16:90 },
-  { left:76, right:78, r16:91 },
+  { left:75, right:78, r16:91 },
   { left:79, right:80, r16:92 },
   { left:83, right:84, r16:93 },
   { left:81, right:82, r16:94 },
@@ -283,10 +283,12 @@ const R32_PAIR_ROWS = [
 ];
 
 // R16: each slot references the two R32 match numbers that feed it.
+// CORRECTED: M89 is Africa de Sud/Canada (73) vs Olanda/Maroc (76) — NOT 73+75
+// as previously listed. M91 is Germania (75) vs 1°Gr.I (78) accordingly.
 const R16_SLOTS = [
-  { id:89, from:[73,75] },
+  { id:89, from:[73,76] },
   { id:90, from:[74,77] },
-  { id:91, from:[76,78] },
+  { id:91, from:[75,78] },
   { id:92, from:[79,80] },
   { id:93, from:[83,84] },
   { id:94, from:[81,82] },
