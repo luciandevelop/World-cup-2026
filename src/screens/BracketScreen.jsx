@@ -447,104 +447,162 @@ function RoundListView({ confirmedR32, r32IdRange, champion }) {
   );
 }
 
-// ─── BRACKET VIEW — horizontal, left-to-right, correct structure ──────────────
-// Layout: R32-left → R16-left → QF-left → SF → FINAL → SF → QF-right → R16-right → R32-right
-// The Final is the rightmost "peak" — there is no continuation after it.
-function BracketView({ champion }) {
-  // Build every round directly from the confirmed roadmap data (same source
-  // used by the mobile list view), so the horizontal bracket shows the same
-  // confirmed teams immediately in their official slots. Layout itself
-  // (Connector, Col, left/center/right structure) is unchanged from before.
-  const r32 = R32_IDS.map(id => {
+// ─── POSTER BRACKET — compact vertical mobile layout ──────────────────────────
+// Single-column-friendly poster: left half + right half, each narrowing from
+// R32 (8 slots) → R16 (4) → QF (2) → SF (1), meeting at a centered Final/3rd
+// place block. No horizontal scroll — everything stacks vertically, connector
+// lines drawn with simple CSS borders (no absolute positioning, so it never
+// breaks across different phone widths).
+
+// Tiny compact card for poster slots — much shorter than the standard MatchCard,
+// built specifically for this dense vertical layout.
+function MiniSlot({ home, away, homeLabel, awayLabel, dim }) {
+  const Row = ({ team, label }) => (
+    <div style={{
+      display:'flex', alignItems:'center', gap:5, padding:'4px 7px', minHeight:22,
+      fontSize: dim ? 9.5 : 10.5, fontWeight: team ? 700 : 500,
+      color: team ? '#fff' : 'rgba(255,255,255,0.22)',
+      fontStyle: team ? 'normal' : 'italic',
+      whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+    }}>
+      {team ? <span style={{flexShrink:0}}>{home?.flag||away?.flag?'':''}</span> : null}
+      <span style={{overflow:'hidden', textOverflow:'ellipsis'}}>{team || label}</span>
+    </div>
+  );
+  return (
+    <div style={{
+      background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.08)',
+      borderRadius:7, overflow:'hidden', width:'100%',
+    }}>
+      <div style={{borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
+        <Row team={home?.team} label={homeLabel}/>
+      </div>
+      <Row team={away?.team} label={awayLabel}/>
+    </div>
+  );
+}
+
+// A vertical "lane" of slots with a connecting bracket line on one side,
+// pairing every 2 slots into 1 on the next column. The connector is just a
+// CSS border-left on a small wrapper — no JS math, no absolute coordinates.
+function Lane({ slots, side }) {
+  // side: 'left' draws the connector on the right edge (pointing inward to center)
+  //       'right' draws the connector on the left edge (pointing inward to center)
+  const borderSide = side === 'left' ? 'borderRight' : 'borderLeft';
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:10, flex:1, minWidth:0 }}>
+      {slots.map((pair, i) => (
+        <div key={i} style={{ display:'flex', flexDirection:'column', gap:4,
+          [borderSide]:'2px solid rgba(0,229,160,0.18)',
+          [side==='left'?'paddingRight':'paddingLeft']:6,
+          [side==='left'?'marginRight':'marginLeft']:-1,
+        }}>
+          {pair.map((s,j) => <MiniSlot key={j} {...s} dim/>)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PosterBracket({ champion }) {
+  const slotFromR32 = (id) => {
     const info = R32_SLOT_INFO[id];
     const homeKnown = !(/^[123]°/.test(info.home));
     const awayKnown = !(/^[123]°/.test(info.away));
     return {
-      id,
       home: homeKnown ? { team: info.home, flag: '' } : null,
       away: awayKnown ? { team: info.away, flag: '' } : null,
-      homeLabel: info.home,
-      awayLabel: info.away,
+      homeLabel: info.home, awayLabel: info.away,
     };
+  };
+  const slotFromRef = (id, from) => ({
+    home: null, away: null,
+    homeLabel: `Câșt. M${from[0]}`, awayLabel: `Câșt. M${from[1]}`,
   });
-  const r16 = R16_SLOTS.map(s => ({
-    id: s.id, home: null, away: null,
-    homeLabel: `Câșt. M${s.from[0]}`, awayLabel: `Câșt. M${s.from[1]}`,
-  }));
-  const qf = QF_SLOTS.map(s => ({
-    id: s.id, home: null, away: null,
-    homeLabel: `Câșt. M${s.from[0]}`, awayLabel: `Câșt. M${s.from[1]}`,
-  }));
-  const sf = SF_SLOTS.map(s => ({
-    id: s.id, home: null, away: null,
-    homeLabel: `Câșt. M${s.from[0]}`, awayLabel: `Câșt. M${s.from[1]}`,
-  }));
-  const fin = [{ id:104, home:null, away:null, homeLabel:'Câșt. M101', awayLabel:'Câșt. M102' }];
 
-  const left  = r32.slice(0,8);
-  const right = r32.slice(8,16);
-
-  // Vertical connector line between columns
-  const Connector = () => (
-    <div style={{ width:1, alignSelf:'stretch', background:'rgba(255,255,255,0.07)', flexShrink:0, margin:'24px 0' }}/>
+  // LEFT HALF — explicit order requested: 73,75,74,77,76,78,79,80
+  const leftR32Order = [73,75,74,77,76,78,79,80];
+  const leftR32 = leftR32Order.map(id => ({ id, ...slotFromR32(id) }));
+  const findLeftR32 = (id) => leftR32.find(s => s.id === id);
+  // Group by ACTUAL R16 source pairs (not adjacent list position) — same
+  // robust approach as the right half, so correctness never depends on the
+  // requested display order happening to align with the real winner mapping.
+  const leftR16Order = [89,90,91,92];
+  const leftR32Pairs = leftR16Order.map(r16id =>
+    R16_SLOTS.find(s => s.id === r16id).from.map(findLeftR32)
   );
+  const leftR16 = leftR16Order.map(id => ({ id, ...slotFromRef(id, R16_SLOTS.find(s=>s.id===id).from) }));
+  const leftR16Pairs = [[leftR16[0]], [leftR16[1]], [leftR16[2]], [leftR16[3]]];
+  const leftQF = [97,99].map(id => ({ id, ...slotFromRef(id, QF_SLOTS.find(s=>s.id===id).from) }));
+  const leftSF = [101].map(id => ({ id, ...slotFromRef(id, SF_SLOTS.find(s=>s.id===id).from) }));
 
-  const Col = ({ rounds, title, small }) => (
-    <div style={{ display:'flex', flexDirection:'column', gap:7, alignItems:'stretch', flex:'0 0 auto' }}>
-      {title && (
-        <div style={{ fontSize:8, fontWeight:800, letterSpacing:'0.14em', textTransform:'uppercase', color:'rgba(255,255,255,0.22)', textAlign:'center', padding:'3px 7px', background:'rgba(255,255,255,0.03)', borderRadius:20, whiteSpace:'nowrap', marginBottom:2 }}>
-          {title}
-        </div>
-      )}
-      {rounds.map((m,i) => <MatchCard key={m.id||i} match={m} isSmall={small}/>)}
-    </div>
+  // RIGHT HALF — explicit order requested: 81,82,83,84,85,88,86,87
+  const rightR32Order = [81,82,83,84,85,88,86,87];
+  const rightR32 = rightR32Order.map(id => ({ id, ...slotFromR32(id) }));
+  const findR32 = (id) => rightR32.find(s => s.id === id);
+  // Group by ACTUAL R16 source pairs (not adjacent list position) — this
+  // guarantees the connector lines always point to the correct next-round
+  // slot, even though the requested display order (81,82,83,84,85,88,86,87)
+  // doesn't put every real pair next to each other (e.g. 85 pairs with 87
+  // for M96, and 86 pairs with 88 for M95 — not simply adjacent in the list).
+  const rightR16Order = [94,93,95,96];
+  const rightR32Pairs = rightR16Order.map(r16id =>
+    R16_SLOTS.find(s => s.id === r16id).from.map(findR32)
   );
+  const rightR16 = rightR16Order.map(id => ({ id, ...slotFromRef(id, R16_SLOTS.find(s=>s.id===id).from) }));
+  const rightQF = [98,100].map(id => ({ id, ...slotFromRef(id, QF_SLOTS.find(s=>s.id===id).from) }));
+  const rightSF = [102].map(id => ({ id, ...slotFromRef(id, SF_SLOTS.find(s=>s.id===id).from) }));
 
   return (
-    <div style={{ overflowX:'auto', WebkitOverflowScrolling:'touch', paddingBottom:12 }}>
-      <div style={{ display:'flex', gap:10, alignItems:'center', minWidth:'max-content', padding:'4px 2px 4px' }}>
-
-        {/* ── LEFT HALF ─────────────────────────────────── */}
-        <Col rounds={left.slice(0,4)} small title="16-imi A"/>
-        <Col rounds={left.slice(4,8)} small title="16-imi B"/>
-        <Connector/>
-        <Col rounds={r16.slice(0,4)} title="Optimi A"/>
-        <Col rounds={qf.slice(0,2)}  title="Sferturi A"/>
-        <Connector/>
-
-        {/* ── CENTER: SF + FINAL + SF ────────────────────── */}
-        <div style={{ display:'flex', flexDirection:'column', gap:10, flex:'0 0 auto', alignItems:'center', justifyContent:'center' }}>
-          <div style={{ fontSize:8, fontWeight:800, letterSpacing:'0.14em', textTransform:'uppercase', color:'rgba(212,175,55,0.65)', textAlign:'center', padding:'3px 10px', background:'rgba(212,175,55,0.06)', borderRadius:20, border:'1px solid rgba(212,175,55,0.15)', whiteSpace:'nowrap', marginBottom:2 }}>
-            Centru
-          </div>
-          <MatchCard match={sf[0]}/>
-          {/* FINAL — the end point */}
-          {champion ? (
-            <div style={{ padding:'10px 14px', background:'linear-gradient(135deg,rgba(212,175,55,0.14),rgba(212,175,55,0.04))', border:'1px solid rgba(212,175,55,0.4)', borderRadius:14, textAlign:'center', minWidth:160 }}>
-              <div style={{ fontSize:9, color:'rgba(212,175,55,0.6)', letterSpacing:'0.15em', textTransform:'uppercase', fontWeight:700, marginBottom:6 }}>🏆 Campioană</div>
-              <span style={{ fontSize:32 }}>{champion.flag}</span>
-              <div style={{ fontSize:14, fontWeight:900, color:'#FFD700', fontFamily:"'Bebas Neue',sans-serif", marginTop:4 }}>{champion.team}</div>
-            </div>
-          ) : (
-            <MatchCard match={{...fin[0], label:'🏆 FINALA'}} isFinal/>
-          )}
-          {/* Third-place match (finala mică) — visual only, shown below the main final */}
-          <MatchCard
-            match={{ id:103, home:null, away:null, homeLabel:'Pierz. M101', awayLabel:'Pierz. M102', label:'🥉 FINALA MICĂ' }}
-            isSmall
-          />
-          <MatchCard match={sf[1]}/>
+    <div>
+      {/* ── Title block ── */}
+      <div style={{ textAlign:'center', marginBottom:14 }}>
+        <div style={{ fontSize:15, fontWeight:900, color:'#fff', letterSpacing:'0.04em', fontFamily:"'Bebas Neue',sans-serif" }}>
+          TABLOUL ELIMINATORIU
         </div>
+        <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', marginTop:3 }}>
+          „Tablou vizual. Predicțiile se fac din Meciuri.”
+        </div>
+      </div>
 
-        <Connector/>
-        {/* ── RIGHT HALF ────────────────────────────────── */}
-        <Col rounds={qf.slice(2,4)}  title="Sferturi B"/>
-        <Col rounds={r16.slice(4,8)} title="Optimi B"/>
-        <Connector/>
-        <Col rounds={right.slice(0,4)} small title="16-imi C"/>
-        <Col rounds={right.slice(4,8)} small title="16-imi D"/>
-        {/* ── END — no columns after this ──────────────── */}
+      {/* ── LEFT HALF: R32 → R16 → QF → SF, narrowing inward ── */}
+      <div style={{ display:'flex', gap:6, marginBottom:14 }}>
+        <Lane side="left" slots={leftR32Pairs.map(p=>p)}/>
+        <Lane side="left" slots={leftR16Pairs}/>
+      </div>
+      <div style={{ display:'flex', justifyContent:'center', gap:8, marginBottom:14 }}>
+        {leftQF.map((m,i) => <div key={i} style={{width:'48%'}}><MiniSlot {...m}/></div>)}
+      </div>
+      <div style={{ display:'flex', justifyContent:'center', marginBottom:18 }}>
+        <div style={{width:'70%'}}><MiniSlot {...leftSF[0]}/></div>
+      </div>
 
+      {/* ── CENTER: Final + 3rd place ── */}
+      <div style={{ textAlign:'center', marginBottom:18, padding:'14px 10px', background:'linear-gradient(135deg,rgba(212,175,55,0.08),rgba(212,175,55,0.02))', border:'1px solid rgba(212,175,55,0.2)', borderRadius:14 }}>
+        <div style={{ fontSize:9, fontWeight:800, color:'rgba(212,175,55,0.7)', letterSpacing:'0.14em', marginBottom:8 }}>🏆 FINALA MARE — M104</div>
+        {champion ? (
+          <ChampionCard team={champion.team} flag={champion.flag}/>
+        ) : (
+          <div style={{maxWidth:220, margin:'0 auto'}}>
+            <MiniSlot home={null} away={null} homeLabel="Câșt. M101" awayLabel="Câșt. M102"/>
+          </div>
+        )}
+        <div style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.3)', letterSpacing:'0.1em', marginTop:14, marginBottom:8 }}>🥉 FINALA MICĂ — M103</div>
+        <div style={{maxWidth:220, margin:'0 auto'}}>
+          <MiniSlot home={null} away={null} homeLabel="Pierz. M101" awayLabel="Pierz. M102"/>
+        </div>
+      </div>
+
+      {/* ── RIGHT HALF: SF → QF → R16 → R32, widening outward ── */}
+      <div style={{ display:'flex', justifyContent:'center', marginBottom:18 }}>
+        <div style={{width:'70%'}}><MiniSlot {...rightSF[0]}/></div>
+      </div>
+      <div style={{ display:'flex', justifyContent:'center', gap:8, marginBottom:14 }}>
+        {rightQF.map((m,i) => <div key={i} style={{width:'48%'}}><MiniSlot {...m}/></div>)}
+      </div>
+      <div style={{ display:'flex', gap:6 }}>
+        <Lane side="right" slots={rightR16.map(s=>[s])}/>
+        <Lane side="right" slots={rightR32Pairs}/>
       </div>
     </div>
   );
@@ -665,7 +723,7 @@ export default function BracketScreen() {
               <span style={{ fontSize:14 }}>←</span>
               Scroll stânga-dreapta pentru tabloul complet
             </div>
-            <BracketView champion={champion}/>
+            <PosterBracket champion={champion}/>
           </div>
         )}
 
