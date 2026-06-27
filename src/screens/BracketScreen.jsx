@@ -233,19 +233,19 @@ const mkEmpty = (count, key, lbl) =>
 const R32_SLOT_INFO = {
   73: { home: 'Africa de Sud', away: 'Canada' },
   74: { home: 'Brazilia', away: 'Japonia' },
-  75: { home: 'Germania', away: '3° Gr.A/B/C/D/F' },
+  75: { home: 'Germania', away: 'Paraguay' },
   76: { home: 'Olanda', away: 'Maroc' },
-  77: { home: 'Coasta de Fildes', away: '2° Gr.I' },
+  77: { home: 'Coasta de Fildes', away: 'Norvegia' },
   78: { home: '1° Gr.I', away: '3° Gr.C/D/F/G/H' },
   79: { home: 'Mexic', away: '3° Gr.C/E/F/H/I' },
-  80: { home: '1° Gr.L', away: '3° Gr.E/H/I/J/K' },
+  80: { home: 'Franta', away: 'Suedia' },
   81: { home: '1° Gr.G', away: '3° Gr.A/E/H/I/J' },
   82: { home: 'SUA', away: 'Bosnia' },
   83: { home: '1° Gr.H', away: '2° Gr.J' },
   84: { home: '2° Gr.K', away: '2° Gr.L' },
   85: { home: 'Elvetia', away: '3° Gr.E/F/G/I/J' },
-  86: { home: 'Australia', away: '2° Gr.G' },
-  87: { home: 'Argentina', away: '2° Gr.H' },
+  86: { home: 'Australia', away: 'Egipt' },
+  87: { home: 'Argentina', away: 'Capul Verde' },
   88: { home: '1° Gr.K', away: '3° Gr.D/E/I/J/L' },
 };
 const R32_IDS = Object.keys(R32_SLOT_INFO).map(Number).sort((a,b)=>a-b); // 73..88
@@ -256,14 +256,15 @@ const R32_IDS = Object.keys(R32_SLOT_INFO).map(Number).sort((a,b)=>a-b); // 73..
 const R32_TEAM_FLAGS = {
   'Africa de Sud': '🇿🇦', 'Canada': '🇨🇦',
   'Brazilia': '🇧🇷', 'Japonia': '🇯🇵',
-  'Germania': '🇩🇪',
+  'Germania': '🇩🇪', 'Paraguay': '🇵🇾',
   'Olanda': '🇳🇱', 'Maroc': '🇲🇦',
-  'Coasta de Fildes': '🇨🇮',
+  'Coasta de Fildes': '🇨🇮', 'Norvegia': '🇳🇴',
   'Mexic': '🇲🇽',
+  'Franta': '🇫🇷', 'Suedia': '🇸🇪',
   'SUA': '🇺🇸', 'Bosnia': '🇧🇦',
   'Elvetia': '🇨🇭',
-  'Australia': '🇦🇺',
-  'Argentina': '🇦🇷',
+  'Australia': '🇦🇺', 'Egipt': '🇪🇬',
+  'Argentina': '🇦🇷', 'Capul Verde': '🇨🇻',
 };
 
 // Visual pairing order for the 16-imi tab: each row shows the two R32 matches
