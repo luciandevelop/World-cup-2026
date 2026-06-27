@@ -125,8 +125,13 @@ export const ALL_MATCHES = [
   // ══ FAZA ELIMINATORIE — Șaisprezecimi (Round of 32) ════════════════════════
   { id:73, group:"KO", stage:"R32", teamA:"Africa de Sud", teamB:"Canada", flagA:"🇿🇦", flagB:"🇨🇦", time:"2026-06-28T19:00:00Z", venue:"Los Angeles" }, // RO 28 Jun 22:00
   { id:74, group:"KO", stage:"R32", teamA:"Brazilia", teamB:"Japonia", flagA:"🇧🇷", flagB:"🇯🇵", time:"2026-06-29T17:00:00Z", venue:"Houston" }, // RO 29 Jun 20:00
+  { id:75, group:"KO", stage:"R32", teamA:"Germania", teamB:"Paraguay", flagA:"🇩🇪", flagB:"🇵🇾", time:"2026-06-29T20:30:00Z", venue:"Boston" }, // RO 29 Jun 23:30
   { id:76, group:"KO", stage:"R32", teamA:"Olanda", teamB:"Maroc", flagA:"🇳🇱", flagB:"🇲🇦", time:"2026-06-30T01:00:00Z", venue:"Monterrey" }, // RO 30 Jun 04:00
+  { id:77, group:"KO", stage:"R32", teamA:"Coasta de Fildes", teamB:"Norvegia", flagA:"🇨🇮", flagB:"🇳🇴", time:"2026-06-30T17:00:00Z", venue:"Dallas" }, // RO 30 Jun 20:00
+  { id:80, group:"KO", stage:"R32", teamA:"Franta", teamB:"Suedia", flagA:"🇫🇷", flagB:"🇸🇪", time:"2026-06-30T21:00:00Z", venue:"New York" }, // RO 01 Jul 00:00
   { id:82, group:"KO", stage:"R32", teamA:"SUA", teamB:"Bosnia", flagA:"🇺🇸", flagB:"🇧🇦", time:"2026-07-02T00:00:00Z", venue:"Santa Clara" }, // RO 02 Jul 03:00
+  { id:86, group:"KO", stage:"R32", teamA:"Australia", teamB:"Egipt", flagA:"🇦🇺", flagB:"🇪🇬", time:"2026-07-03T18:00:00Z", venue:"Dallas" }, // RO 03 Jul 21:00
+  { id:87, group:"KO", stage:"R32", teamA:"Argentina", teamB:"Capul Verde", flagA:"🇦🇷", flagB:"🇨🇻", time:"2026-07-03T22:00:00Z", venue:"Miami" }, // RO 04 Jul 01:00
 
 ];
 
