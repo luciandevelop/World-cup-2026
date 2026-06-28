@@ -128,10 +128,17 @@ export const ALL_MATCHES = [
   { id:75, group:"KO", stage:"R32", teamA:"Germania", teamB:"Paraguay", flagA:"🇩🇪", flagB:"🇵🇾", time:"2026-06-29T20:30:00Z", venue:"Boston" }, // RO 29 Jun 23:30
   { id:76, group:"KO", stage:"R32", teamA:"Olanda", teamB:"Maroc", flagA:"🇳🇱", flagB:"🇲🇦", time:"2026-06-30T01:00:00Z", venue:"Monterrey" }, // RO 30 Jun 04:00
   { id:77, group:"KO", stage:"R32", teamA:"Coasta de Fildes", teamB:"Norvegia", flagA:"🇨🇮", flagB:"🇳🇴", time:"2026-06-30T17:00:00Z", venue:"Dallas" }, // RO 30 Jun 20:00
+  { id:78, group:"KO", stage:"R32", teamA:"Anglia", teamB:"RD Congo", flagA:"🏴󠁧󠁢󠁥󠁮󠁧󠁿", flagB:"🇨🇩", time:"2026-07-01T16:00:00Z", venue:"Atlanta" }, // RO 01 Jul 19:00
+  { id:79, group:"KO", stage:"R32", teamA:"Mexic", teamB:"Ecuador", flagA:"🇲🇽", flagB:"🇪🇨", time:"2026-07-01T01:00:00Z", venue:"Mexico City" }, // RO 01 Jul 04:00
   { id:80, group:"KO", stage:"R32", teamA:"Franta", teamB:"Suedia", flagA:"🇫🇷", flagB:"🇸🇪", time:"2026-06-30T21:00:00Z", venue:"New York" }, // RO 01 Jul 00:00
+  { id:81, group:"KO", stage:"R32", teamA:"Belgia", teamB:"Senegal", flagA:"🇧🇪", flagB:"🇸🇳", time:"2026-07-01T20:00:00Z", venue:"Seattle" }, // RO 01 Jul 23:00
   { id:82, group:"KO", stage:"R32", teamA:"SUA", teamB:"Bosnia", flagA:"🇺🇸", flagB:"🇧🇦", time:"2026-07-02T00:00:00Z", venue:"Santa Clara" }, // RO 02 Jul 03:00
+  { id:83, group:"KO", stage:"R32", teamA:"Spania", teamB:"Austria", flagA:"🇪🇸", flagB:"🇦🇹", time:"2026-07-02T19:00:00Z", venue:"Los Angeles" }, // RO 02 Jul 22:00
+  { id:84, group:"KO", stage:"R32", teamA:"Portugalia", teamB:"Croatia", flagA:"🇵🇹", flagB:"🇭🇷", time:"2026-07-02T23:00:00Z", venue:"Toronto" }, // RO 03 Jul 02:00
+  { id:85, group:"KO", stage:"R32", teamA:"Elvetia", teamB:"Algeria", flagA:"🇨🇭", flagB:"🇩🇿", time:"2026-07-03T03:00:00Z", venue:"Vancouver" }, // RO 03 Jul 06:00
   { id:86, group:"KO", stage:"R32", teamA:"Australia", teamB:"Egipt", flagA:"🇦🇺", flagB:"🇪🇬", time:"2026-07-03T18:00:00Z", venue:"Dallas" }, // RO 03 Jul 21:00
   { id:87, group:"KO", stage:"R32", teamA:"Argentina", teamB:"Capul Verde", flagA:"🇦🇷", flagB:"🇨🇻", time:"2026-07-03T22:00:00Z", venue:"Miami" }, // RO 04 Jul 01:00
+  { id:88, group:"KO", stage:"R32", teamA:"Columbia", teamB:"Ghana", flagA:"🇨🇴", flagB:"🇬🇭", time:"2026-07-04T01:30:00Z", venue:"Kansas City" }, // RO 04 Jul 04:30
 
 ];
 
