@@ -457,6 +457,11 @@ export default function App() {
     if (update?._action === 'specialResults') {
       loadAllSpecialPredictions().then(setAllSpecialPreds);
       loadSpecialResults().then(r => { if (r) setSpecialResults(r); });
+      loadAllPredictions().then(setAllPredictions);
+      // Also reload THIS user's own predictions so PredictionModal joker count
+      // reflects jokerRepairs from specialResults/main. Without this, `predictions`
+      // stays stale and BogdanB/Pannnnn still see 2/2 available after repair.
+      if (user?.uid) loadUserPredictions(user.uid).then(setPredictions);
       return;
     }
     setGroupOverrides(loadGroupOverrides());
