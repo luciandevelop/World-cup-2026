@@ -178,22 +178,52 @@ export async function savePrediction(uid, matchId, pred) {
   _saveToAllPreds(uid, matchId, pred);
 }
 
-// ─── TEMPORARY ADMIN REPAIR (one-time use) ────────────────────────────────────
-// EMERGENCY FIX: sets usedJoker:true on an EXISTING prediction document. Does
-// NOT create a new prediction, does NOT touch scoreA/scoreB/possession/corners,
-// does NOT touch scoring logic — purely flips the one field that was being
-// silently dropped before the savePrediction bugfix above. Throws clearly if
-// the target document doesn't exist, so it can never accidentally fabricate
-// a prediction the player never actually made.
-export async function adminRepairSetJoker(uid, matchId) {
-  if (!FIREBASE_CONFIGURED) throw new Error('Firebase nu este configurat — nimic de reparat.');
-  const docId = `${matchId}_${uid}`;
-  const ref = doc(db, 'predictions', docId);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) {
-    throw new Error(`Nu există predicție salvată pentru acest utilizator la meciul ${matchId} (doc ${docId} nu există).`);
+// ─── JOKER REPAIRS via specialResults/main ────────────────────────────────────
+// Admin cannot write usedJoker directly to predictions/ (Firestore rules block
+// it — the hasOnly list on predictions only allows owner writes of known fields,
+// and admin has no special privilege on that collection).
+//
+// Instead, repairs are stored as a sub-map inside specialResults/main, which is
+// already admin-writable. The key format is "{matchId}_{uid}": true.
+// All prediction-reading paths then merge this map on top of the raw predictions
+// so the rest of the app (Friends, Player Detail, scoring, Audit) sees the
+// corrected usedJoker value automatically, with no rules change needed.
+//
+// This is a permanent overlay — it never writes to predictions/ and never
+// creates a prediction that didn't already exist. The admin button validates
+// that a prediction document exists before adding the repair key.
+
+export async function loadJokerRepairs() {
+  if (!FIREBASE_CONFIGURED) return {};
+  try {
+    const snap = await getDoc(doc(db, 'specialResults', 'main'));
+    if (!snap.exists()) return {};
+    return snap.data()?.jokerRepairs || {};
+  } catch (e) {
+    console.error('[Firestore] loadJokerRepairs:', e);
+    return {};
   }
-  await updateDoc(ref, { usedJoker: true });
+}
+
+export async function adminRepairSetJokerViaSpecialResults(uid, matchId) {
+  if (!FIREBASE_CONFIGURED) throw new Error('Firebase nu este configurat — nimic de reparat.');
+
+  // Verify the prediction document exists — we must NOT invent a joker for a
+  // prediction the user never made.
+  const predDocId = `${matchId}_${uid}`;
+  const predSnap  = await getDoc(doc(db, 'predictions', predDocId));
+  if (!predSnap.exists()) {
+    throw new Error(`Nu există predicție salvată pentru acest utilizator la meciul ${matchId} (doc ${predDocId} nu există).`);
+  }
+
+  // Write repair key into specialResults/main using merge — this never
+  // overwrites other fields (winner, semifinalists, etc.) already in that doc.
+  const repairKey = `${matchId}_${uid}`;
+  await setDoc(
+    doc(db, 'specialResults', 'main'),
+    { jokerRepairs: { [repairKey]: true } },
+    { merge: true }
+  );
   return true;
 }
 
@@ -201,9 +231,10 @@ export async function loadUserPredictions(uid) {
   if (FIREBASE_CONFIGURED) {
     // Primary query: new docs use 'uid' field
     // Compat query: old docs (written with userId) — handles data from previous deploys
-    const [snap1, snap2] = await Promise.all([
+    const [snap1, snap2, repairs] = await Promise.all([
       getDocs(query(collection(db, 'predictions'), where('uid',    '==', uid))),
       getDocs(query(collection(db, 'predictions'), where('userId', '==', uid))),
+      loadJokerRepairs(),
     ]);
     const result = {};
     const toResult = (d) => {
@@ -213,14 +244,22 @@ export async function loadUserPredictions(uid) {
         scoreB:     data.scoreB,
         possession: data.possession,
         corners:    data.corners,
-        // BUGFIX: usedJoker was missing here — pass through whatever Firestore
-        // has (undefined for old docs, true/false for new ones written after
-        // the savePrediction fix above).
         ...(data.usedJoker !== undefined ? { usedJoker: data.usedJoker } : {}),
       };
     };
     snap1.forEach(toResult);
     snap2.forEach(toResult);
+    // Merge admin joker repairs — if a repair key exists for this uid + matchId,
+    // force usedJoker:true regardless of what is in the prediction document.
+    Object.entries(repairs).forEach(([key, val]) => {
+      if (!val) return;
+      const parts = key.split('_');
+      const repMatchId = Number(parts[0]);
+      const repUid = parts.slice(1).join('_');
+      if (repUid === uid && result[repMatchId] !== undefined) {
+        result[repMatchId].usedJoker = true;
+      }
+    });
     return result;
   }
   try { return JSON.parse(localStorage.getItem(LS_PREDS + uid)) || {}; }
@@ -229,7 +268,10 @@ export async function loadUserPredictions(uid) {
 
 export async function loadAllPredictions() {
   if (FIREBASE_CONFIGURED) {
-    const snap   = await getDocs(collection(db, 'predictions'));
+    const [snap, repairs] = await Promise.all([
+      getDocs(collection(db, 'predictions')),
+      loadJokerRepairs(),
+    ]);
     const byUser = {};
     snap.forEach(d => {
       const data  = d.data();
@@ -241,13 +283,19 @@ export async function loadAllPredictions() {
         scoreB:     data.scoreB,
         possession: data.possession,
         corners:    data.corners,
-        // BUGFIX (critical): usedJoker was missing here — this is the exact
-        // reason Friends predictions and Player Detail modal never showed the
-        // 🔥 JOKER ×2 badge for anyone, even when it was correctly set in the
-        // modal and even after the Firestore write was fixed above. Reading
-        // code must also include the field, or it gets silently dropped here.
         ...(data.usedJoker !== undefined ? { usedJoker: data.usedJoker } : {}),
       };
+    });
+    // Merge admin joker repairs on top — if a repair key exists, force
+    // usedJoker:true on that prediction, overriding whatever Firestore has.
+    Object.entries(repairs).forEach(([key, val]) => {
+      if (!val) return;
+      const parts     = key.split('_');
+      const repMatchId = Number(parts[0]);
+      const repUid    = parts.slice(1).join('_');
+      if (byUser[repUid] && byUser[repUid][repMatchId] !== undefined) {
+        byUser[repUid][repMatchId].usedJoker = true;
+      }
     });
     return byUser;
   }
@@ -343,7 +391,7 @@ export function subscribeToPredictions(callback) {
   if (FIREBASE_CONFIGURED) {
     return onSnapshot(
       collection(db, 'predictions'),
-      (snap) => {
+      async (snap) => {
         const byUser = {};
         snap.forEach(d => {
           const data  = d.data();
@@ -353,12 +401,26 @@ export function subscribeToPredictions(callback) {
           byUser[owner][data.matchId] = {
             scoreA: data.scoreA, scoreB: data.scoreB,
             possession: data.possession, corners: data.corners,
-            // usedJoker must be preserved here — same pattern as loadAllPredictions.
-            // Without this, every realtime snapshot silently drops the field and
-            // the Joker badge disappears from Friends / Player Detail for everyone.
+            // Preserve usedJoker from Firestore when present.
             ...(data.usedJoker !== undefined ? { usedJoker: data.usedJoker } : {}),
           };
         });
+        // Merge admin joker repairs — same logic as loadAllPredictions so that
+        // repairs written to specialResults/main are reflected in realtime too.
+        try {
+          const repairs = await loadJokerRepairs();
+          Object.entries(repairs).forEach(([key, val]) => {
+            if (!val) return;
+            const parts      = key.split('_');
+            const repMatchId = Number(parts[0]);
+            const repUid     = parts.slice(1).join('_');
+            if (byUser[repUid] && byUser[repUid][repMatchId] !== undefined) {
+              byUser[repUid][repMatchId].usedJoker = true;
+            }
+          });
+        } catch (e) {
+          console.error('[Firestore] subscribeToPredictions jokerRepairs merge:', e);
+        }
         callback(byUser);
       },
       (err) => console.error('[Firestore] subscribeToPredictions:', err)
