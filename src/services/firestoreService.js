@@ -353,6 +353,10 @@ export function subscribeToPredictions(callback) {
           byUser[owner][data.matchId] = {
             scoreA: data.scoreA, scoreB: data.scoreB,
             possession: data.possession, corners: data.corners,
+            // usedJoker must be preserved here — same pattern as loadAllPredictions.
+            // Without this, every realtime snapshot silently drops the field and
+            // the Joker badge disappears from Friends / Player Detail for everyone.
+            ...(data.usedJoker !== undefined ? { usedJoker: data.usedJoker } : {}),
           };
         });
         callback(byUser);
