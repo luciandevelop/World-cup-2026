@@ -150,6 +150,15 @@ export async function savePrediction(uid, matchId, pred) {
     corners:    pred.corners    ?? null,
     updatedAt:  now,
   };
+  // BUGFIX: usedJoker was being silently dropped here — it was sent correctly
+  // by PredictionModal but never written to Firestore, so the joker was lost
+  // on every refresh/reload for everyone (including the player who set it).
+  // Only include the field when present, so old predictions without it are
+  // completely unaffected (no false usedJoker:false gets written over old docs
+  // that simply never had the concept).
+  if (pred.usedJoker !== undefined) {
+    data.usedJoker = pred.usedJoker === true;
+  }
 
   if (FIREBASE_CONFIGURED) {
     const ref  = doc(db, 'predictions', docId);
@@ -185,6 +194,10 @@ export async function loadUserPredictions(uid) {
         scoreB:     data.scoreB,
         possession: data.possession,
         corners:    data.corners,
+        // BUGFIX: usedJoker was missing here — pass through whatever Firestore
+        // has (undefined for old docs, true/false for new ones written after
+        // the savePrediction fix above).
+        ...(data.usedJoker !== undefined ? { usedJoker: data.usedJoker } : {}),
       };
     };
     snap1.forEach(toResult);
@@ -209,6 +222,12 @@ export async function loadAllPredictions() {
         scoreB:     data.scoreB,
         possession: data.possession,
         corners:    data.corners,
+        // BUGFIX (critical): usedJoker was missing here — this is the exact
+        // reason Friends predictions and Player Detail modal never showed the
+        // 🔥 JOKER ×2 badge for anyone, even when it was correctly set in the
+        // modal and even after the Firestore write was fixed above. Reading
+        // code must also include the field, or it gets silently dropped here.
+        ...(data.usedJoker !== undefined ? { usedJoker: data.usedJoker } : {}),
       };
     });
     return byUser;
