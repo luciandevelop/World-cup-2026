@@ -11,7 +11,7 @@ import {
   formatKickoffRO, buildGroupStandings, buildQualifiedTeams, buildMatches, calcBreakdown,
 } from '../data/gameData.js';
 import { ALL_GROUPS } from '../data/matches.js';
-import { saveMatchResult, REALTIME_MODE, adminRepairSetJoker } from '../services/firestoreService.js'; // resetTestData removed
+import { saveMatchResult, REALTIME_MODE, adminRepairSetJokerViaSpecialResults } from '../services/firestoreService.js'; // resetTestData removed
 import { saveSpecialResults, resetSpecialData, WC_TEAMS } from '../services/specialEventsService.js';
 
 // localStorage key for admin-set results (shared across all users on same device)
@@ -755,8 +755,8 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
                   continue;
                 }
                 const [uid] = found;
-                await adminRepairSetJoker(uid, 74);
-                results.push(`✅ ${found[1]?.nickname || nick}: usedJoker:true setat pe M74.`);
+                await adminRepairSetJokerViaSpecialResults(uid, 74);
+                results.push(`✅ ${found[1]?.nickname || nick}: Joker M74 reparat via specialResults.`);
               } catch (e) {
                 results.push(`❌ ${nick}: ${e?.message || 'eroare necunoscută'}.`);
               }
