@@ -743,7 +743,7 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
           onClick={async () => {
             setJokerRepairBusy(true);
             setJokerRepairMsg('');
-            const targets = ['bogdanb', 'pannnn'];
+            const targets = ['bogdanb', 'pannnnn'];
             const results = [];
             for (const nick of targets) {
               try {
