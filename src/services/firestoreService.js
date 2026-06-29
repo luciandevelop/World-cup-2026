@@ -178,6 +178,25 @@ export async function savePrediction(uid, matchId, pred) {
   _saveToAllPreds(uid, matchId, pred);
 }
 
+// ─── TEMPORARY ADMIN REPAIR (one-time use) ────────────────────────────────────
+// EMERGENCY FIX: sets usedJoker:true on an EXISTING prediction document. Does
+// NOT create a new prediction, does NOT touch scoreA/scoreB/possession/corners,
+// does NOT touch scoring logic — purely flips the one field that was being
+// silently dropped before the savePrediction bugfix above. Throws clearly if
+// the target document doesn't exist, so it can never accidentally fabricate
+// a prediction the player never actually made.
+export async function adminRepairSetJoker(uid, matchId) {
+  if (!FIREBASE_CONFIGURED) throw new Error('Firebase nu este configurat — nimic de reparat.');
+  const docId = `${matchId}_${uid}`;
+  const ref = doc(db, 'predictions', docId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    throw new Error(`Nu există predicție salvată pentru acest utilizator la meciul ${matchId} (doc ${docId} nu există).`);
+  }
+  await updateDoc(ref, { usedJoker: true });
+  return true;
+}
+
 export async function loadUserPredictions(uid) {
   if (FIREBASE_CONFIGURED) {
     // Primary query: new docs use 'uid' field
