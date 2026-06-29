@@ -11,7 +11,7 @@ import {
   formatKickoffRO, buildGroupStandings, buildQualifiedTeams, buildMatches, calcBreakdown,
 } from '../data/gameData.js';
 import { ALL_GROUPS } from '../data/matches.js';
-import { saveMatchResult, REALTIME_MODE } from '../services/firestoreService.js'; // resetTestData removed
+import { saveMatchResult, REALTIME_MODE, adminRepairSetJoker } from '../services/firestoreService.js'; // resetTestData removed
 import { saveSpecialResults, resetSpecialData, WC_TEAMS } from '../services/specialEventsService.js';
 
 // localStorage key for admin-set results (shared across all users on same device)
@@ -133,6 +133,10 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
   const [showDebug,        setShowDebug]         = useState(false);
   const [groupOverrides,   setGroupOverrides]    = useState(() => loadGroupOverrides());
   const [lineupFormation, setLineupFormation] = useState('4-3-3');
+
+  // ── TEMPORARY EMERGENCY REPAIR — one-time use, see button below ──────────
+  const [jokerRepairMsg, setJokerRepairMsg] = useState('');
+  const [jokerRepairBusy, setJokerRepairBusy] = useState(false);
 
   // ── JOKER AUDIT (read-only) ───────────────────────────────────────────────
   // Derives joker usage purely from existing prediction data. No new Firestore
@@ -715,6 +719,63 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
                 </div>
               );
             })}
+          </div>
+        )}
+      </div>
+
+      {/* ── ⚠️ REPARAȚIE URGENTĂ — UNICĂ, TEMPORARĂ ──────────────────────────── */}
+      {/* One-time emergency fix for the usedJoker-not-persisted bug found in
+          production: BogdanB and Pannnn both activated Joker on match 74
+          before the Firestore write was fixed. This button ONLY flips
+          usedJoker:true on their EXISTING prediction documents — no scoring,
+          no new prediction, no other field touched. Each user is repaired
+          independently so a missing doc for one doesn't block the other.
+          Safe to remove once confirmed working. */}
+      <div style={{ marginTop:10, padding:'10px 12px', background:'rgba(239,68,68,0.05)', border:'1px solid rgba(239,68,68,0.2)', borderRadius:10 }}>
+        <div style={{ fontSize:10, color:'rgba(239,68,68,0.75)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:6, fontWeight:700 }}>
+          ⚠️ Reparație urgentă (unică)
+        </div>
+        <div style={{ fontSize:10.5, color:'rgba(255,255,255,0.4)', marginBottom:8, lineHeight:1.4 }}>
+          BogdanB și Pannnn au activat Joker pe M74 (Brazilia vs Japonia) înainte de fix-ul de salvare. Acest buton marchează manual <code>usedJoker:true</code> pe predicțiile lor deja existente — nu schimbă scorul, nu creează predicție nouă.
+        </div>
+        <button
+          disabled={jokerRepairBusy}
+          onClick={async () => {
+            setJokerRepairBusy(true);
+            setJokerRepairMsg('');
+            const targets = ['bogdanb', 'pannnn'];
+            const results = [];
+            for (const nick of targets) {
+              try {
+                const found = Object.entries(allUsers).find(([, u]) =>
+                  (u?.nickname || '').toLowerCase() === nick
+                );
+                if (!found) {
+                  results.push(`❌ ${nick}: utilizator negăsit.`);
+                  continue;
+                }
+                const [uid] = found;
+                await adminRepairSetJoker(uid, 74);
+                results.push(`✅ ${found[1]?.nickname || nick}: usedJoker:true setat pe M74.`);
+              } catch (e) {
+                results.push(`❌ ${nick}: ${e?.message || 'eroare necunoscută'}.`);
+              }
+            }
+            setJokerRepairMsg(results.join(' '));
+            setJokerRepairBusy(false);
+          }}
+          style={{
+            width:'100%', padding:'9px 12px', borderRadius:8, border:'1px solid rgba(239,68,68,0.35)',
+            background: jokerRepairBusy ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.14)',
+            color:'#EF4444', fontSize:12, fontWeight:800, cursor: jokerRepairBusy ? 'default' : 'pointer',
+          }}
+        >
+          {jokerRepairBusy ? 'Se repară...' : 'Fix BogdanB + Pannnn Joker M74'}
+        </button>
+        {jokerRepairMsg && (
+          <div style={{ fontSize:10.5, marginTop:7, color: jokerRepairMsg.startsWith('❌') && !jokerRepairMsg.includes('✅') ? '#EF4444' : '#00E5A0', lineHeight:1.4 }}>
+            {jokerRepairMsg}
+            <br/><span style={{opacity:0.6}}>Reîncarcă pagina pentru a vedea Audit Joker actualizat.</span>
           </div>
         )}
       </div>
