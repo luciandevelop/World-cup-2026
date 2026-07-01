@@ -140,6 +140,12 @@ export const ALL_MATCHES = [
   { id:87, group:"KO", stage:"R32", teamA:"Argentina", teamB:"Capul Verde", flagA:"🇦🇷", flagB:"🇨🇻", time:"2026-07-03T22:00:00Z", venue:"Miami" }, // RO 04 Jul 01:00
   { id:88, group:"KO", stage:"R32", teamA:"Columbia", teamB:"Ghana", flagA:"🇨🇴", flagB:"🇬🇭", time:"2026-07-04T01:30:00Z", venue:"Kansas City" }, // RO 04 Jul 04:30
 
+  // ══ FAZA ELIMINATORIE — Optimi (Round of 16) ════════════════════════════════
+  // ID-uri 89-96, mapare exactă din BracketScreen.jsx R16_SLOTS
+  { id:89, group:"KO", stage:"R16", teamA:"Canada", teamB:"Maroc", flagA:"🇨🇦", flagB:"🇲🇦", time:"2026-07-04T17:00:00Z", venue:"Houston" }, // RO 04 Jul 20:00 — din M73+M76
+  { id:90, group:"KO", stage:"R16", teamA:"Brazilia", teamB:"Norvegia", flagA:"🇧🇷", flagB:"🇳🇴", time:"2026-07-05T20:00:00Z", venue:"New York" }, // RO 05 Jul 23:00 — din M74+M77
+  { id:91, group:"KO", stage:"R16", teamA:"Paraguay", teamB:"Franta", flagA:"🇵🇾", flagB:"🇫🇷", time:"2026-07-04T21:00:00Z", venue:"Philadelphia" }, // RO 05 Jul 00:00 — din M75+M80
+
 ];
 
 export const ALL_GROUPS = ["A","B","C","D","E","F","G","H","I","J","K","L"];
