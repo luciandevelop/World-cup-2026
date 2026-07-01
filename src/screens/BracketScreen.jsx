@@ -349,13 +349,27 @@ function RoundListView({ confirmedR32, r32IdRange, champion }) {
   });
   const r32ById = Object.fromEntries(r32.map(m => [m.id, m]));
 
+  // Confirmed R16 teams — populated as Round of 16 fixtures are determined.
+  // Only slots with both teams confirmed are filled; the rest stay as
+  // "Câșt. M[X]" winner references until results are known.
+  const CONFIRMED_R16 = {
+    89: { home: { team: 'Canada',   flag: '🇨🇦' }, away: { team: 'Maroc',   flag: '🇲🇦' } },
+    90: { home: { team: 'Brazilia', flag: '🇧🇷' }, away: { team: 'Norvegia', flag: '🇳🇴' } },
+    91: { home: { team: 'Paraguay', flag: '🇵🇾' }, away: { team: 'Franta',   flag: '🇫🇷' } },
+  };
+
   // R16 — winner-reference slots (89-96), with a small preview line.
-  const r16 = R16_SLOTS.map(s => ({
-    id: s.id, home: null, away: null,
-    homeLabel: `Câșt. M${s.from[0]}`,
-    awayLabel: `Câșt. M${s.from[1]}`,
-    preview: `${r32Preview(s.from[0])}  vs  ${r32Preview(s.from[1])}`,
-  }));
+  const r16 = R16_SLOTS.map(s => {
+    const confirmed = CONFIRMED_R16[s.id];
+    return {
+      id: s.id,
+      home: confirmed ? confirmed.home : null,
+      away: confirmed ? confirmed.away : null,
+      homeLabel: confirmed ? confirmed.home.team : `Câșt. M${s.from[0]}`,
+      awayLabel: confirmed ? confirmed.away.team : `Câșt. M${s.from[1]}`,
+      preview: `${r32Preview(s.from[0])}  vs  ${r32Preview(s.from[1])}`,
+    };
+  });
 
   // QF — winner-reference slots (97-100).
   const qf = QF_SLOTS.map(s => ({
