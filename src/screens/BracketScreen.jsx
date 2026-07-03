@@ -353,9 +353,12 @@ function RoundListView({ confirmedR32, r32IdRange, champion }) {
   // Only slots with both teams confirmed are filled; the rest stay as
   // "Câșt. M[X]" winner references until results are known.
   const CONFIRMED_R16 = {
-    89: { home: { team: 'Canada',   flag: '🇨🇦' }, away: { team: 'Maroc',   flag: '🇲🇦' } },
-    90: { home: { team: 'Brazilia', flag: '🇧🇷' }, away: { team: 'Norvegia', flag: '🇳🇴' } },
-    91: { home: { team: 'Paraguay', flag: '🇵🇾' }, away: { team: 'Franta',   flag: '🇫🇷' } },
+    89: { home: { team: 'Canada',    flag: '🇨🇦' }, away: { team: 'Maroc',      flag: '🇲🇦' } },
+    90: { home: { team: 'Brazilia',  flag: '🇧🇷' }, away: { team: 'Norvegia',   flag: '🇳🇴' } },
+    91: { home: { team: 'Paraguay',  flag: '🇵🇾' }, away: { team: 'Franta',     flag: '🇫🇷' } },
+    92: { home: { team: 'Mexic',     flag: '🇲🇽' }, away: { team: 'Anglia',     flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' } },
+    93: { home: { team: 'Spania',    flag: '🇪🇸' }, away: { team: 'Portugalia', flag: '🇵🇹' } },
+    94: { home: { team: 'Belgia',    flag: '🇧🇪' }, away: { team: 'SUA',        flag: '🇺🇸' } },
   };
 
   // R16 — winner-reference slots (89-96), with a small preview line.
