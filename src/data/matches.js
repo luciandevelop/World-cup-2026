@@ -142,9 +142,12 @@ export const ALL_MATCHES = [
 
   // ══ FAZA ELIMINATORIE — Optimi (Round of 16) ════════════════════════════════
   // ID-uri 89-96, mapare exactă din BracketScreen.jsx R16_SLOTS
-  { id:89, group:"KO", stage:"R16", teamA:"Canada", teamB:"Maroc", flagA:"🇨🇦", flagB:"🇲🇦", time:"2026-07-04T17:00:00Z", venue:"Houston" }, // RO 04 Jul 20:00 — din M73+M76
-  { id:90, group:"KO", stage:"R16", teamA:"Brazilia", teamB:"Norvegia", flagA:"🇧🇷", flagB:"🇳🇴", time:"2026-07-05T20:00:00Z", venue:"New York" }, // RO 05 Jul 23:00 — din M74+M77
-  { id:91, group:"KO", stage:"R16", teamA:"Paraguay", teamB:"Franta", flagA:"🇵🇾", flagB:"🇫🇷", time:"2026-07-04T21:00:00Z", venue:"Philadelphia" }, // RO 05 Jul 00:00 — din M75+M80
+  { id:89, group:"KO", stage:"R16", teamA:"Canada", teamB:"Maroc", flagA:"🇨🇦", flagB:"🇲🇦", time:"2026-07-04T17:00:00Z", venue:"Houston" }, // RO 04 Jul 20:00
+  { id:90, group:"KO", stage:"R16", teamA:"Brazilia", teamB:"Norvegia", flagA:"🇧🇷", flagB:"🇳🇴", time:"2026-07-05T20:00:00Z", venue:"New York" }, // RO 05 Jul 23:00
+  { id:91, group:"KO", stage:"R16", teamA:"Paraguay", teamB:"Franta", flagA:"🇵🇾", flagB:"🇫🇷", time:"2026-07-04T21:00:00Z", venue:"Philadelphia" }, // RO 05 Jul 00:00
+  { id:92, group:"KO", stage:"R16", teamA:"Mexic", teamB:"Anglia", flagA:"🇲🇽", flagB:"🏴󠁧󠁢󠁥󠁮󠁧󠁿", time:"2026-07-06T00:00:00Z", venue:"Mexico City" }, // RO 06 Jul 03:00 — Yahoo: Sun Jul5 8pm ET
+  { id:93, group:"KO", stage:"R16", teamA:"Spania", teamB:"Portugalia", flagA:"🇪🇸", flagB:"🇵🇹", time:"2026-07-06T19:00:00Z", venue:"Dallas" }, // RO 06 Jul 22:00 — Yahoo: Mon Jul6 3pm ET
+  { id:94, group:"KO", stage:"R16", teamA:"Belgia", teamB:"SUA", flagA:"🇧🇪", flagB:"🇺🇸", time:"2026-07-07T00:00:00Z", venue:"Seattle" }, // RO 07 Jul 03:00 — Yahoo: Mon Jul6 8pm ET
 
 ];
 
