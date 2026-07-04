@@ -359,6 +359,8 @@ function RoundListView({ confirmedR32, r32IdRange, champion }) {
     92: { home: { team: 'Mexic',     flag: '🇲🇽' }, away: { team: 'Anglia',     flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' } },
     93: { home: { team: 'Spania',    flag: '🇪🇸' }, away: { team: 'Portugalia', flag: '🇵🇹' } },
     94: { home: { team: 'Belgia',    flag: '🇧🇪' }, away: { team: 'SUA',        flag: '🇺🇸' } },
+    95: { home: { team: 'Argentina', flag: '🇦🇷' }, away: { team: 'Egipt',      flag: '🇪🇬' } },
+    96: { home: { team: 'Elvetia',   flag: '🇨🇭' }, away: { team: 'Columbia',   flag: '🇨🇴' } },
   };
 
   // R16 — winner-reference slots (89-96), with a small preview line.
