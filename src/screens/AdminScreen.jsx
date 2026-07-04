@@ -101,7 +101,7 @@ function AdminHelp({ open, onToggle }) {
   );
 }
 
-export default function AdminScreen({ currentUser, finishedResults, onMatchUpdate, specialResultsInit = null, allUsers = {}, allPredictions = {} }) {
+export default function AdminScreen({ currentUser, finishedResults, onMatchUpdate, specialResultsInit = null, allUsers = {}, allPredictions = {}, allSpecialPreds = {} }) {
   const [sel,     setSel]    = useState(null);
   const [specialRes, setSpecialRes] = useState(
     specialResultsInit
@@ -717,6 +717,65 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
                         </div>
                       ))}
                     </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── 🏆 AUDIT CALIFICATE ÎN SFERTURI ──────────────────────────────────── */}
+      {/* Visible always to admin — shows every player's QF picks regardless of
+          lock time. Use this to verify picks before the lock deadline. */}
+      <div style={{ marginTop:10, padding:'10px 12px', background:'rgba(0,229,160,0.03)', border:'1px solid rgba(0,229,160,0.12)', borderRadius:10 }}>
+        <div style={{ fontSize:10, color:'rgba(0,229,160,0.7)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:8, fontWeight:700 }}>
+          🏆 Audit — Calificate în Sferturi
+        </div>
+        {Object.keys(allSpecialPreds).length === 0 ? (
+          <div style={{ fontSize:11, color:'rgba(255,255,255,0.25)', fontStyle:'italic' }}>
+            Niciun jucător nu a salvat încă predicția pentru sferturi.
+          </div>
+        ) : (
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            {Object.entries(allSpecialPreds).map(([uid, pred]) => {
+              const nickname = allUsers[uid]?.nickname || uid;
+              const qf = pred?.quarterFinalists || {};
+              const count = Object.values(qf).filter(Boolean).length;
+              const realQF = specialResultsInit?.quarterFinalists || {};
+              const correct = Object.entries(realQF).filter(([id, w]) => qf[id] === w).length;
+              return (
+                <div key={uid} style={{ padding:'7px 9px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: count > 0 ? 5 : 0 }}>
+                    <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{nickname}</span>
+                    <span style={{ fontSize:11, fontWeight:800, fontFamily:"'DM Mono',monospace",
+                      color: count === 8 ? 'rgba(0,229,160,0.8)' : count > 0 ? 'rgba(255,215,0,0.7)' : 'rgba(255,255,255,0.25)' }}>
+                      {count}/8{Object.keys(realQF).length > 0 ? ` · ${correct} corecte` : ''}
+                    </span>
+                  </div>
+                  {count > 0 && (
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+                      {R16_MATCHES.map(m => {
+                        const picked = qf[m.id];
+                        const realWin = realQF[m.id];
+                        const cor = realWin && picked === realWin;
+                        const wrg = realWin && picked && picked !== realWin;
+                        const flag = picked === m.home ? m.homeFlag : picked === m.away ? m.awayFlag : '';
+                        return (
+                          <span key={m.id} style={{
+                            fontSize:10, padding:'2px 6px', borderRadius:5, fontWeight:600,
+                            background: cor?'rgba(0,229,160,0.12)':wrg?'rgba(239,68,68,0.1)':'rgba(255,255,255,0.05)',
+                            color: cor?'#00E5A0':wrg?'#EF4444':picked?'rgba(255,255,255,0.6)':'rgba(255,255,255,0.2)',
+                            border: `1px solid ${cor?'rgba(0,229,160,0.2)':wrg?'rgba(239,68,68,0.2)':'rgba(255,255,255,0.06)'}`,
+                          }}>
+                            {picked ? `${flag} ${picked}` : '—'}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {count === 0 && (
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.25)', fontStyle:'italic' }}>Nu a salvat predicția.</div>
                   )}
                 </div>
               );
