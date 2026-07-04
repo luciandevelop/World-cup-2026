@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { ALL_MATCHES, ALL_GROUPS, getGroupLabel } from './matches.js';
+import { calcSpecialPoints } from '../services/specialEventsService.js';
 export { getGroupLabel };
 
 // ─── MATCH STATUS OVERRIDES ───────────────────────────────────────────────────
@@ -233,8 +234,8 @@ export function calculateUserScore(userPreds, finishedResults = {}) {
 export const QUALIFY_PCT   = 1.0;   // kept for import compatibility; not used for elimination
 export const CURRENT_STAGE = "Faza grupelor";
 
-export function buildLeaderboard(allPlayerPreds, currentUser, finishedMatches = null) {
-  const fm = finishedMatches || buildMatches({}).filter(m => m.isFinished); // official WC only
+export function buildLeaderboard(allPlayerPreds, currentUser, finishedMatches = null, allSpecialPredsByNick = {}, specialResults = null) {
+  const fm = finishedMatches || buildMatches({}).filter(m => m.isFinished);
   const nicknames = new Set([currentUser, ...Object.keys(allPlayerPreds)]);
 
   const players = Array.from(nicknames).map(nick => {
@@ -249,11 +250,14 @@ export function buildLeaderboard(allPlayerPreds, currentUser, finishedMatches = 
       if (b.exactScore > 0) exactScores++;
       if (lastMatchId === null || match.id > lastMatchId) { lastMatchPts = b.total; lastMatchId = match.id; }
     });
-    return { nickname:nick, points:totalPoints, exactScores, lastMatchPts };
+    // All special points — winner 500, semifinalists 200x4, topScorer 300,
+    // quarterFinalists 50x8 + bonus. calcSpecialPoints is the single source of truth.
+    const specialPts = calcSpecialPoints(allSpecialPredsByNick[nick] || null, specialResults);
+    totalPoints += specialPts;
+    return { nickname:nick, points:totalPoints, exactScores, lastMatchPts, specialPts };
   });
 
   players.sort((a, b) => b.points - a.points || a.nickname.localeCompare(b.nickname));
-  // qualified is always true — no one is eliminated from the fantasy competition
   return players.map((p, i) => ({ ...p, rank:i+1, qualified:true }));
 }
 
