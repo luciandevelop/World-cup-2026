@@ -56,8 +56,8 @@ export const R16_MATCHES = [
   { id:'92', home:'Mexic',      homeFlag:'🇲🇽', away:'Anglia',     awayFlag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
   { id:'93', home:'Spania',     homeFlag:'🇪🇸', away:'Portugalia', awayFlag:'🇵🇹' },
   { id:'94', home:'Belgia',     homeFlag:'🇧🇪', away:'SUA',        awayFlag:'🇺🇸' },
-  { id:'95', home:'Australia',  homeFlag:'🇦🇺', away:'Elvetia',    awayFlag:'🇨🇭' },
-  { id:'96', home:'Argentina',  homeFlag:'🇦🇷', away:'Columbia',   awayFlag:'🇨🇴' },
+  { id:'95', home:'Argentina',  homeFlag:'🇦🇷', away:'Egipt',      awayFlag:'🇪🇬' },
+  { id:'96', home:'Elvetia',    homeFlag:'🇨🇭', away:'Columbia',   awayFlag:'🇨🇴' },
 ];
 
 // ── TEAMS LIST (for campioană / semifinaliste / golgheter) ────────────────────
