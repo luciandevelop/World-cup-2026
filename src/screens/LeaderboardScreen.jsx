@@ -12,7 +12,7 @@ import {
   getPlayerForm,
 } from '../data/gameData.js';
 import { FootballAvatar } from '../components/UI.jsx';
-import { isSpecialLocked } from '../services/specialEventsService.js';
+import { isSpecialLocked, isQFLocked, calcQFPoints, R16_MATCHES } from '../services/specialEventsService.js';
 
 function normalizePredMap(preds = {}) {
   return Object.fromEntries(
@@ -26,7 +26,7 @@ function normalizePredMap(preds = {}) {
 // Only shows finished matches (isFinished=true) — predictions for open/upcoming
 // matches are never revealed here, same rule as Friends tab.
 function PlayerDetailModal({ nickname, avatarId, rank, points, exactScores,
-                              allPredictions, finishedMatches, onClose, specialPred = null }) {
+                              allPredictions, finishedMatches, onClose, specialPred = null, specialResults = null }) {
   // Build this player's prediction map (normalised to numeric keys)
   const preds = useMemo(() => {
     const raw = allPredictions[nickname] || {};
@@ -237,6 +237,57 @@ function PlayerDetailModal({ nickname, avatarId, rank, points, exactScores,
               )}
             </div>
           )}
+          {/* ── Calificate în Sferturi — read-only after lock ── */}
+          {isQFLocked() && specialPred?.quarterFinalists && (
+            <div style={{ marginTop:12, padding:'12px 14px', background:'rgba(255,255,255,0.02)',
+                          border:'1px solid rgba(255,255,255,0.07)', borderRadius:10 }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'rgba(255,255,255,0.6)',
+                            letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:8 }}>
+                🏆 Calificate în Sferturi
+              </div>
+              {(() => {
+                const qfPts = calcQFPoints(specialPred, specialResults);
+                const realQF = specialResults?.quarterFinalists || {};
+                return (
+                  <>
+                    <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                      {R16_MATCHES.map(m => {
+                        const picked  = specialPred.quarterFinalists[m.id];
+                        const realWin = realQF[m.id];
+                        if (!picked) return null;
+                        const correct = realWin && picked === realWin;
+                        const wrong   = realWin && picked !== realWin;
+                        const pickedFlag = picked === m.home ? m.homeFlag : m.awayFlag;
+                        return (
+                          <div key={m.id} style={{
+                            display:'flex', justifyContent:'space-between', alignItems:'center',
+                            padding:'5px 8px', borderRadius:8,
+                            background: correct?'rgba(0,229,160,0.07)':wrong?'rgba(239,68,68,0.06)':'rgba(255,255,255,0.03)',
+                          }}>
+                            <span style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>
+                              {m.homeFlag} {m.home} vs {m.awayFlag} {m.away}
+                            </span>
+                            <span style={{ fontSize:11, fontWeight:700,
+                              color:correct?'#00E5A0':wrong?'#EF4444':'rgba(255,255,255,0.6)' }}>
+                              {pickedFlag} {picked}
+                              {correct?' ✓ +50':wrong?` ✗`:'' }
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {(qfPts.total > 0 || Object.keys(realQF).length > 0) && (
+                      <div style={{ fontSize:10, color:'rgba(0,229,160,0.65)', marginTop:8, textAlign:'right' }}>
+                        {qfPts.correct}/8 corecte · {qfPts.base} pts
+                        {qfPts.bonus > 0 ? ` + ${qfPts.bonus} bonus` : ''}{qfPts.total > 0 ? ` = ${qfPts.total} pts` : ''}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          )}
+
         </div>
       </div>
     </div>
@@ -284,13 +335,13 @@ export default function LeaderboardScreen({
         ...(currentNickname ? { [currentNickname]: myPreds } : {}),
       };
 
-      const sorted = buildLeaderboard(allPlayerPreds, currentNickname || 'Me', finishedMatches);
+      const sorted = buildLeaderboard(allPlayerPreds, currentNickname || 'Me', finishedMatches, allSpecialPredsByNick, safeFinishedResults);
       return { sorted, finishedCount, error: null };
     } catch (err) {
       console.error('LEADERBOARD CRASH', err);
       return { sorted: [], finishedCount: 0, error: err?.message || String(err) };
     }
-  }, [currentUser, currentNickname, predictions, allPredictions, finishedResults]);
+  }, [currentUser, currentNickname, predictions, allPredictions, finishedResults, allSpecialPredsByNick]);
 
   const { sorted, finishedCount, error } = data;
   const total = sorted.length;
@@ -474,6 +525,7 @@ export default function LeaderboardScreen({
           }
           finishedMatches={buildMatches(finishedResults).filter(m => m.isFinished)}
           specialPred={allSpecialPredsByNick[selectedPlayer] || null}
+          specialResults={finishedResults}
           onClose={() => setSelectedPlayer(null)}
         />
       );

@@ -12,7 +12,7 @@ import {
 } from '../data/gameData.js';
 import { ALL_GROUPS } from '../data/matches.js';
 import { saveMatchResult, REALTIME_MODE, adminRepairSetJokerViaSpecialResults } from '../services/firestoreService.js'; // resetTestData removed
-import { saveSpecialResults, resetSpecialData, WC_TEAMS } from '../services/specialEventsService.js';
+import { saveSpecialResults, resetSpecialData, WC_TEAMS, R16_MATCHES, saveQFResults } from '../services/specialEventsService.js';
 
 // localStorage key for admin-set results (shared across all users on same device)
 const RESULTS_KEY   = 'wc2026_admin_results';
@@ -109,6 +109,8 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
       : { winner:'', semifinalists:[], topScorerCountry:'' }
   );
   const [specialMsg, setSpecialMsg] = useState('');
+  const [qfSel, setQFSel]       = useState(specialResultsInit?.quarterFinalists || {});
+  const [qfMsg, setQFMsg]       = useState('');
   const [sA,      setSA]     = useState(0);
   const [sB,      setSB]     = useState(0);
   const [possA,   setPossA]  = useState('');
@@ -827,6 +829,88 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
         {specialMsg && <div style={{ fontSize:11, color:specialMsg.startsWith('✅')?'rgba(0,229,160,0.8)':'#EF4444', marginBottom:6 }}>{specialMsg}</div>}
         <button onClick={async()=>{ setSpecialMsg(''); const res=await saveSpecialResults(adminUid, specialRes); if(res.success){setSpecialMsg('✅ Salvat! Clasamentul se actualizează.'); onMatchUpdate?.({_action:'specialResults'});} else setSpecialMsg('Eroare: '+res.error); }} style={{ width:'100%', padding:'9px', background:'rgba(255,215,0,0.1)', border:'1px solid rgba(255,215,0,0.25)', borderRadius:9, color:'#FFD700', fontSize:12, fontWeight:800, cursor:'pointer' }}>
           💾 Salvează rezultate speciale
+        </button>
+      </div>
+
+
+      {/* ── CALIFICATE ÎN SFERTURI — panou admin ─────────────────────────────── */}
+      <div style={{ marginTop:10, padding:'12px 14px', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14 }}>
+        <div style={{ fontSize:11, fontWeight:800, color:'rgba(255,255,255,0.7)', letterSpacing:'0.07em', textTransform:'uppercase', marginBottom:6 }}>
+          🏆 Calificate în Sferturi — setează rezultatele reale
+        </div>
+        <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:14 }}>
+          Alege câștigătorul real al fiecărui meci din optimi de finală. Salvarea actualizează automat clasamentul.
+        </div>
+
+        <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:12 }}>
+          {R16_MATCHES.map(m => {
+            const picked  = qfSel[m.id];
+            const homesel = picked === m.home;
+            const awaysel = picked === m.away;
+
+            const teamBtn = (side) => {
+              const sel  = side === 'home' ? homesel : awaysel;
+              const flag = side === 'home' ? m.homeFlag : m.awayFlag;
+              const team = side === 'home' ? m.home : m.away;
+              return (
+                <button
+                  key={side}
+                  onClick={() => {
+                    const v = side === 'home' ? m.home : m.away;
+                    setQFSel(prev => ({ ...prev, [m.id]: prev[m.id] === v ? undefined : v }));
+                  }}
+                  style={{
+                    flex:1, padding:'12px 6px', borderRadius:10, border:'none', cursor:'pointer',
+                    display:'flex', flexDirection:'column', alignItems:'center', gap:4,
+                    background: sel ? 'rgba(0,229,160,0.16)' : 'rgba(255,255,255,0.04)',
+                    outline: sel ? '1.5px solid rgba(0,229,160,0.55)' : '1px solid rgba(255,255,255,0.08)',
+                    transition:'background 0.12s',
+                  }}>
+                  <span style={{ fontSize:24, lineHeight:1 }}>{flag}</span>
+                  <span style={{ fontSize:11, fontWeight:700, color: sel ? '#00E5A0' : 'rgba(255,255,255,0.8)', textAlign:'center', lineHeight:1.2 }}>{team}</span>
+                  {sel && <span style={{ fontSize:9, color:'rgba(0,229,160,0.8)' }}>✓ câștigător real</span>}
+                </button>
+              );
+            };
+
+            return (
+              <div key={m.id} style={{ display:'flex', gap:6, alignItems:'stretch' }}>
+                {teamBtn('home')}
+                <div style={{ display:'flex', alignItems:'center', padding:'0 4px' }}>
+                  <span style={{ fontSize:9, fontWeight:800, color:'rgba(255,255,255,0.18)' }}>VS</span>
+                </div>
+                {teamBtn('away')}
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ fontSize:10, marginBottom:8,
+          color: Object.values(qfSel).filter(Boolean).length === 8 ? 'rgba(0,229,160,0.8)' : 'rgba(255,255,255,0.3)' }}>
+          {Object.values(qfSel).filter(Boolean).length}/8 meciuri setate
+        </div>
+        {qfMsg && <div style={{ fontSize:11, color:qfMsg.startsWith('✅')?'rgba(0,229,160,0.8)':'#EF4444', marginBottom:6 }}>{qfMsg}</div>}
+        <button
+          disabled={Object.values(qfSel).filter(Boolean).length !== 8}
+          onClick={async () => {
+            setQFMsg('');
+            const clean = Object.fromEntries(Object.entries(qfSel).filter(([,v]) => v));
+            const res = await saveQFResults(adminUid, clean);
+            if (res.success) {
+              setQFMsg('✅ Salvat! Clasamentul se actualizează.');
+              onMatchUpdate?.({ _action:'specialResults' });
+            } else {
+              setQFMsg('Eroare: ' + (res.error || 'necunoscută'));
+            }
+          }}
+          style={{
+            width:'100%', padding:'10px', fontSize:13, fontWeight:800, borderRadius:10,
+            cursor: Object.values(qfSel).filter(Boolean).length === 8 ? 'pointer' : 'default',
+            background: Object.values(qfSel).filter(Boolean).length === 8 ? 'rgba(0,229,160,0.12)' : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${Object.values(qfSel).filter(Boolean).length === 8 ? 'rgba(0,229,160,0.35)' : 'rgba(255,255,255,0.07)'}`,
+            color: Object.values(qfSel).filter(Boolean).length === 8 ? '#00E5A0' : 'rgba(255,255,255,0.25)',
+          }}>
+          💾 Salvează calificatele reale în sferturi
         </button>
       </div>
 
