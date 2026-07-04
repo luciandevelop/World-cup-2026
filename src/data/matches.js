@@ -148,6 +148,8 @@ export const ALL_MATCHES = [
   { id:92, group:"KO", stage:"R16", teamA:"Mexic", teamB:"Anglia", flagA:"🇲🇽", flagB:"🏴󠁧󠁢󠁥󠁮󠁧󠁿", time:"2026-07-06T00:00:00Z", venue:"Mexico City" }, // RO 06 Jul 03:00 — Yahoo: Sun Jul5 8pm ET
   { id:93, group:"KO", stage:"R16", teamA:"Spania", teamB:"Portugalia", flagA:"🇪🇸", flagB:"🇵🇹", time:"2026-07-06T19:00:00Z", venue:"Dallas" }, // RO 06 Jul 22:00 — Yahoo: Mon Jul6 3pm ET
   { id:94, group:"KO", stage:"R16", teamA:"Belgia", teamB:"SUA", flagA:"🇧🇪", flagB:"🇺🇸", time:"2026-07-07T00:00:00Z", venue:"Seattle" }, // RO 07 Jul 03:00 — Yahoo: Mon Jul6 8pm ET
+  { id:95, group:"KO", stage:"R16", teamA:"Argentina", teamB:"Egipt", flagA:"🇦🇷", flagB:"🇪🇬", time:"2026-07-07T16:00:00Z", venue:"Atlanta" }, // RO 07 Jul 19:00 — Yahoo: Tue Jul7 12pm ET
+  { id:96, group:"KO", stage:"R16", teamA:"Elvetia", teamB:"Columbia", flagA:"🇨🇭", flagB:"🇨🇴", time:"2026-07-07T20:00:00Z", venue:"Vancouver" }, // RO 07 Jul 23:00 — Yahoo: Tue Jul7 4pm ET
 
 ];
 
