@@ -303,10 +303,10 @@ const R16_SLOTS = [
 ];
 // QF: each slot references the two R16 match numbers that feed it.
 const QF_SLOTS = [
-  { id:97,  from:[89,90] },
-  { id:98,  from:[93,94] },
-  { id:99,  from:[91,92] },
-  { id:100, from:[95,96] },
+  { id:97,  from:[89,91] },  // Maroc(M89) vs Franta(M91) — confirmed
+  { id:98,  from:[93,94] },  // câșt.M93 vs câșt.M94 — placeholder
+  { id:99,  from:[90,92] },  // Norvegia(M90) vs Anglia(M92) — confirmed
+  { id:100, from:[95,96] },  // câșt.M95 vs câșt.M96 — placeholder
 ];
 // SF: each slot references the two QF match numbers that feed it.
 const SF_SLOTS = [
@@ -376,12 +376,21 @@ function RoundListView({ confirmedR32, r32IdRange, champion }) {
     };
   });
 
-  // QF — winner-reference slots (97-100).
-  const qf = QF_SLOTS.map(s => ({
-    id: s.id, home: null, away: null,
-    homeLabel: `Câșt. M${s.from[0]}`,
-    awayLabel: `Câșt. M${s.from[1]}`,
-  }));
+  // QF — winner-reference slots (97-100), fill confirmed matches.
+  const CONFIRMED_QF = {
+    97: { home: { team: 'Franta',   flag: '🇫🇷' }, away: { team: 'Maroc',  flag: '🇲🇦' } },
+    99: { home: { team: 'Norvegia', flag: '🇳🇴' }, away: { team: 'Anglia', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' } },
+  };
+  const qf = QF_SLOTS.map(s => {
+    const confirmed = CONFIRMED_QF[s.id];
+    return {
+      id: s.id,
+      home: confirmed ? confirmed.home : null,
+      away: confirmed ? confirmed.away : null,
+      homeLabel: confirmed ? confirmed.home.team : `Câșt. M${s.from[0]}`,
+      awayLabel: confirmed ? confirmed.away.team : `Câșt. M${s.from[1]}`,
+    };
+  });
 
   // SF — winner-reference slots (101-102).
   const sf = SF_SLOTS.map(s => ({
