@@ -151,6 +151,10 @@ export const ALL_MATCHES = [
   { id:95, group:"KO", stage:"R16", teamA:"Argentina", teamB:"Egipt", flagA:"🇦🇷", flagB:"🇪🇬", time:"2026-07-07T16:00:00Z", venue:"Atlanta" }, // RO 07 Jul 19:00 — Yahoo: Tue Jul7 12pm ET
   { id:96, group:"KO", stage:"R16", teamA:"Elvetia", teamB:"Columbia", flagA:"🇨🇭", flagB:"🇨🇴", time:"2026-07-07T20:00:00Z", venue:"Vancouver" }, // RO 07 Jul 23:00 — Yahoo: Tue Jul7 4pm ET
 
+  // ══ FAZA ELIMINATORIE — Sferturi de finală (Quarterfinals) ══════════════════
+  { id:97, group:"KO", stage:"QF", teamA:"Franta",   teamB:"Maroc",  flagA:"🇫🇷", flagB:"🇲🇦", time:"2026-07-10T19:00:00Z", venue:"Los Angeles" }, // RO 10 Jul 22:00 — Inglewood/SoFi Stadium
+  { id:99, group:"KO", stage:"QF", teamA:"Norvegia", teamB:"Anglia", flagA:"🇳🇴", flagB:"🏴󠁧󠁢󠁥󠁮󠁧󠁿", time:"2026-07-12T01:00:00Z", venue:"Kansas City"  }, // RO 12 Jul 04:00 — Arrowhead Stadium
+
 ];
 
 export const ALL_GROUPS = ["A","B","C","D","E","F","G","H","I","J","K","L"];
