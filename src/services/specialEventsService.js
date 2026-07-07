@@ -93,10 +93,66 @@ export const WC_TEAMS = [
 // winner=500, each correct semifinalist=200 (max 800), topScorer=300
 // quarterFinalists: +50/match correct, bonus +100 at 7/8, +200 at 8/8
 
+// ── TEAM → MATCH LOOKUP (for auto-repair) ────────────────────────────────────
+// Each R16 team appears in exactly one fixture.
+const _TEAM_TO_MATCH_ID = {};
+R16_MATCHES.forEach(m => { _TEAM_TO_MATCH_ID[m.home] = m.id; _TEAM_TO_MATCH_ID[m.away] = m.id; });
+
+// Valid teams per matchId — used for is-correctly-placed check.
+const _R16_VALID = Object.fromEntries(R16_MATCHES.map(m => [m.id, new Set([m.home, m.away])]));
+const _isCorrectlyPlaced = (id, team) => !!team && (_R16_VALID[id]?.has(team) ?? false);
+
+// repairQFPicks — runtime-only, in-memory, never writes to Firestore.
+//
+// Old buggy UI versions saved picks under wrong matchIds (e.g. the user
+// correctly chose Argentina and Elveția but the data was stored as
+// {95:"Elveția", 96:"Argentina"} instead of {95:"Argentina", 96:"Elveția"}).
+//
+// Algorithm (iterates until stable, handles chains and swaps):
+//   For each misplaced pick (team not valid for its saved matchId):
+//     1. Find the correct matchId for that team.
+//     2. If the correct slot is empty → move there.
+//     3. If the correct slot has a valid pick → remove the misplaced one (don't overwrite).
+//     4. If the correct slot also has a misplaced pick → swap atomically, then re-evaluate.
+//     5. If the team doesn't belong to any R16 fixture → remove (truly unknown).
+//
+// Valid picks are NEVER overwritten.
+export function repairQFPicks(qf) {
+  if (!qf) return {};
+  const result = { ...qf };
+  let changed = true;
+  let iterations = 0;
+  while (changed && iterations < 16) {
+    changed = false;
+    iterations++;
+    for (const [id, team] of Object.entries(result)) {
+      if (!team) { delete result[id]; changed = true; break; }
+      if (_isCorrectlyPlaced(id, team)) continue;
+
+      const correctId = _TEAM_TO_MATCH_ID[team];
+      if (!correctId) { delete result[id]; changed = true; break; }  // unknown team
+
+      const atDest = result[correctId];
+      if (!atDest) {
+        result[correctId] = team; delete result[id]; changed = true; break;
+      }
+      if (_isCorrectlyPlaced(correctId, atDest)) {
+        delete result[id]; changed = true; break;                // dest valid — remove misplaced
+      }
+      // Both sides misplaced — swap atomically
+      result[correctId] = team; result[id] = atDest;
+      changed = true; break;
+    }
+  }
+  return result;
+}
+
 // Internal helper — counts matches where user picked the real winner.
+// Applies repairQFPicks first so old buggy swapped picks score correctly.
 function _countQFCorrect(userQF, realQF) {
   if (!userQF || !realQF) return 0;
-  return Object.entries(realQF).filter(([id, winner]) => userQF[id] === winner).length;
+  const fixed = repairQFPicks(userQF);
+  return Object.entries(realQF).filter(([id, winner]) => fixed[id] === winner).length;
 }
 
 export function calcSpecialPoints(userPred, results) {
@@ -126,14 +182,14 @@ export function calcSpecialPoints(userPred, results) {
 // Public breakdown for display in UI.
 export function calcQFPoints(userPred, results) {
   const realQF  = results?.quarterFinalists || {};
-  const userQF  = userPred?.quarterFinalists || {};
-  const entered = Object.keys(realQF).length;          // how many results admin has saved
-  const correct = _countQFCorrect(userQF, realQF);     // correct picks so far
+  const rawQF   = userPred?.quarterFinalists || {};
+  const userQF  = repairQFPicks(rawQF);             // repair before display/scoring
+  const entered = Object.keys(realQF).length;
+  const correct = _countQFCorrect(rawQF, realQF);   // _countQFCorrect also repairs internally
   const base    = correct * 50;
-  // Bonus only when ALL 8 results are in — never early
   const allDone = entered === 8;
   const bonus   = allDone ? (correct === 8 ? 200 : correct === 7 ? 100 : 0) : 0;
-  return { correct, entered, base, bonus, total: base + bonus, allDone };
+  return { correct, entered, base, bonus, total: base + bonus, allDone, repairedQF: userQF };
 }
 
 // ── READ ──────────────────────────────────────────────────────────────────────
