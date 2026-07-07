@@ -114,18 +114,26 @@ export function calcSpecialPoints(userPred, results) {
   if (results.quarterFinalists && userPred.quarterFinalists) {
     const c = _countQFCorrect(userPred.quarterFinalists, results.quarterFinalists);
     pts += c * 50;
-    if (c === 8) pts += 200;
-    else if (c === 7) pts += 100;
+    // Bonus only when all 8 results are entered
+    if (Object.keys(results.quarterFinalists).length === 8) {
+      if (c === 8) pts += 200;
+      else if (c === 7) pts += 100;
+    }
   }
   return pts;
 }
 
 // Public breakdown for display in UI.
 export function calcQFPoints(userPred, results) {
-  const correct = _countQFCorrect(userPred?.quarterFinalists, results?.quarterFinalists);
+  const realQF  = results?.quarterFinalists || {};
+  const userQF  = userPred?.quarterFinalists || {};
+  const entered = Object.keys(realQF).length;          // how many results admin has saved
+  const correct = _countQFCorrect(userQF, realQF);     // correct picks so far
   const base    = correct * 50;
-  const bonus   = correct === 8 ? 200 : correct === 7 ? 100 : 0;
-  return { correct, base, bonus, total: base + bonus };
+  // Bonus only when ALL 8 results are in — never early
+  const allDone = entered === 8;
+  const bonus   = allDone ? (correct === 8 ? 200 : correct === 7 ? 100 : 0) : 0;
+  return { correct, entered, base, bonus, total: base + bonus, allDone };
 }
 
 // ── READ ──────────────────────────────────────────────────────────────────────
@@ -215,16 +223,18 @@ export async function saveQFPrediction(uid, quarterFinalists) {
 // Admin saves the real qualified teams onto specialResults/main using merge:true.
 // No Firestore rules change needed — admin writes to specialResults/main already allowed.
 export async function saveQFResults(adminUid, quarterFinalists) {
-  const filled = Object.values(quarterFinalists).filter(Boolean).length;
-  if (filled !== 8) return { success: false, error: 'Setează câștigătorul pentru toate cele 8 meciuri.' };
+  // Allow partial saves — admin can enter results one by one as matches finish.
+  // merge:true ensures previously saved winners are kept unless overwritten.
   if (!FIREBASE_CONFIGURED) {
     try {
       const existing = JSON.parse(localStorage.getItem('wc_special_results') || '{}');
-      localStorage.setItem('wc_special_results', JSON.stringify({ ...existing, quarterFinalists }));
+      const merged = { ...(existing.quarterFinalists || {}), ...quarterFinalists };
+      localStorage.setItem('wc_special_results', JSON.stringify({ ...existing, quarterFinalists: merged }));
       return { success: true };
     } catch { return { success: false, error: 'Eroare localStorage.' }; }
   }
   try {
+    // Use dot-notation path update via setDoc merge so only changed keys are written
     await setDoc(
       doc(db, 'specialResults', 'main'),
       { quarterFinalists, updatedBy: adminUid, updatedAt: serverTimestamp() },
