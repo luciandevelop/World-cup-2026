@@ -357,6 +357,7 @@ export default function LeaderboardScreen({
   finishedResults = {},
   allUsers = {},
   allSpecialPredsByNick = {},
+  specialResults = null,
 }) {
   const currentNickname =
     typeof currentUser === 'string'
@@ -581,7 +582,7 @@ export default function LeaderboardScreen({
           }
           finishedMatches={buildMatches(finishedResults).filter(m => m.isFinished)}
           specialPred={allSpecialPredsByNick[selectedPlayer] || null}
-          specialResults={finishedResults}
+          specialResults={specialResults}
           onClose={() => setSelectedPlayer(null)}
         />
       );
