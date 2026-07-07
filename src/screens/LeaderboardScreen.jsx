@@ -392,13 +392,13 @@ export default function LeaderboardScreen({
         ...(currentNickname ? { [currentNickname]: myPreds } : {}),
       };
 
-      const sorted = buildLeaderboard(allPlayerPreds, currentNickname || 'Me', finishedMatches, allSpecialPredsByNick, safeFinishedResults);
+      const sorted = buildLeaderboard(allPlayerPreds, currentNickname || 'Me', finishedMatches, allSpecialPredsByNick, specialResults);
       return { sorted, finishedCount, error: null };
     } catch (err) {
       console.error('LEADERBOARD CRASH', err);
       return { sorted: [], finishedCount: 0, error: err?.message || String(err) };
     }
-  }, [currentUser, currentNickname, predictions, allPredictions, finishedResults, allSpecialPredsByNick]);
+  }, [currentUser, currentNickname, predictions, allPredictions, finishedResults, allSpecialPredsByNick, specialResults]);
 
   const { sorted, finishedCount, error } = data;
   const total = sorted.length;
