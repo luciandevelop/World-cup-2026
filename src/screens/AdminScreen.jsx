@@ -981,7 +981,7 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
           onClick={async () => {
             setQFMsg('');
             const clean = Object.fromEntries(Object.entries(qfSel).filter(([,v]) => v));
-            const res = await saveQFResults(adminUid, clean);
+            const res = await saveQFResults(currentUser?.uid, clean);
             if (res.success) {
               setQFMsg(`✅ ${Object.keys(clean).length} rezultat(e) salvate! Clasamentul se actualizează.`);
               onMatchUpdate?.({ _action:'specialResults' });
