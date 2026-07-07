@@ -12,7 +12,7 @@ import {
 } from '../data/gameData.js';
 import { ALL_GROUPS } from '../data/matches.js';
 import { saveMatchResult, REALTIME_MODE, adminRepairSetJokerViaSpecialResults } from '../services/firestoreService.js'; // resetTestData removed
-import { saveSpecialResults, resetSpecialData, WC_TEAMS, R16_MATCHES, saveQFResults } from '../services/specialEventsService.js';
+import { saveSpecialResults, resetSpecialData, WC_TEAMS, R16_MATCHES, saveQFResults, repairQFPicks } from '../services/specialEventsService.js';
 
 // localStorage key for admin-set results (shared across all users on same device)
 const RESULTS_KEY   = 'wc2026_admin_results';
@@ -726,8 +726,6 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
       </div>
 
       {/* ── 🏆 AUDIT CALIFICATE ÎN SFERTURI ──────────────────────────────────── */}
-      {/* Visible always to admin — shows every player's QF picks regardless of
-          lock time. Use this to verify picks before the lock deadline. */}
       <div style={{ marginTop:10, padding:'10px 12px', background:'rgba(0,229,160,0.03)', border:'1px solid rgba(0,229,160,0.12)', borderRadius:10 }}>
         <div style={{ fontSize:10, color:'rgba(0,229,160,0.7)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:8, fontWeight:700 }}>
           🏆 Audit — Calificate în Sferturi
@@ -740,10 +738,11 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
           <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
             {Object.entries(allSpecialPreds).map(([uid, pred]) => {
               const nickname = allUsers[uid]?.nickname || uid;
-              const qf = pred?.quarterFinalists || {};
-              const count = Object.values(qf).filter(Boolean).length;
-              const realQF = specialResultsInit?.quarterFinalists || {};
-              const correct = Object.entries(realQF).filter(([id, w]) => qf[id] === w).length;
+              const rawQF    = pred?.quarterFinalists || {};
+              const qf       = repairQFPicks(rawQF);   // repair in memory before display
+              const count    = Object.values(qf).filter(Boolean).length;
+              const realQF   = specialResultsInit?.quarterFinalists || {};
+              const correct  = Object.entries(realQF).filter(([id, w]) => qf[id] === w).length;
               return (
                 <div key={uid} style={{ padding:'7px 9px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.05)' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: count > 0 ? 5 : 0 }}>
@@ -756,11 +755,11 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
                   {count > 0 && (
                     <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
                       {R16_MATCHES.map(m => {
-                        const picked = qf[m.id];
+                        const picked  = qf[m.id];
                         const realWin = realQF[m.id];
-                        const cor = realWin && picked === realWin;
-                        const wrg = realWin && picked && picked !== realWin;
-                        const flag = picked === m.home ? m.homeFlag : picked === m.away ? m.awayFlag : '';
+                        const cor     = realWin && picked === realWin;
+                        const wrg     = realWin && picked && picked !== realWin;
+                        const flag    = picked === m.home ? m.homeFlag : picked === m.away ? m.awayFlag : '';
                         return (
                           <span key={m.id} style={{
                             fontSize:10, padding:'2px 6px', borderRadius:5, fontWeight:600,

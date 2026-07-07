@@ -254,24 +254,22 @@ function PlayerDetailModal({ nickname, avatarId, rank, points, exactScores,
                     {/* Per-match rows: ✅ correct | ❌ wrong | ⏳ pending */}
                     <div style={{ display:'flex', flexDirection:'column', gap:5, marginBottom:12 }}>
                       {R16_MATCHES.map(m => {
-                        const picked      = specialPred.quarterFinalists[m.id];
-                        const realWin     = realQF[m.id];
-                        const hasResult   = !!realWin;
-                        const correct     = hasResult && picked === realWin;
-                        const wrong       = hasResult && picked && picked !== realWin;
-                        const pending     = !hasResult;
-                        const pickedFlag  = picked === m.home ? m.homeFlag : picked === m.away ? m.awayFlag : '';
+                        const picked     = qfPts.repairedQF[m.id];  // use repaired picks
+                        const realWin    = realQF[m.id];
+                        const hasResult  = !!realWin;
+                        const correct    = hasResult && picked === realWin;
+                        const wrong      = hasResult && picked && picked !== realWin;
+                        const pending    = !hasResult;
+                        const pickedFlag = picked === m.home ? m.homeFlag : picked === m.away ? m.awayFlag : '';
                         return (
                           <div key={m.id} style={{
                             borderRadius:8, overflow:'hidden',
                             border:`1px solid ${correct?'rgba(0,229,160,0.15)':wrong?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.05)'}`,
                           }}>
-                            {/* Fixture label */}
                             <div style={{ padding:'4px 8px', background:'rgba(255,255,255,0.02)',
                               fontSize:10, color:'rgba(255,255,255,0.4)' }}>
                               {m.homeFlag} {m.home} vs {m.awayFlag} {m.away}
                             </div>
-                            {/* Pick + result */}
                             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
                               padding:'5px 8px',
                               background: correct?'rgba(0,229,160,0.07)':wrong?'rgba(239,68,68,0.06)':'rgba(255,255,255,0.01)' }}>
@@ -280,12 +278,8 @@ function PlayerDetailModal({ nickname, avatarId, rank, points, exactScores,
                                 fontStyle: picked ? 'normal' : 'italic' }}>
                                 {picked ? <>{pickedFlag} {picked}</> : '— nepredis'}
                               </span>
-                              {pending && (
-                                <span style={{ fontSize:11, color:'rgba(255,180,0,0.7)' }}>⏳ În așteptare</span>
-                              )}
-                              {correct && (
-                                <span style={{ fontSize:11, fontWeight:700, color:'#00E5A0' }}>✅ +50</span>
-                              )}
+                              {pending && <span style={{ fontSize:11, color:'rgba(255,180,0,0.7)' }}>⏳ În așteptare</span>}
+                              {correct && <span style={{ fontSize:11, fontWeight:700, color:'#00E5A0' }}>✅ +50</span>}
                               {wrong && (
                                 <span style={{ fontSize:11, fontWeight:700, color:'#EF4444' }}>
                                   ❌ +0 <span style={{ fontSize:9, opacity:0.7 }}>({realWin})</span>
