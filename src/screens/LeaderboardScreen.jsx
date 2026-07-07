@@ -242,44 +242,100 @@ function PlayerDetailModal({ nickname, avatarId, rank, points, exactScores,
             <div style={{ marginTop:12, padding:'12px 14px', background:'rgba(255,255,255,0.02)',
                           border:'1px solid rgba(255,255,255,0.07)', borderRadius:10 }}>
               <div style={{ fontSize:11, fontWeight:800, color:'rgba(255,255,255,0.6)',
-                            letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:8 }}>
+                            letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:10 }}>
                 🏆 Calificate în Sferturi
               </div>
               {(() => {
-                const qfPts = calcQFPoints(specialPred, specialResults);
+                const qfPts  = calcQFPoints(specialPred, specialResults);
                 const realQF = specialResults?.quarterFinalists || {};
+                const entered = Object.keys(realQF).length;  // how many results admin has entered
                 return (
                   <>
-                    <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                    {/* Per-match rows: ✅ correct | ❌ wrong | ⏳ pending */}
+                    <div style={{ display:'flex', flexDirection:'column', gap:5, marginBottom:12 }}>
                       {R16_MATCHES.map(m => {
-                        const picked  = specialPred.quarterFinalists[m.id];
-                        const realWin = realQF[m.id];
-                        if (!picked) return null;
-                        const correct = realWin && picked === realWin;
-                        const wrong   = realWin && picked !== realWin;
-                        const pickedFlag = picked === m.home ? m.homeFlag : m.awayFlag;
+                        const picked      = specialPred.quarterFinalists[m.id];
+                        const realWin     = realQF[m.id];
+                        const hasResult   = !!realWin;
+                        const correct     = hasResult && picked === realWin;
+                        const wrong       = hasResult && picked && picked !== realWin;
+                        const pending     = !hasResult;
+                        const pickedFlag  = picked === m.home ? m.homeFlag : picked === m.away ? m.awayFlag : '';
                         return (
                           <div key={m.id} style={{
-                            display:'flex', justifyContent:'space-between', alignItems:'center',
-                            padding:'5px 8px', borderRadius:8,
-                            background: correct?'rgba(0,229,160,0.07)':wrong?'rgba(239,68,68,0.06)':'rgba(255,255,255,0.03)',
+                            borderRadius:8, overflow:'hidden',
+                            border:`1px solid ${correct?'rgba(0,229,160,0.15)':wrong?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.05)'}`,
                           }}>
-                            <span style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>
+                            {/* Fixture label */}
+                            <div style={{ padding:'4px 8px', background:'rgba(255,255,255,0.02)',
+                              fontSize:10, color:'rgba(255,255,255,0.4)' }}>
                               {m.homeFlag} {m.home} vs {m.awayFlag} {m.away}
-                            </span>
-                            <span style={{ fontSize:11, fontWeight:700,
-                              color:correct?'#00E5A0':wrong?'#EF4444':'rgba(255,255,255,0.6)' }}>
-                              {pickedFlag} {picked}
-                              {correct?' ✓ +50':wrong?` ✗`:'' }
-                            </span>
+                            </div>
+                            {/* Pick + result */}
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
+                              padding:'5px 8px',
+                              background: correct?'rgba(0,229,160,0.07)':wrong?'rgba(239,68,68,0.06)':'rgba(255,255,255,0.01)' }}>
+                              <span style={{ fontSize:11, fontWeight:600,
+                                color: picked ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)',
+                                fontStyle: picked ? 'normal' : 'italic' }}>
+                                {picked ? <>{pickedFlag} {picked}</> : '— nepredis'}
+                              </span>
+                              {pending && (
+                                <span style={{ fontSize:11, color:'rgba(255,180,0,0.7)' }}>⏳ În așteptare</span>
+                              )}
+                              {correct && (
+                                <span style={{ fontSize:11, fontWeight:700, color:'#00E5A0' }}>✅ +50</span>
+                              )}
+                              {wrong && (
+                                <span style={{ fontSize:11, fontWeight:700, color:'#EF4444' }}>
+                                  ❌ +0 <span style={{ fontSize:9, opacity:0.7 }}>({realWin})</span>
+                                </span>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
                     </div>
-                    {(qfPts.total > 0 || Object.keys(realQF).length > 0) && (
-                      <div style={{ fontSize:10, color:'rgba(0,229,160,0.65)', marginTop:8, textAlign:'right' }}>
-                        {qfPts.correct}/8 corecte · {qfPts.base} pts
-                        {qfPts.bonus > 0 ? ` + ${qfPts.bonus} bonus` : ''}{qfPts.total > 0 ? ` = ${qfPts.total} pts` : ''}
+
+                    {/* Live summary card */}
+                    {entered > 0 && (
+                      <div style={{
+                        padding:'10px 12px', borderRadius:10,
+                        background:'rgba(255,255,255,0.03)',
+                        border:'1px solid rgba(255,255,255,0.08)',
+                      }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
+                          <span style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>Calificate corecte:</span>
+                          <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>
+                            {qfPts.correct} / {entered}
+                          </span>
+                        </div>
+                        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
+                          <span style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>Puncte calificări:</span>
+                          <span style={{ fontSize:11, fontWeight:700, color:'#FFD700' }}>+{qfPts.base}</span>
+                        </div>
+                        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+                          <span style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>Bonus:</span>
+                          {qfPts.allDone ? (
+                            <span style={{ fontSize:11, fontWeight:700,
+                              color: qfPts.bonus > 0 ? '#00E5A0' : 'rgba(255,255,255,0.35)' }}>
+                              {qfPts.bonus > 0 ? `+${qfPts.bonus}` : '—'}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize:11, color:'rgba(255,180,0,0.6)', fontStyle:'italic' }}>
+                              Se acordă după toate cele 8 rezultate
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ borderTop:'1px solid rgba(255,255,255,0.07)', paddingTop:7,
+                          display:'flex', justifyContent:'space-between' }}>
+                          <span style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.7)' }}>
+                            {qfPts.allDone ? 'TOTAL:' : 'TOTAL momentan:'}
+                          </span>
+                          <span style={{ fontSize:12, fontWeight:900, color:'#FFD700' }}>
+                            +{qfPts.total}
+                          </span>
+                        </div>
                       </div>
                     )}
                   </>

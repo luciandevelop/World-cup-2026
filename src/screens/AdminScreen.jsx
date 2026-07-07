@@ -894,23 +894,40 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
 
       {/* ── CALIFICATE ÎN SFERTURI — panou admin ─────────────────────────────── */}
       <div style={{ marginTop:10, padding:'12px 14px', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14 }}>
-        <div style={{ fontSize:11, fontWeight:800, color:'rgba(255,255,255,0.7)', letterSpacing:'0.07em', textTransform:'uppercase', marginBottom:6 }}>
-          🏆 Calificate în Sferturi — setează rezultatele reale
+        <div style={{ fontSize:11, fontWeight:800, color:'rgba(255,255,255,0.7)', letterSpacing:'0.07em', textTransform:'uppercase', marginBottom:4 }}>
+          🏆 Calificate în Sferturi — rezultate reale
         </div>
         <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:14 }}>
-          Alege câștigătorul real al fiecărui meci din optimi de finală. Salvarea actualizează automat clasamentul.
+          Poți salva după fiecare meci. Rezultatele anterioare rămân salvate.
         </div>
+
+        {/* Already-saved indicator */}
+        {(() => {
+          const savedQF = specialResultsInit?.quarterFinalists || {};
+          const savedCount = Object.values(savedQF).filter(Boolean).length;
+          if (savedCount === 0) return null;
+          return (
+            <div style={{ fontSize:10, color:'rgba(0,229,160,0.7)', marginBottom:10,
+              padding:'5px 8px', background:'rgba(0,229,160,0.06)', borderRadius:7,
+              border:'1px solid rgba(0,229,160,0.15)' }}>
+              ✓ {savedCount}/8 rezultate salvate în Firestore
+            </div>
+          );
+        })()}
 
         <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:12 }}>
           {R16_MATCHES.map(m => {
-            const picked  = qfSel[m.id];
-            const homesel = picked === m.home;
-            const awaysel = picked === m.away;
+            const picked    = qfSel[m.id];
+            const savedWin  = specialResultsInit?.quarterFinalists?.[m.id];
+            const homesel   = picked === m.home;
+            const awaysel   = picked === m.away;
+            const isSaved   = !!savedWin;
 
             const teamBtn = (side) => {
-              const sel  = side === 'home' ? homesel : awaysel;
-              const flag = side === 'home' ? m.homeFlag : m.awayFlag;
-              const team = side === 'home' ? m.home : m.away;
+              const sel    = side === 'home' ? homesel : awaysel;
+              const flag   = side === 'home' ? m.homeFlag : m.awayFlag;
+              const team   = side === 'home' ? m.home : m.away;
+              const isReal = savedWin === team;
               return (
                 <button
                   key={side}
@@ -919,24 +936,34 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
                     setQFSel(prev => ({ ...prev, [m.id]: prev[m.id] === v ? undefined : v }));
                   }}
                   style={{
-                    flex:1, padding:'12px 6px', borderRadius:10, border:'none', cursor:'pointer',
-                    display:'flex', flexDirection:'column', alignItems:'center', gap:4,
+                    flex:1, padding:'10px 6px', borderRadius:10, border:'none', cursor:'pointer',
+                    display:'flex', flexDirection:'column', alignItems:'center', gap:3,
                     background: sel ? 'rgba(0,229,160,0.16)' : 'rgba(255,255,255,0.04)',
                     outline: sel ? '1.5px solid rgba(0,229,160,0.55)' : '1px solid rgba(255,255,255,0.08)',
                     transition:'background 0.12s',
                   }}>
-                  <span style={{ fontSize:24, lineHeight:1 }}>{flag}</span>
+                  <span style={{ fontSize:22, lineHeight:1 }}>{flag}</span>
                   <span style={{ fontSize:11, fontWeight:700, color: sel ? '#00E5A0' : 'rgba(255,255,255,0.8)', textAlign:'center', lineHeight:1.2 }}>{team}</span>
-                  {sel && <span style={{ fontSize:9, color:'rgba(0,229,160,0.8)' }}>✓ câștigător real</span>}
+                  {isReal && <span style={{ fontSize:9, color:'rgba(0,229,160,0.9)', fontWeight:700 }}>✓ Salvat</span>}
+                  {sel && !isReal && <span style={{ fontSize:9, color:'rgba(255,215,0,0.8)' }}>◎ selectat</span>}
                 </button>
               );
             };
 
             return (
-              <div key={m.id} style={{ display:'flex', gap:6, alignItems:'stretch' }}>
+              <div key={m.id} style={{
+                display:'flex', gap:6, alignItems:'stretch',
+                opacity: isSaved && !picked ? 0.7 : 1,
+              }}>
                 {teamBtn('home')}
-                <div style={{ display:'flex', alignItems:'center', padding:'0 4px' }}>
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'0 4px', gap:2 }}>
                   <span style={{ fontSize:9, fontWeight:800, color:'rgba(255,255,255,0.18)' }}>VS</span>
+                  {isSaved && (
+                    <span style={{ fontSize:8, color:'rgba(0,229,160,0.6)', fontWeight:700, whiteSpace:'nowrap' }}>✓ salvat</span>
+                  )}
+                  {!isSaved && (
+                    <span style={{ fontSize:8, color:'rgba(255,255,255,0.2)', whiteSpace:'nowrap' }}>nesalvat</span>
+                  )}
                 </div>
                 {teamBtn('away')}
               </div>
@@ -945,18 +972,18 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
         </div>
 
         <div style={{ fontSize:10, marginBottom:8,
-          color: Object.values(qfSel).filter(Boolean).length === 8 ? 'rgba(0,229,160,0.8)' : 'rgba(255,255,255,0.3)' }}>
-          {Object.values(qfSel).filter(Boolean).length}/8 meciuri setate
+          color: Object.values(qfSel).filter(Boolean).length > 0 ? 'rgba(0,229,160,0.8)' : 'rgba(255,255,255,0.3)' }}>
+          {Object.values(qfSel).filter(Boolean).length} meci(uri) selectate pentru salvare
         </div>
         {qfMsg && <div style={{ fontSize:11, color:qfMsg.startsWith('✅')?'rgba(0,229,160,0.8)':'#EF4444', marginBottom:6 }}>{qfMsg}</div>}
         <button
-          disabled={Object.values(qfSel).filter(Boolean).length !== 8}
+          disabled={Object.values(qfSel).filter(Boolean).length === 0}
           onClick={async () => {
             setQFMsg('');
             const clean = Object.fromEntries(Object.entries(qfSel).filter(([,v]) => v));
             const res = await saveQFResults(adminUid, clean);
             if (res.success) {
-              setQFMsg('✅ Salvat! Clasamentul se actualizează.');
+              setQFMsg(`✅ ${Object.keys(clean).length} rezultat(e) salvate! Clasamentul se actualizează.`);
               onMatchUpdate?.({ _action:'specialResults' });
             } else {
               setQFMsg('Eroare: ' + (res.error || 'necunoscută'));
@@ -964,12 +991,12 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
           }}
           style={{
             width:'100%', padding:'10px', fontSize:13, fontWeight:800, borderRadius:10,
-            cursor: Object.values(qfSel).filter(Boolean).length === 8 ? 'pointer' : 'default',
-            background: Object.values(qfSel).filter(Boolean).length === 8 ? 'rgba(0,229,160,0.12)' : 'rgba(255,255,255,0.03)',
-            border: `1px solid ${Object.values(qfSel).filter(Boolean).length === 8 ? 'rgba(0,229,160,0.35)' : 'rgba(255,255,255,0.07)'}`,
-            color: Object.values(qfSel).filter(Boolean).length === 8 ? '#00E5A0' : 'rgba(255,255,255,0.25)',
+            cursor: Object.values(qfSel).filter(Boolean).length > 0 ? 'pointer' : 'default',
+            background: Object.values(qfSel).filter(Boolean).length > 0 ? 'rgba(0,229,160,0.12)' : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${Object.values(qfSel).filter(Boolean).length > 0 ? 'rgba(0,229,160,0.35)' : 'rgba(255,255,255,0.07)'}`,
+            color: Object.values(qfSel).filter(Boolean).length > 0 ? '#00E5A0' : 'rgba(255,255,255,0.25)',
           }}>
-          💾 Salvează calificatele reale în sferturi
+          💾 Salvează rezultatele selectate
         </button>
       </div>
 
