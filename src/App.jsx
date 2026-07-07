@@ -598,7 +598,7 @@ export default function App() {
           : tab==='matches'
           ? <MatchesScreen predictions={predictions} onPredict={setPredictingMatch} finishedResults={finishedResults} groupOverrides={groupOverrides} allPredictions={allPredictions} allUsers={allUsers} activityFeed={activityFeedComputed} user={user} specialResults={specialResults} allSpecialPreds={allSpecialPreds}/>
           : tab==='leaderboard'
-          ? <LeaderboardScreen currentUser={user?.nickname} predictions={predictions} allPredictions={predsByNick} allUsers={allUsers} finishedResults={finishedResults} allSpecialPredsByNick={allSpecialPredsByNick}/>
+          ? <LeaderboardScreen currentUser={user?.nickname} predictions={predictions} allPredictions={predsByNick} allUsers={allUsers} finishedResults={finishedResults} allSpecialPredsByNick={allSpecialPredsByNick} specialResults={specialResults}/>
           : tab==='bracket'
           ? <BracketScreen/>
           : <HowToPlayScreen/>
