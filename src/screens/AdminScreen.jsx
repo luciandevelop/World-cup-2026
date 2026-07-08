@@ -13,6 +13,7 @@ import {
 import { ALL_GROUPS } from '../data/matches.js';
 import { saveMatchResult, REALTIME_MODE, adminRepairSetJokerViaSpecialResults } from '../services/firestoreService.js'; // resetTestData removed
 import { saveSpecialResults, resetSpecialData, WC_TEAMS, R16_MATCHES, saveQFResults, repairQFPicks, SF_MATCHES, saveSFResults, calcSFPoints } from '../services/specialEventsService.js';
+import { sendPasswordReset } from '../services/emailAuth.js';
 
 // localStorage key for admin-set results (shared across all users on same device)
 const RESULTS_KEY   = 'wc2026_admin_results';
@@ -113,6 +114,7 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
   const [qfMsg, setQFMsg]       = useState('');
   const [sfSel, setSFSel]       = useState(specialResultsInit?.qualifiedToSemis || {});
   const [sfMsg, setSFMsg]       = useState('');
+  const [resetMsgs, setResetMsgs] = useState({}); // uid → message
   const [sA,      setSA]     = useState(0);
   const [sB,      setSB]     = useState(0);
   const [possA,   setPossA]  = useState('');
@@ -680,6 +682,46 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
             </div>
           );
         })()}
+      </div>
+
+      {/* ── 👤 GESTIONARE CONTURI ─────────────────────────────────────────────── */}
+      <div style={{ marginTop:10, padding:'10px 12px', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:10 }}>
+        <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:8, fontWeight:700 }}>
+          👤 Gestionare Conturi — Resetare Parolă
+        </div>
+        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+          {Object.entries(allUsers).filter(([,u]) => u?.nickname).map(([uid, u]) => {
+            const msg = resetMsgs[uid] || '';
+            return (
+              <div key={uid} style={{ padding:'8px 10px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                  <div>
+                    <div style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{u.nickname}</div>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginTop:1 }}>{u.email || '—'}</div>
+                  </div>
+                  <button
+                    disabled={!!msg}
+                    onClick={async () => {
+                      if (!u.email) { setResetMsgs(p => ({...p, [uid]:'❌ Email necunoscut'})); return; }
+                      setResetMsgs(p => ({...p, [uid]:'Se trimite...'}));
+                      const res = await sendPasswordReset(u.email);
+                      setResetMsgs(p => ({...p, [uid]: res.success ? '✅ Email trimis!' : '❌ ' + res.error}));
+                      setTimeout(() => setResetMsgs(p => ({...p, [uid]:''})), 5000);
+                    }}
+                    style={{
+                      padding:'5px 10px', fontSize:10, fontWeight:700, borderRadius:7, whiteSpace:'nowrap',
+                      cursor: msg ? 'default' : 'pointer',
+                      background: msg?.startsWith('✅') ? 'rgba(0,229,160,0.1)' : msg?.startsWith('❌') ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.07)',
+                      border: `1px solid ${msg?.startsWith('✅') ? 'rgba(0,229,160,0.3)' : msg?.startsWith('❌') ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.12)'}`,
+                      color: msg?.startsWith('✅') ? '#00E5A0' : msg?.startsWith('❌') ? '#EF4444' : 'rgba(255,255,255,0.7)',
+                    }}>
+                    {msg || '🔑 Trimite reset parolă'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* ── 🔥 AUDIT JOKER (read-only) ──────────────────────────────────────── */}
