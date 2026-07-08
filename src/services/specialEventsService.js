@@ -176,10 +176,18 @@ export function calcSpecialPoints(userPred, results) {
       else if (c === 7) pts += 100;
     }
   }
+  // SF ("Calificate în Semifinale") scoring — +100/correct, +250 bonus only at 4/4
+  if (results.qualifiedToSemis && userPred.qualifiedToSemis) {
+    const realSF = results.qualifiedToSemis;
+    const userSF = userPred.qualifiedToSemis;
+    const c = Object.entries(realSF).filter(([id, w]) => userSF[id] === w).length;
+    pts += c * 100;
+    if (Object.keys(realSF).length === 4 && c === 4) pts += 250;
+  }
   return pts;
 }
 
-// Public breakdown for display in UI.
+// Public breakdown for QF display in UI.
 export function calcQFPoints(userPred, results) {
   const realQF  = results?.quarterFinalists || {};
   const rawQF   = userPred?.quarterFinalists || {};
@@ -190,6 +198,90 @@ export function calcQFPoints(userPred, results) {
   const allDone = entered === 8;
   const bonus   = allDone ? (correct === 8 ? 200 : correct === 7 ? 100 : 0) : 0;
   return { correct, entered, base, bonus, total: base + bonus, allDone, repairedQF: userQF };
+}
+
+// ── CALIFICATE ÎN SEMIFINALE ──────────────────────────────────────────────────
+// Separate from "Calificate în Sferturi" (QF).
+// Users pick ONE winner from each of the 4 QF fixtures.
+// Stored as { "97":"Franta", "98":"Spania", ... } on specialPredictions/{uid}.qualifiedToSemis
+// Admin stores results on specialResults/main.qualifiedToSemis
+
+// The 4 confirmed QF fixtures (teams that play in the quarterfinals)
+export const SF_MATCHES = [
+  { id:'97',  home:'Franta',    homeFlag:'🇫🇷', away:'Maroc',   awayFlag:'🇲🇦' },
+  { id:'98',  home:'Spania',    homeFlag:'🇪🇸', away:'Belgia',  awayFlag:'🇧🇪' },
+  { id:'99',  home:'Norvegia',  homeFlag:'🇳🇴', away:'Anglia',  awayFlag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
+  { id:'100', home:'Argentina', homeFlag:'🇦🇷', away:'Elvetia', awayFlag:'🇨🇭' },
+];
+
+// Lock: first QF kicks off 09 Jul 2026 20:00 UTC (23:00 RO)
+export const SF_PRED_LOCK_TIME = new Date('2026-07-09T20:00:00.000Z');
+
+export function isSFPredLocked() {
+  return Date.now() >= SF_PRED_LOCK_TIME.getTime();
+}
+
+export function sfPredLockCountdown() {
+  const ms = SF_PRED_LOCK_TIME.getTime() - Date.now();
+  if (ms <= 0) return null;
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  if (h > 48) return `${Math.floor(h / 24)}z`;
+  if (h > 0)  return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+// Breakdown for display: correct count, base, bonus, total, allDone
+export function calcSFPoints(userPred, results) {
+  const realSF  = results?.qualifiedToSemis || {};
+  const userSF  = userPred?.qualifiedToSemis || {};
+  const entered = Object.keys(realSF).length;
+  const correct = Object.entries(realSF).filter(([id, w]) => userSF[id] === w).length;
+  const base    = correct * 100;
+  const allDone = entered === 4;
+  const bonus   = allDone && correct === 4 ? 250 : 0;
+  return { correct, entered, base, bonus, total: base + bonus, allDone };
+}
+
+// Save user's SF picks onto specialPredictions/{uid} (merge — doesn't touch other fields)
+export async function saveSFPrediction(uid, qualifiedToSemis) {
+  if (isSFPredLocked()) return { success: false, error: 'Predicția pentru semifinale este blocată.' };
+  if (!uid) return { success: false, error: 'Utilizator neautentificat.' };
+  if (!FIREBASE_CONFIGURED) {
+    try {
+      const existing = JSON.parse(localStorage.getItem('wc_sp_' + uid) || '{}');
+      localStorage.setItem('wc_sp_' + uid, JSON.stringify({ ...existing, qualifiedToSemis }));
+      return { success: true };
+    } catch { return { success: false, error: 'Eroare localStorage.' }; }
+  }
+  try {
+    await setDoc(
+      doc(db, 'specialPredictions', uid),
+      { qualifiedToSemis, uid, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+    return { success: true };
+  } catch(e) { return { success: false, error: e.message }; }
+}
+
+// Admin saves real SF results onto specialResults/main (partial saves allowed, merge:true)
+export async function saveSFResults(adminUid, qualifiedToSemis) {
+  if (!FIREBASE_CONFIGURED) {
+    try {
+      const existing = JSON.parse(localStorage.getItem('wc_special_results') || '{}');
+      const merged = { ...(existing.qualifiedToSemis || {}), ...qualifiedToSemis };
+      localStorage.setItem('wc_special_results', JSON.stringify({ ...existing, qualifiedToSemis: merged }));
+      return { success: true };
+    } catch { return { success: false, error: 'Eroare localStorage.' }; }
+  }
+  try {
+    await setDoc(
+      doc(db, 'specialResults', 'main'),
+      { qualifiedToSemis, updatedBy: adminUid, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+    return { success: true };
+  } catch(e) { return { success: false, error: e.message }; }
 }
 
 // ── READ ──────────────────────────────────────────────────────────────────────
