@@ -2,6 +2,7 @@ import {
   isSpecialLocked, specialLockCountdown, WC_TEAMS,
   loadSpecialPrediction, saveSpecialPrediction, calcSpecialPoints,
   isQFLocked, qfLockCountdown, R16_MATCHES, saveQFPrediction, calcQFPoints,
+  isSFPredLocked, sfPredLockCountdown, SF_MATCHES, saveSFPrediction, calcSFPoints,
 } from '../services/specialEventsService.js';
 
 // ─── FRIEND PREDICTIONS PANEL ────────────────────────────────────────────────
@@ -971,6 +972,38 @@ function SpecialEventsPanel({ user, specialResults, allSpecialPreds }) {
   const qfPts  = calcQFPoints(pred, specialResults);
   const qfFilled = Object.values(draftQF).filter(Boolean).length;
 
+  // SF state — { matchId: teamName } for "Calificate în Semifinale"
+  const [draftSF, setDraftSF]   = useState({});
+  const [savingSF, setSavingSF] = useState(false);
+  const [msgSF, setMsgSF]       = useState('');
+  const sfLocked    = isSFPredLocked();
+  const sfCountdown = sfPredLockCountdown();
+  const sfPts       = calcSFPoints(pred, specialResults);
+  const sfFilled    = Object.values(draftSF).filter(Boolean).length;
+
+  useEffect(() => {
+    if (!pred) return;
+    setDraftSF(pred.qualifiedToSemis || {});
+  }, [pred]);
+
+  const pickSF = (matchId, team) => {
+    if (sfLocked) return;
+    setDraftSF(prev => ({ ...prev, [matchId]: prev[matchId] === team ? undefined : team }));
+  };
+
+  const handleSaveSF = async () => {
+    if (sfLocked || !user?.uid) return;
+    if (sfFilled !== 4) { setMsgSF(`Alege câștigătorul pentru toate 4 meciurile (${sfFilled}/4)`); return; }
+    setSavingSF(true); setMsgSF('');
+    try {
+      const clean = Object.fromEntries(Object.entries(draftSF).filter(([,v])=>v));
+      const res = await saveSFPrediction(user.uid, clean);
+      if (res.success) { setPred(p => ({ ...p, qualifiedToSemis: clean })); setMsgSF('✅ Salvat!'); }
+      else setMsgSF('Eroare: ' + (res.error || 'necunoscută'));
+    } catch(e) { setMsgSF('Eroare: ' + (e.message || 'necunoscută')); }
+    finally { setSavingSF(false); }
+  };
+
   return (
     <div style={{ marginBottom:16, border:'1px solid rgba(255,215,0,0.18)', borderRadius:14, overflow:'hidden', background:'rgba(255,215,0,0.03)' }}>
 
@@ -1121,6 +1154,101 @@ function SpecialEventsPanel({ user, specialResults, allSpecialPreds }) {
             {qfLocked && specialResults?.quarterFinalists && (
               <div style={{ fontSize:10, color:'rgba(0,229,160,0.6)', marginTop:10, textAlign:'center' }}>
                 {qfPts.correct}/8 corecte · {qfPts.base} pts{qfPts.bonus>0?` + ${qfPts.bonus} bonus`:''}{qfPts.total>0?` = ${qfPts.total} pts`:''}
+              </div>
+            )}
+          </div>
+
+          {/* ── CALIFICATE ÎN SEMIFINALE ─────────────────────────────────────── */}
+          <div style={{ marginTop:20, paddingTop:16, borderTop:'1px solid rgba(255,255,255,0.07)' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'rgba(255,255,255,0.6)', textTransform:'uppercase', letterSpacing:'0.07em' }}>
+                🏅 Calificate în Semifinale
+              </div>
+              {sfPts.total > 0 && <span style={{ fontSize:12, fontWeight:800, color:'#FFD700' }}>+{sfPts.total} pts</span>}
+            </div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', marginBottom:14 }}>
+              {sfLocked
+                ? '🔒 Blocat · +100 pts / echipă corectă · bonus +250 la 4/4'
+                : sfCountdown ? `⏳ Blochează în ${sfCountdown}` : '🔓 Alege câștigătorul din fiecare sfert de finală'}
+            </div>
+
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {SF_MATCHES.map(m => {
+                const savedSF = pred?.qualifiedToSemis || {};
+                const picked  = sfLocked ? savedSF[m.id] : draftSF[m.id];
+                const realWin = specialResults?.qualifiedToSemis?.[m.id];
+                const homesel = picked === m.home;
+                const awaysel = picked === m.away;
+                const homecor = sfLocked && realWin && homesel && realWin === m.home;
+                const homewrg = sfLocked && realWin && homesel && realWin !== m.home;
+                const awaycor = sfLocked && realWin && awaysel && realWin === m.away;
+                const awaywrg = sfLocked && realWin && awaysel && realWin !== m.away;
+                const realH   = sfLocked && realWin === m.home;
+                const realA   = sfLocked && realWin === m.away;
+
+                const teamBtn = (side) => {
+                  const sel = side==='home' ? homesel : awaysel;
+                  const cor = side==='home' ? homecor : awaycor;
+                  const wrg = side==='home' ? homewrg : awaywrg;
+                  const isReal = side==='home' ? realH : realA;
+                  const flag = side==='home' ? m.homeFlag : m.awayFlag;
+                  const team = side==='home' ? m.home : m.away;
+                  let bg='rgba(255,255,255,0.03)', bc='rgba(255,255,255,0.07)', tc='rgba(255,255,255,0.75)';
+                  if (!sfLocked && sel) { bg='rgba(0,229,160,0.14)'; bc='rgba(0,229,160,0.5)'; tc='#00E5A0'; }
+                  if (cor)  { bg='rgba(0,229,160,0.14)'; bc='rgba(0,229,160,0.5)'; tc='#00E5A0'; }
+                  if (wrg)  { bg='rgba(239,68,68,0.12)'; bc='rgba(239,68,68,0.4)'; tc='#EF4444'; }
+                  if (sfLocked && isReal && !sel) bc='rgba(0,229,160,0.2)';
+                  const badge = !sfLocked && sel ? <div style={{fontSize:9,color:'rgba(0,229,160,0.8)',marginTop:2}}>✓ seleție</div>
+                    : cor ? <div style={{fontSize:9,color:'#00E5A0',marginTop:2}}>✓ +100 pts</div>
+                    : wrg ? <div style={{fontSize:9,color:'#EF4444',marginTop:2}}>✗</div>
+                    : sfLocked && isReal && !sel ? <div style={{fontSize:9,color:'rgba(0,229,160,0.5)',marginTop:2}}>câștigător real</div>
+                    : null;
+                  return (
+                    <button key={side} disabled={sfLocked}
+                      onClick={() => pickSF(m.id, team)}
+                      style={{ flex:1, padding:'12px 6px', border:`1px solid ${bc}`, borderRadius:10,
+                        background:bg, cursor:sfLocked?'default':'pointer',
+                        display:'flex', flexDirection:'column', alignItems:'center', gap:3,
+                        transition:'background 0.12s, border-color 0.12s' }}>
+                      <span style={{ fontSize:24, lineHeight:1 }}>{flag}</span>
+                      <span style={{ fontSize:11, fontWeight:700, color:tc, textAlign:'center', lineHeight:1.2 }}>{team}</span>
+                      {badge}
+                    </button>
+                  );
+                };
+
+                return (
+                  <div key={m.id} style={{ display:'flex', gap:6, alignItems:'stretch' }}>
+                    {teamBtn('home')}
+                    <div style={{ display:'flex', alignItems:'center', flexShrink:0 }}>
+                      <span style={{ fontSize:9, fontWeight:800, color:'rgba(255,255,255,0.18)' }}>VS</span>
+                    </div>
+                    {teamBtn('away')}
+                  </div>
+                );
+              })}
+            </div>
+
+            {!sfLocked && (
+              <div style={{ marginTop:10 }}>
+                <div style={{ fontSize:10, marginBottom:7, color:sfFilled===4?'rgba(0,229,160,0.8)':'rgba(255,255,255,0.3)' }}>
+                  {sfFilled}/4 meciuri selectate
+                </div>
+                {msgSF && <div style={{ fontSize:11, marginBottom:6, color:msgSF.startsWith('✅')?'rgba(0,229,160,0.8)':'#EF4444' }}>{msgSF}</div>}
+                <button onClick={handleSaveSF} disabled={savingSF||sfFilled!==4} style={{
+                  width:'100%', padding:'10px', fontSize:13, fontWeight:800, borderRadius:10,
+                  cursor:sfFilled===4?'pointer':'default',
+                  background:sfFilled===4?'rgba(0,229,160,0.12)':'rgba(255,255,255,0.03)',
+                  border:`1px solid ${sfFilled===4?'rgba(0,229,160,0.35)':'rgba(255,255,255,0.07)'}`,
+                  color:sfFilled===4?'#00E5A0':'rgba(255,255,255,0.2)',
+                }}>
+                  {savingSF?'Se salvează...':'💾 Salvează calificatele în semifinale'}
+                </button>
+              </div>
+            )}
+            {sfLocked && specialResults?.qualifiedToSemis && (
+              <div style={{ fontSize:10, color:'rgba(0,229,160,0.6)', marginTop:10, textAlign:'center' }}>
+                {sfPts.correct}/{sfPts.entered} corecte · {sfPts.base} pts{sfPts.bonus>0?` + ${sfPts.bonus} bonus`:sfPts.allDone?'':' · bonus după toate 4'}{sfPts.total>0?` = ${sfPts.total} pts`:''}
               </div>
             )}
           </div>

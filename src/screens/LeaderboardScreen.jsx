@@ -12,7 +12,7 @@ import {
   getPlayerForm,
 } from '../data/gameData.js';
 import { FootballAvatar } from '../components/UI.jsx';
-import { isSpecialLocked, isQFLocked, calcQFPoints, R16_MATCHES } from '../services/specialEventsService.js';
+import { isSpecialLocked, isQFLocked, calcQFPoints, R16_MATCHES, isSFPredLocked, calcSFPoints, SF_MATCHES } from '../services/specialEventsService.js';
 
 function normalizePredMap(preds = {}) {
   return Object.fromEntries(
@@ -329,6 +329,75 @@ function PlayerDetailModal({ nickname, avatarId, rank, points, exactScores,
                           <span style={{ fontSize:12, fontWeight:900, color:'#FFD700' }}>
                             +{qfPts.total}
                           </span>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* ── Calificate în Semifinale — read-only after lock ── */}
+          {isSFPredLocked() && specialPred?.qualifiedToSemis && (
+            <div style={{ marginTop:12, padding:'12px 14px', background:'rgba(255,255,255,0.02)',
+                          border:'1px solid rgba(255,255,255,0.07)', borderRadius:10 }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'rgba(255,255,255,0.6)',
+                            letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:10 }}>
+                🏅 Calificate în Semifinale
+              </div>
+              {(() => {
+                const sfPts  = calcSFPoints(specialPred, specialResults);
+                const realSF = specialResults?.qualifiedToSemis || {};
+                const entered = Object.keys(realSF).length;
+                return (
+                  <>
+                    <div style={{ display:'flex', flexDirection:'column', gap:5, marginBottom:10 }}>
+                      {SF_MATCHES.map(m => {
+                        const picked     = specialPred.qualifiedToSemis[m.id];
+                        const realWin    = realSF[m.id];
+                        const hasResult  = !!realWin;
+                        const correct    = hasResult && picked === realWin;
+                        const wrong      = hasResult && picked && picked !== realWin;
+                        const pickedFlag = picked === m.home ? m.homeFlag : picked === m.away ? m.awayFlag : '';
+                        return (
+                          <div key={m.id} style={{ borderRadius:8, overflow:'hidden',
+                            border:`1px solid ${correct?'rgba(0,229,160,0.15)':wrong?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.05)'}` }}>
+                            <div style={{ padding:'4px 8px', background:'rgba(255,255,255,0.02)', fontSize:10, color:'rgba(255,255,255,0.4)' }}>
+                              {m.homeFlag} {m.home} vs {m.awayFlag} {m.away}
+                            </div>
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px',
+                              background:correct?'rgba(0,229,160,0.07)':wrong?'rgba(239,68,68,0.06)':'rgba(255,255,255,0.01)' }}>
+                              <span style={{ fontSize:11, fontWeight:600, color:picked?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.3)', fontStyle:picked?'normal':'italic' }}>
+                                {picked?<>{pickedFlag} {picked}</>:'— nepredis'}
+                              </span>
+                              {!hasResult && <span style={{ fontSize:11, color:'rgba(255,180,0,0.7)' }}>⏳ În așteptare</span>}
+                              {correct    && <span style={{ fontSize:11, fontWeight:700, color:'#00E5A0' }}>✅ +100</span>}
+                              {wrong      && <span style={{ fontSize:11, fontWeight:700, color:'#EF4444' }}>❌ +0 <span style={{fontSize:9,opacity:0.7}}>({realWin})</span></span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {entered > 0 && (
+                      <div style={{ padding:'10px 12px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
+                          <span style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>Calificate corecte:</span>
+                          <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{sfPts.correct} / {entered}</span>
+                        </div>
+                        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
+                          <span style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>Puncte calificări:</span>
+                          <span style={{ fontSize:11, fontWeight:700, color:'#FFD700' }}>+{sfPts.base}</span>
+                        </div>
+                        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+                          <span style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>Bonus:</span>
+                          {sfPts.allDone
+                            ? <span style={{ fontSize:11, fontWeight:700, color:sfPts.bonus>0?'#00E5A0':'rgba(255,255,255,0.35)' }}>{sfPts.bonus>0?`+${sfPts.bonus}`:'—'}</span>
+                            : <span style={{ fontSize:11, color:'rgba(255,180,0,0.6)', fontStyle:'italic' }}>Se acordă după toate 4 rezultate</span>}
+                        </div>
+                        <div style={{ borderTop:'1px solid rgba(255,255,255,0.07)', paddingTop:7, display:'flex', justifyContent:'space-between' }}>
+                          <span style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.7)' }}>{sfPts.allDone?'TOTAL:':'TOTAL momentan:'}</span>
+                          <span style={{ fontSize:12, fontWeight:900, color:'#FFD700' }}>+{sfPts.total}</span>
                         </div>
                       </div>
                     )}

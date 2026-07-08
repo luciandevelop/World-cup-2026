@@ -378,8 +378,10 @@ function RoundListView({ confirmedR32, r32IdRange, champion }) {
 
   // QF — winner-reference slots (97-100), fill confirmed matches.
   const CONFIRMED_QF = {
-    97: { home: { team: 'Franta',   flag: '🇫🇷' }, away: { team: 'Maroc',  flag: '🇲🇦' } },
-    99: { home: { team: 'Norvegia', flag: '🇳🇴' }, away: { team: 'Anglia', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' } },
+    97:  { home: { team: 'Franta',    flag: '🇫🇷' }, away: { team: 'Maroc',   flag: '🇲🇦' } },
+    98:  { home: { team: 'Spania',    flag: '🇪🇸' }, away: { team: 'Belgia',  flag: '🇧🇪' } },
+    99:  { home: { team: 'Norvegia',  flag: '🇳🇴' }, away: { team: 'Anglia',  flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' } },
+    100: { home: { team: 'Argentina', flag: '🇦🇷' }, away: { team: 'Elvetia', flag: '🇨🇭' } },
   };
   const qf = QF_SLOTS.map(s => {
     const confirmed = CONFIRMED_QF[s.id];

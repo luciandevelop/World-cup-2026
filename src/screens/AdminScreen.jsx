@@ -12,7 +12,7 @@ import {
 } from '../data/gameData.js';
 import { ALL_GROUPS } from '../data/matches.js';
 import { saveMatchResult, REALTIME_MODE, adminRepairSetJokerViaSpecialResults } from '../services/firestoreService.js'; // resetTestData removed
-import { saveSpecialResults, resetSpecialData, WC_TEAMS, R16_MATCHES, saveQFResults, repairQFPicks } from '../services/specialEventsService.js';
+import { saveSpecialResults, resetSpecialData, WC_TEAMS, R16_MATCHES, saveQFResults, repairQFPicks, SF_MATCHES, saveSFResults, calcSFPoints } from '../services/specialEventsService.js';
 
 // localStorage key for admin-set results (shared across all users on same device)
 const RESULTS_KEY   = 'wc2026_admin_results';
@@ -111,6 +111,8 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
   const [specialMsg, setSpecialMsg] = useState('');
   const [qfSel, setQFSel]       = useState(specialResultsInit?.quarterFinalists || {});
   const [qfMsg, setQFMsg]       = useState('');
+  const [sfSel, setSFSel]       = useState(specialResultsInit?.qualifiedToSemis || {});
+  const [sfMsg, setSFMsg]       = useState('');
   const [sA,      setSA]     = useState(0);
   const [sB,      setSB]     = useState(0);
   const [possA,   setPossA]  = useState('');
@@ -997,6 +999,134 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
           }}>
           💾 Salvează rezultatele selectate
         </button>
+      </div>
+
+      {/* ── CALIFICATE ÎN SEMIFINALE — admin panel ────────────────────────────── */}
+      <div style={{ marginTop:10, padding:'12px 14px', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14 }}>
+        <div style={{ fontSize:11, fontWeight:800, color:'rgba(255,255,255,0.7)', letterSpacing:'0.07em', textTransform:'uppercase', marginBottom:4 }}>
+          🏅 Calificate în Semifinale — rezultate reale
+        </div>
+        <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:12 }}>
+          Alege câștigătorul fiecărui sfert. Salvarea parțială e permisă.
+        </div>
+        {(() => {
+          const savedCount = Object.values(sfSel).filter(Boolean).length;
+          return savedCount > 0 ? (
+            <div style={{ fontSize:10, color:'rgba(0,229,160,0.7)', marginBottom:10, padding:'5px 8px', background:'rgba(0,229,160,0.06)', borderRadius:7, border:'1px solid rgba(0,229,160,0.15)' }}>
+              ✓ {savedCount}/4 rezultate salvate
+            </div>
+          ) : null;
+        })()}
+        <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:10 }}>
+          {SF_MATCHES.map(m => {
+            const picked  = sfSel[m.id];
+            const homesel = picked === m.home;
+            const awaysel = picked === m.away;
+            const isSaved = !!(specialResultsInit?.qualifiedToSemis?.[m.id]);
+            const savedWin = specialResultsInit?.qualifiedToSemis?.[m.id];
+            const teamBtn = (side) => {
+              const sel  = side==='home' ? homesel : awaysel;
+              const team = side==='home' ? m.home : m.away;
+              const flag = side==='home' ? m.homeFlag : m.awayFlag;
+              const isReal = savedWin === team;
+              return (
+                <button key={side}
+                  onClick={() => setSFSel(prev => ({...prev, [m.id]: prev[m.id]===team?undefined:team}))}
+                  style={{ flex:1, padding:'10px 6px', borderRadius:10, border:'none', cursor:'pointer',
+                    display:'flex', flexDirection:'column', alignItems:'center', gap:3,
+                    background:sel?'rgba(0,229,160,0.16)':'rgba(255,255,255,0.04)',
+                    outline:sel?'1.5px solid rgba(0,229,160,0.55)':'1px solid rgba(255,255,255,0.08)',
+                    transition:'background 0.12s' }}>
+                  <span style={{ fontSize:22, lineHeight:1 }}>{flag}</span>
+                  <span style={{ fontSize:11, fontWeight:700, color:sel?'#00E5A0':'rgba(255,255,255,0.8)', textAlign:'center', lineHeight:1.2 }}>{team}</span>
+                  {isReal && <span style={{ fontSize:9, color:'rgba(0,229,160,0.9)', fontWeight:700 }}>✓ Salvat</span>}
+                  {sel && !isReal && <span style={{ fontSize:9, color:'rgba(255,215,0,0.8)' }}>◎ selectat</span>}
+                </button>
+              );
+            };
+            return (
+              <div key={m.id} style={{ display:'flex', gap:6, alignItems:'stretch' }}>
+                {teamBtn('home')}
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'0 4px', gap:2 }}>
+                  <span style={{ fontSize:9, fontWeight:800, color:'rgba(255,255,255,0.18)' }}>VS</span>
+                  <span style={{ fontSize:8, color:isSaved?'rgba(0,229,160,0.6)':'rgba(255,255,255,0.2)', whiteSpace:'nowrap' }}>{isSaved?'✓ salvat':'nesalvat'}</span>
+                </div>
+                {teamBtn('away')}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ fontSize:10, marginBottom:8, color:Object.values(sfSel).filter(Boolean).length>0?'rgba(0,229,160,0.8)':'rgba(255,255,255,0.3)' }}>
+          {Object.values(sfSel).filter(Boolean).length} meci(uri) selectate
+        </div>
+        {sfMsg && <div style={{ fontSize:11, color:sfMsg.startsWith('✅')?'rgba(0,229,160,0.8)':'#EF4444', marginBottom:6 }}>{sfMsg}</div>}
+        <button
+          disabled={Object.values(sfSel).filter(Boolean).length === 0}
+          onClick={async () => {
+            setSFMsg('');
+            const clean = Object.fromEntries(Object.entries(sfSel).filter(([,v])=>v));
+            const res = await saveSFResults(currentUser?.uid, clean);
+            if (res.success) { setSFMsg(`✅ ${Object.keys(clean).length} rezultat(e) salvate! Clasamentul se actualizează.`); onMatchUpdate?.({ _action:'specialResults' }); }
+            else setSFMsg('Eroare: ' + (res.error || 'necunoscută'));
+          }}
+          style={{ width:'100%', padding:'10px', fontSize:13, fontWeight:800, borderRadius:10,
+            cursor:Object.values(sfSel).filter(Boolean).length>0?'pointer':'default',
+            background:Object.values(sfSel).filter(Boolean).length>0?'rgba(0,229,160,0.12)':'rgba(255,255,255,0.03)',
+            border:`1px solid ${Object.values(sfSel).filter(Boolean).length>0?'rgba(0,229,160,0.35)':'rgba(255,255,255,0.07)'}`,
+            color:Object.values(sfSel).filter(Boolean).length>0?'#00E5A0':'rgba(255,255,255,0.25)' }}>
+          💾 Salvează calificatele în semifinale
+        </button>
+      </div>
+
+      {/* ── AUDIT CALIFICATE ÎN SEMIFINALE ───────────────────────────────────── */}
+      <div style={{ marginTop:10, padding:'10px 12px', background:'rgba(100,100,255,0.03)', border:'1px solid rgba(100,100,255,0.12)', borderRadius:10 }}>
+        <div style={{ fontSize:10, color:'rgba(150,150,255,0.7)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:8, fontWeight:700 }}>
+          🏅 Audit — Calificate în Semifinale
+        </div>
+        {Object.keys(allSpecialPreds).length === 0 ? (
+          <div style={{ fontSize:11, color:'rgba(255,255,255,0.25)', fontStyle:'italic' }}>Niciun jucător nu a salvat încă.</div>
+        ) : (
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            {Object.entries(allSpecialPreds).map(([uid, pred]) => {
+              const nickname = allUsers[uid]?.nickname || uid;
+              const sf = pred?.qualifiedToSemis || {};
+              const realSF = specialResultsInit?.qualifiedToSemis || {};
+              const count = Object.values(sf).filter(Boolean).length;
+              const correct = Object.entries(realSF).filter(([id,w]) => sf[id]===w).length;
+              return (
+                <div key={uid} style={{ padding:'6px 9px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:count>0?4:0 }}>
+                    <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{nickname}</span>
+                    <span style={{ fontSize:11, fontWeight:800, fontFamily:"'DM Mono',monospace",
+                      color:count===4?'rgba(0,229,160,0.8)':count>0?'rgba(255,215,0,0.7)':'rgba(255,255,255,0.25)' }}>
+                      {count}/4{Object.keys(realSF).length>0?` · ${correct} ✓`:''}
+                    </span>
+                  </div>
+                  {count > 0 && (
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+                      {SF_MATCHES.map(m => {
+                        const picked = sf[m.id];
+                        const realWin = realSF[m.id];
+                        const cor = realWin && picked===realWin;
+                        const wrg = realWin && picked && picked!==realWin;
+                        const flag = picked===m.home?m.homeFlag:picked===m.away?m.awayFlag:'';
+                        return (
+                          <span key={m.id} style={{ fontSize:10, padding:'2px 6px', borderRadius:5, fontWeight:600,
+                            background:cor?'rgba(0,229,160,0.12)':wrg?'rgba(239,68,68,0.1)':'rgba(255,255,255,0.05)',
+                            color:cor?'#00E5A0':wrg?'#EF4444':picked?'rgba(255,255,255,0.6)':'rgba(255,255,255,0.2)',
+                            border:`1px solid ${cor?'rgba(0,229,160,0.2)':wrg?'rgba(239,68,68,0.2)':'rgba(255,255,255,0.06)'}` }}>
+                            {picked?`${flag} ${picked}`:'—'}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {count===0 && <div style={{ fontSize:10, color:'rgba(255,255,255,0.25)', fontStyle:'italic' }}>Nu a salvat.</div>}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Reset amicale button removed — test phase complete */}
