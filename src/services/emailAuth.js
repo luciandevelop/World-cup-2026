@@ -5,6 +5,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { FIREBASE_CONFIGURED, firebaseSignInWithEmail } from './firebase.js';
+import { auth } from './firebase.js';
+import { sendPasswordResetEmail } from 'firebase/auth';
 
 // ─── SEND "CODE" ──────────────────────────────────────────────────────────────
 // Firebase mode: signals the UI to show a password field (not a code field).
@@ -56,5 +58,21 @@ function _translateAuthError(code) {
     case 'auth/invalid-email':         return 'Email invalid.';
     case 'FIREBASE_NOT_CONFIGURED':    return 'Firebase nu este configurat. Contactează administratorul.';
     default:                           return 'Eroare la autentificare. Încearcă din nou.';
+  }
+}
+
+export async function sendPasswordReset(email) {
+  if (!FIREBASE_CONFIGURED || !auth) return { success: false, error: 'Firebase nu este configurat.' };
+  const normalised = (email || '').trim().toLowerCase();
+  if (!normalised || !normalised.includes('@')) return { success: false, error: 'Email invalid.' };
+  try {
+    await sendPasswordResetEmail(auth, normalised);
+    return { success: true };
+  } catch(e) {
+    const code = e.code || '';
+    if (code === 'auth/user-not-found')    return { success: false, error: 'Nu există cont cu acest email.' };
+    if (code === 'auth/invalid-email')     return { success: false, error: 'Email invalid.' };
+    if (code === 'auth/too-many-requests') return { success: false, error: 'Prea multe cereri. Încearcă mai târziu.' };
+    return { success: false, error: 'Eroare la trimiterea emailului.' };
   }
 }
