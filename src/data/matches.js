@@ -152,8 +152,10 @@ export const ALL_MATCHES = [
   { id:96, group:"KO", stage:"R16", teamA:"Elvetia", teamB:"Columbia", flagA:"🇨🇭", flagB:"🇨🇴", time:"2026-07-07T20:00:00Z", venue:"Vancouver" }, // RO 07 Jul 23:00 — Yahoo: Tue Jul7 4pm ET
 
   // ══ FAZA ELIMINATORIE — Sferturi de finală (Quarterfinals) ══════════════════
-  { id:97, group:"KO", stage:"QF", teamA:"Franta",   teamB:"Maroc",  flagA:"🇫🇷", flagB:"🇲🇦", time:"2026-07-09T20:00:00Z", venue:"Los Angeles" }, // RO 09 Jul 23:00
-  { id:99, group:"KO", stage:"QF", teamA:"Norvegia", teamB:"Anglia", flagA:"🇳🇴", flagB:"🏴󠁧󠁢󠁥󠁮󠁧󠁿", time:"2026-07-11T21:00:00Z", venue:"Kansas City"  }, // RO 12 Jul 00:00
+  { id:97, group:"KO", stage:"QF", teamA:"Franta",    teamB:"Maroc",    flagA:"🇫🇷", flagB:"🇲🇦", time:"2026-07-09T20:00:00Z", venue:"Los Angeles" }, // RO 09 Jul 23:00 — 4pm ET Jul 9, SoFi (Gillette/Boston)
+  { id:98, group:"KO", stage:"QF", teamA:"Spania",    teamB:"Belgia",   flagA:"🇪🇸", flagB:"🇧🇪", time:"2026-07-10T19:00:00Z", venue:"Los Angeles" }, // RO 10 Jul 22:00 — 3pm ET Jul 10, SoFi/Los Angeles Stadium
+  { id:99, group:"KO", stage:"QF", teamA:"Norvegia",  teamB:"Anglia",   flagA:"🇳🇴", flagB:"🏴󠁧󠁢󠁥󠁮󠁧󠁿", time:"2026-07-11T21:00:00Z", venue:"Kansas City"  }, // RO 12 Jul 00:00 — 5pm ET Jul 11, Hard Rock/Miami
+  { id:100, group:"KO", stage:"QF", teamA:"Argentina", teamB:"Elvetia", flagA:"🇦🇷", flagB:"🇨🇭", time:"2026-07-12T01:00:00Z", venue:"Kansas City"  }, // RO 12 Jul 04:00 — 9pm ET Jul 11, Arrowhead/Kansas City
 
 ];
 
