@@ -114,7 +114,8 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
   const [qfMsg, setQFMsg]       = useState('');
   const [sfSel, setSFSel]       = useState(specialResultsInit?.qualifiedToSemis || {});
   const [sfMsg, setSFMsg]       = useState('');
-  const [resetMsgs, setResetMsgs] = useState({}); // uid → message
+  const [resetMsgs, setResetMsgs]     = useState({}); // uid → message
+  const [manualEmails, setManualEmails] = useState({}); // uid → manually typed email
   const [sA,      setSA]     = useState(0);
   const [sB,      setSB]     = useState(0);
   const [possA,   setPossA]  = useState('');
@@ -691,33 +692,68 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
         </div>
         <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
           {Object.entries(allUsers).filter(([,u]) => u?.nickname).map(([uid, u]) => {
-            const msg = resetMsgs[uid] || '';
+            const msg        = resetMsgs[uid] || '';
+            const emailKnown = u.email;
+            const manual     = manualEmails[uid] || '';
+            const emailToUse = emailKnown || manual;
             return (
               <div key={uid} style={{ padding:'8px 10px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom: emailKnown ? 0 : 6 }}>
                   <div>
                     <div style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{u.nickname}</div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginTop:1 }}>{u.email || '—'}</div>
+                    {emailKnown
+                      ? <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginTop:1 }}>{emailKnown}</div>
+                      : <div style={{ fontSize:10, color:'rgba(255,120,0,0.6)', marginTop:1 }}>email necunoscut</div>
+                    }
                   </div>
-                  <button
-                    disabled={!!msg}
-                    onClick={async () => {
-                      if (!u.email) { setResetMsgs(p => ({...p, [uid]:'❌ Email necunoscut'})); return; }
-                      setResetMsgs(p => ({...p, [uid]:'Se trimite...'}));
-                      const res = await sendPasswordReset(u.email);
-                      setResetMsgs(p => ({...p, [uid]: res.success ? '✅ Email trimis!' : '❌ ' + res.error}));
-                      setTimeout(() => setResetMsgs(p => ({...p, [uid]:''})), 5000);
-                    }}
-                    style={{
-                      padding:'5px 10px', fontSize:10, fontWeight:700, borderRadius:7, whiteSpace:'nowrap',
-                      cursor: msg ? 'default' : 'pointer',
-                      background: msg?.startsWith('✅') ? 'rgba(0,229,160,0.1)' : msg?.startsWith('❌') ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.07)',
-                      border: `1px solid ${msg?.startsWith('✅') ? 'rgba(0,229,160,0.3)' : msg?.startsWith('❌') ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.12)'}`,
-                      color: msg?.startsWith('✅') ? '#00E5A0' : msg?.startsWith('❌') ? '#EF4444' : 'rgba(255,255,255,0.7)',
-                    }}>
-                    {msg || '🔑 Trimite reset parolă'}
-                  </button>
+                  {emailKnown && (
+                    <button
+                      disabled={!!msg}
+                      onClick={async () => {
+                        setResetMsgs(p => ({...p, [uid]:'Se trimite...'}));
+                        const res = await sendPasswordReset(emailKnown);
+                        setResetMsgs(p => ({...p, [uid]: res.success ? '✅ Trimis!' : '❌ ' + res.error}));
+                        setTimeout(() => setResetMsgs(p => ({...p, [uid]:''})), 5000);
+                      }}
+                      style={{
+                        padding:'5px 10px', fontSize:10, fontWeight:700, borderRadius:7, whiteSpace:'nowrap',
+                        cursor: msg ? 'default' : 'pointer',
+                        background: msg?.startsWith('✅') ? 'rgba(0,229,160,0.1)' : msg?.startsWith('❌') ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.07)',
+                        border: `1px solid ${msg?.startsWith('✅') ? 'rgba(0,229,160,0.3)' : msg?.startsWith('❌') ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.12)'}`,
+                        color: msg?.startsWith('✅') ? '#00E5A0' : msg?.startsWith('❌') ? '#EF4444' : 'rgba(255,255,255,0.7)',
+                      }}>
+                      {msg || '🔑 Reset parolă'}
+                    </button>
+                  )}
                 </div>
+                {/* For users without email in Firestore — manual input */}
+                {!emailKnown && (
+                  <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                    <input
+                      type="email" value={manual} placeholder="introdu emailul lui..."
+                      onChange={e => setManualEmails(p => ({...p, [uid]: e.target.value}))}
+                      style={{ flex:1, padding:'6px 10px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:7, color:'#fff', fontSize:11, fontFamily:'inherit', outline:'none' }}
+                    />
+                    <button
+                      disabled={!manual.includes('@') || !!msg}
+                      onClick={async () => {
+                        if (!manual.includes('@')) return;
+                        setResetMsgs(p => ({...p, [uid]:'Se trimite...'}));
+                        const res = await sendPasswordReset(manual);
+                        setResetMsgs(p => ({...p, [uid]: res.success ? '✅ Trimis!' : '❌ ' + res.error}));
+                        setTimeout(() => setResetMsgs(p => ({...p, [uid]:''})), 5000);
+                      }}
+                      style={{
+                        padding:'5px 10px', fontSize:10, fontWeight:700, borderRadius:7, whiteSpace:'nowrap',
+                        cursor: manual.includes('@') && !msg ? 'pointer' : 'default',
+                        background: msg?.startsWith('✅') ? 'rgba(0,229,160,0.1)' : msg?.startsWith('❌') ? 'rgba(239,68,68,0.1)' : manual.includes('@') ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.03)',
+                        border: `1px solid ${msg?.startsWith('✅') ? 'rgba(0,229,160,0.3)' : msg?.startsWith('❌') ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                        color: msg?.startsWith('✅') ? '#00E5A0' : msg?.startsWith('❌') ? '#EF4444' : manual.includes('@') ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.25)',
+                      }}>
+                      {msg || '🔑 Reset'}
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}

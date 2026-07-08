@@ -11,6 +11,7 @@ import {
   checkNicknameAvailable, sendEmailCode, verifyEmailCode,
   FIREBASE_CONFIGURED,
 } from '../services/authService.js';
+import { sendPasswordReset } from '../services/emailAuth.js';
 
 // ─── EMAIL LOGIN SCREEN ───────────────────────────────────────────────────────
 export function LoginScreen({ onLogin }) {
@@ -24,6 +25,21 @@ export function LoginScreen({ onLogin }) {
   const [loading,    setLoading]  = useState(false);
   const [socialLoad, setSocialLoad] = useState(null);
   const [error,      setError]    = useState('');
+
+  // Forgot password
+  const [forgotEmail,   setForgotEmail]   = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMsg,     setForgotMsg]     = useState('');
+  const [forgotErr,     setForgotErr]     = useState('');
+
+  const handleForgot = async () => {
+    if (!forgotEmail.trim()) { setForgotErr('Introdu adresa de email.'); return; }
+    setForgotLoading(true); setForgotErr(''); setForgotMsg('');
+    const res = await sendPasswordReset(forgotEmail);
+    setForgotLoading(false);
+    if (res.success) setForgotMsg('✅ Email trimis! Verifică Inbox și Spam.');
+    else setForgotErr(res.error || 'Eroare necunoscută.');
+  };
 
   // Hard block: if Firebase is not configured, nothing works.
   // Show an error and do not render any login form.
@@ -169,6 +185,41 @@ export function LoginScreen({ onLogin }) {
             </div>
             <button onClick={handlePasswordLogin} disabled={loading || password.length < 6} style={{ width:'100%', padding:'14px', background:(loading||password.length<6)?'rgba(255,255,255,0.06)':'linear-gradient(135deg,#00E5A0,#00C27A)', border:'none', borderRadius:13, color:(loading||password.length<6)?'rgba(255,255,255,0.25)':'#060C09', fontSize:15, fontWeight:800, cursor:(loading||password.length<6)?'default':'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, fontFamily:"'Bebas Neue',sans-serif", letterSpacing:'0.08em' }}>
               {loading ? <><Spinner size={16} color="#060C09"/>Se autentifică...</> : 'INTRĂ ÎN JOC →'}
+            </button>
+            <div style={{ textAlign:'center', marginTop:12 }}>
+              <button onClick={() => { setStep('forgot'); setForgotEmail(email); setForgotMsg(''); setForgotErr(''); }}
+                style={{ background:'none', border:'none', color:'rgba(255,255,255,0.3)', fontSize:12, cursor:'pointer', textDecoration:'underline', padding:0 }}>
+                Ai uitat parola?
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── FORGOT PASSWORD ─────────────────────────────────────────────────── */}
+        {step === 'forgot' && (
+          <div>
+            <button onClick={() => { setStep('password'); setForgotMsg(''); setForgotErr(''); }}
+              style={{ background:'none', border:'none', color:'rgba(255,255,255,0.35)', fontSize:12, cursor:'pointer', padding:'0 0 14px', display:'flex', alignItems:'center', gap:4 }}>
+              ← Înapoi
+            </button>
+            <div style={{ marginBottom:16 }}>
+              <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:4 }}>Resetare parolă</div>
+              <div style={{ fontSize:12, color:'rgba(255,255,255,0.4)', lineHeight:1.5 }}>
+                Introdu emailul cu care te-ai înregistrat. Îți trimitem un link de resetare.
+              </div>
+            </div>
+            <input
+              type="email" value={forgotEmail}
+              onChange={e => { setForgotEmail(e.target.value); setForgotErr(''); setForgotMsg(''); }}
+              onKeyDown={e => e.key === 'Enter' && handleForgot()}
+              placeholder="email@exemplu.com" autoFocus
+              style={{ width:'100%', padding:'14px 16px', background:'rgba(255,255,255,0.06)', border:`1px solid ${forgotErr?'rgba(255,107,107,0.4)':'rgba(255,255,255,0.12)'}`, borderRadius:13, color:'#fff', fontSize:15, fontFamily:'inherit', outline:'none', boxSizing:'border-box', marginBottom:10 }}
+            />
+            {forgotErr && <div style={{ fontSize:12, color:'#FF6B6B', background:'rgba(255,107,107,0.07)', border:'1px solid rgba(255,107,107,0.15)', borderRadius:8, padding:'8px 12px', marginBottom:10 }}>{forgotErr}</div>}
+            {forgotMsg && <div style={{ fontSize:12, color:'#00E5A0', background:'rgba(0,229,160,0.07)', border:'1px solid rgba(0,229,160,0.2)', borderRadius:8, padding:'10px 12px', marginBottom:10, lineHeight:1.5 }}>{forgotMsg}</div>}
+            <button onClick={handleForgot} disabled={forgotLoading || !!forgotMsg}
+              style={{ width:'100%', padding:'14px', background:forgotLoading||forgotMsg?'rgba(255,255,255,0.06)':'linear-gradient(135deg,#00E5A0,#00C27A)', border:'none', borderRadius:13, color:forgotLoading||forgotMsg?'rgba(255,255,255,0.25)':'#060C09', fontSize:14, fontWeight:800, cursor:forgotLoading||forgotMsg?'default':'pointer', fontFamily:"'Bebas Neue',sans-serif", letterSpacing:'0.08em' }}>
+              {forgotLoading ? <><Spinner size={16} color="#060C09"/> Se trimite...</> : 'TRIMITE EMAIL →'}
             </button>
           </div>
         )}
