@@ -208,31 +208,89 @@ function PlayerDetailModal({ nickname, avatarId, rank, points, exactScores,
                   Nu a completat predicțiile speciale.
                 </div>
               ) : (
-                <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
-                  <div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:2 }}>
-                      🏆 Campioană
-                    </div>
-                    <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>
-                      {specialPred.winner || '—'}
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:2 }}>
-                      🥈 Semifinaliste
-                    </div>
-                    <div style={{ fontSize:12, color:'rgba(255,255,255,0.85)', lineHeight:1.5 }}>
-                      {(specialPred.semifinalists || []).join(', ') || '—'}
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:2 }}>
-                      ⚽ Țara golgheterului
-                    </div>
-                    <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>
-                      {specialPred.topScorerCountry || '—'}
-                    </div>
-                  </div>
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+
+                  {/* Câștigătoare */}
+                  {(() => {
+                    const picked = specialPred.winner || null;
+                    const real   = specialResults?.winner || null;
+                    const cor    = real && picked === real;
+                    const wrg    = real && picked && picked !== real;
+                    return (
+                      <div style={{ padding:'7px 9px', borderRadius:8,
+                        background: cor?'rgba(0,229,160,0.07)':wrg?'rgba(239,68,68,0.06)':'rgba(255,255,255,0.03)',
+                        border:`1px solid ${cor?'rgba(0,229,160,0.15)':wrg?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.05)'}` }}>
+                        <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:3 }}>🏆 Campioană · 500 pts</div>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                          <span style={{ fontSize:13, fontWeight:700, color: cor?'#00E5A0':wrg?'#EF4444':'#fff' }}>
+                            {picked || '—'}
+                          </span>
+                          {cor && <span style={{ fontSize:11, fontWeight:700, color:'#00E5A0' }}>✅ +500</span>}
+                          {wrg && <span style={{ fontSize:11, fontWeight:700, color:'#EF4444' }}>❌ +0 <span style={{fontSize:9,opacity:0.7}}>({real})</span></span>}
+                          {!real && picked && <span style={{ fontSize:10, color:'rgba(255,180,0,0.7)' }}>⏳</span>}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Semifinaliste */}
+                  {(() => {
+                    const picked = specialPred.semifinalists || [];
+                    const real   = specialResults?.semifinalists || [];
+                    const hasReal = real.length > 0;
+                    const correct = picked.filter(t => real.includes(t));
+                    const pts = correct.length * 200;
+                    return (
+                      <div style={{ padding:'7px 9px', borderRadius:8,
+                        background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)' }}>
+                        <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:5 }}>
+                          🥈 Semifinaliste · 200 pts / echipă
+                          {hasReal && pts > 0 && <span style={{ color:'#FFD700', marginLeft:6, fontWeight:700 }}>+{pts}</span>}
+                          {!hasReal && <span style={{ color:'rgba(255,180,0,0.6)', marginLeft:6 }}>⏳</span>}
+                        </div>
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                          {picked.length > 0 ? picked.map(team => {
+                            const cor = hasReal && real.includes(team);
+                            const wrg = hasReal && !real.includes(team);
+                            return (
+                              <span key={team} style={{
+                                fontSize:11, padding:'3px 8px', borderRadius:6, fontWeight:600,
+                                background: cor?'rgba(0,229,160,0.12)':wrg?'rgba(239,68,68,0.1)':'rgba(255,255,255,0.07)',
+                                color: cor?'#00E5A0':wrg?'#EF4444':'rgba(255,255,255,0.7)',
+                                border:`1px solid ${cor?'rgba(0,229,160,0.25)':wrg?'rgba(239,68,68,0.2)':'rgba(255,255,255,0.08)'}`,
+                              }}>
+                                {cor?'✓ ':wrg?'✗ ':''}{team}
+                              </span>
+                            );
+                          }) : <span style={{ color:'rgba(255,255,255,0.25)', fontStyle:'italic', fontSize:12 }}>—</span>}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Golgheter */}
+                  {(() => {
+                    const picked = specialPred.topScorerCountry || null;
+                    const real   = specialResults?.topScorerCountry || null;
+                    const cor    = real && picked === real;
+                    const wrg    = real && picked && picked !== real;
+                    return (
+                      <div style={{ padding:'7px 9px', borderRadius:8,
+                        background: cor?'rgba(0,229,160,0.07)':wrg?'rgba(239,68,68,0.06)':'rgba(255,255,255,0.03)',
+                        border:`1px solid ${cor?'rgba(0,229,160,0.15)':wrg?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.05)'}` }}>
+                        <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:3 }}>⚽ Țara golgheterului · 300 pts</div>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                          <span style={{ fontSize:13, fontWeight:700, color: cor?'#00E5A0':wrg?'#EF4444':'#fff' }}>
+                            {picked || '—'}
+                          </span>
+                          {cor && <span style={{ fontSize:11, fontWeight:700, color:'#00E5A0' }}>✅ +300</span>}
+                          {wrg && <span style={{ fontSize:11, fontWeight:700, color:'#EF4444' }}>❌ +0 <span style={{fontSize:9,opacity:0.7}}>({real})</span></span>}
+                          {!real && picked && <span style={{ fontSize:10, color:'rgba(255,180,0,0.7)' }}>⏳</span>}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                 </div>
               )}
             </div>
