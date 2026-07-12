@@ -4,7 +4,7 @@
 // PRODUCTION: replace localStorage.setItem calls with Firestore/Supabase writes.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ScoreInput } from '../components/UI.jsx';
 import {
   MATCHES, ADMIN_EMAILS, ADMIN_EMAILS_RUNTIME,
@@ -114,6 +114,20 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
   const [qfMsg, setQFMsg]       = useState('');
   const [sfSel, setSFSel]       = useState(specialResultsInit?.qualifiedToSemis || {});
   const [sfMsg, setSFMsg]       = useState('');
+
+  // Sync qfSel and sfSel whenever specialResultsInit is updated by App.jsx
+  // (happens after save + onMatchUpdate reloads specialResults from Firestore).
+  // useState initial value is only used at mount, so we need this effect
+  // to keep the UI in sync with what's actually in Firestore.
+  useEffect(() => {
+    if (specialResultsInit?.quarterFinalists) setQFSel(specialResultsInit.quarterFinalists);
+    if (specialResultsInit?.qualifiedToSemis) setSFSel(specialResultsInit.qualifiedToSemis);
+    if (specialResultsInit) setSpecialRes({
+      winner:           specialResultsInit.winner           || '',
+      semifinalists:    specialResultsInit.semifinalists    || [],
+      topScorerCountry: specialResultsInit.topScorerCountry || '',
+    });
+  }, [specialResultsInit]);
   const [resetMsgs, setResetMsgs]     = useState({}); // uid → message
   const [manualEmails, setManualEmails] = useState({}); // uid → manually typed email
   const [sA,      setSA]     = useState(0);
@@ -965,7 +979,17 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
           </select>
         </div>
         {specialMsg && <div style={{ fontSize:11, color:specialMsg.startsWith('✅')?'rgba(0,229,160,0.8)':'#EF4444', marginBottom:6 }}>{specialMsg}</div>}
-        <button onClick={async()=>{ setSpecialMsg(''); const res=await saveSpecialResults(adminUid, {...specialRes, qualifiedToSemis: Object.keys(sfSel).length>0?sfSel:undefined}); if(res.success){setSpecialMsg('✅ Salvat! Clasamentul se actualizează.'); onMatchUpdate?.({_action:'specialResults'});} else setSpecialMsg('Eroare: '+res.error); }} style={{ width:'100%', padding:'9px', background:'rgba(255,215,0,0.1)', border:'1px solid rgba(255,215,0,0.25)', borderRadius:9, color:'#FFD700', fontSize:12, fontWeight:800, cursor:'pointer' }}>
+        <button onClick={async()=>{
+          setSpecialMsg('');
+          const payload = {...specialRes, qualifiedToSemis: Object.keys(sfSel).length>0 ? sfSel : undefined};
+          const res = await saveSpecialResults(currentUser?.uid, payload);
+          if(res.success){
+            setSpecialMsg('✅ Salvat! Clasamentul se actualizează.');
+            onMatchUpdate?.({_action:'specialResults'});
+          } else {
+            setSpecialMsg('❌ Eroare: ' + (res.error || 'necunoscută'));
+          }
+        }} style={{ width:'100%', padding:'9px', background:'rgba(255,215,0,0.1)', border:'1px solid rgba(255,215,0,0.25)', borderRadius:9, color:'#FFD700', fontSize:12, fontWeight:800, cursor:'pointer' }}>
           💾 Salvează rezultate speciale
         </button>
       </div>
