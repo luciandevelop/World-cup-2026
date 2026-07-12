@@ -157,6 +157,10 @@ export const ALL_MATCHES = [
   { id:99, group:"KO", stage:"QF", teamA:"Norvegia",  teamB:"Anglia",   flagA:"🇳🇴", flagB:"🏴󠁧󠁢󠁥󠁮󠁧󠁿", time:"2026-07-11T21:00:00Z", venue:"Kansas City"  }, // RO 12 Jul 00:00 — 5pm ET Jul 11, Hard Rock/Miami
   { id:100, group:"KO", stage:"QF", teamA:"Argentina", teamB:"Elvetia", flagA:"🇦🇷", flagB:"🇨🇭", time:"2026-07-12T01:00:00Z", venue:"Kansas City"  }, // RO 12 Jul 04:00 — 9pm ET Jul 11, Arrowhead/Kansas City
 
+  // ══ SEMIFINALE ═══════════════════════════════════════════════════════════════
+  { id:101, group:"KO", stage:"SF", teamA:"Franta",  teamB:"Spania",    flagA:"🇫🇷", flagB:"🇪🇸", time:"2026-07-14T19:00:00Z", venue:"Dallas"  }, // RO 14 Jul 22:00 — 3pm ET, AT&T Stadium
+  { id:102, group:"KO", stage:"SF", teamA:"Anglia",  teamB:"Argentina", flagA:"🏴󠁧󠁢󠁥󠁮󠁧󠁿", flagB:"🇦🇷", time:"2026-07-15T19:00:00Z", venue:"Atlanta" }, // RO 15 Jul 22:00 — 3pm ET, Mercedes-Benz Stadium
+
 ];
 
 export const ALL_GROUPS = ["A","B","C","D","E","F","G","H","I","J","K","L"];
