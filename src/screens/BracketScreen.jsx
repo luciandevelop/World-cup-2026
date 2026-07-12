@@ -395,11 +395,20 @@ function RoundListView({ confirmedR32, r32IdRange, champion }) {
   });
 
   // SF — winner-reference slots (101-102).
-  const sf = SF_SLOTS.map(s => ({
-    id: s.id, home: null, away: null,
-    homeLabel: `Câșt. M${s.from[0]}`,
-    awayLabel: `Câșt. M${s.from[1]}`,
-  }));
+  const CONFIRMED_SF = {
+    101: { home: { team:'Franta',  flag:'🇫🇷' }, away: { team:'Spania',    flag:'🇪🇸' } },
+    102: { home: { team:'Anglia',  flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿' }, away: { team:'Argentina', flag:'🇦🇷' } },
+  };
+  const sf = SF_SLOTS.map(s => {
+    const confirmed = CONFIRMED_SF[s.id];
+    return {
+      id: s.id,
+      home: confirmed ? confirmed.home : null,
+      away: confirmed ? confirmed.away : null,
+      homeLabel: confirmed ? confirmed.home.team : `Câșt. M${s.from[0]}`,
+      awayLabel: confirmed ? confirmed.away.team : `Câșt. M${s.from[1]}`,
+    };
+  });
 
   const ROUND_DATA = {
     r32: { matches:r32, label:'Șaisprezecimi',      isFinal:false },
