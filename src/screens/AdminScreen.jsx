@@ -981,8 +981,7 @@ export default function AdminScreen({ currentUser, finishedResults, onMatchUpdat
         {specialMsg && <div style={{ fontSize:11, color:specialMsg.startsWith('✅')?'rgba(0,229,160,0.8)':'#EF4444', marginBottom:6 }}>{specialMsg}</div>}
         <button onClick={async()=>{
           setSpecialMsg('');
-          const payload = {...specialRes, qualifiedToSemis: Object.keys(sfSel).length>0 ? sfSel : undefined};
-          const res = await saveSpecialResults(currentUser?.uid, payload);
+          const res = await saveSpecialResults(currentUser?.uid, specialRes);
           if(res.success){
             setSpecialMsg('✅ Salvat! Clasamentul se actualizează.');
             onMatchUpdate?.({_action:'specialResults'});
