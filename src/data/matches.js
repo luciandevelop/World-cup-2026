@@ -161,6 +161,10 @@ export const ALL_MATCHES = [
   { id:101, group:"KO", stage:"SF", teamA:"Franta",  teamB:"Spania",    flagA:"🇫🇷", flagB:"🇪🇸", time:"2026-07-14T19:00:00Z", venue:"Dallas"  }, // RO 14 Jul 22:00 — 3pm ET, AT&T Stadium
   { id:102, group:"KO", stage:"SF", teamA:"Anglia",  teamB:"Argentina", flagA:"🏴󠁧󠁢󠁥󠁮󠁧󠁿", flagB:"🇦🇷", time:"2026-07-15T19:00:00Z", venue:"Atlanta" }, // RO 15 Jul 22:00 — 3pm ET, Mercedes-Benz Stadium
 
+  // ══ FINALA MICĂ (locul 3) și FINALA MARE ═════════════════════════════════════
+  { id:103, group:"KO", stage:"THIRD_PLACE", teamA:"Franta",  teamB:"Anglia",    flagA:"🇫🇷", flagB:"🏴󠁧󠁢󠁥󠁮󠁧󠁿", time:"2026-07-18T21:00:00Z", venue:"Miami"     }, // RO 19 Jul 00:00
+  { id:104, group:"KO", stage:"FINAL",       teamA:"Spania",  teamB:"Argentina", flagA:"🇪🇸", flagB:"🇦🇷", time:"2026-07-19T19:00:00Z", venue:"New York"  }, // RO 19 Jul 22:00
+
 ];
 
 export const ALL_GROUPS = ["A","B","C","D","E","F","G","H","I","J","K","L"];
