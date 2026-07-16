@@ -415,7 +415,7 @@ function RoundListView({ confirmedR32, r32IdRange, champion }) {
     r16: { matches:r16, label:'Optimi de Finală',   isFinal:false },
     qf:  { matches:qf,  label:'Sferturi de Finală', isFinal:false },
     sf:  { matches:sf,  label:'Semifinale',         isFinal:false },
-    f:   { matches:[{ id:104, home:null, away:null, homeLabel:'Câșt. M101', awayLabel:'Câșt. M102' }], label:'🏆 Finala', isFinal:true },
+    f:   { matches:[{ id:104, home:{team:'Spania',flag:'🇪🇸'}, away:{team:'Argentina',flag:'🇦🇷'}, homeLabel:'Spania', awayLabel:'Argentina' }], label:'🏆 Finala', isFinal:true },
   };
 
   // M103 — finala mică (loser references from the 2 semifinals).
