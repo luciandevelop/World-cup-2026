@@ -1,81 +1,135 @@
-// ─── src/services/authService.js ──────────────────────────────────────────────
-// Auth service — Firebase only. NO demo mode. NO fake users.
-// Every function throws or returns an error if Firebase is not configured.
-// ─────────────────────────────────────────────────────────────────────────────
-
 import {
-  FIREBASE_CONFIGURED,
-  firebaseSignInWithGoogle,
-  firebaseSignOut,
-  onFirebaseAuthChange,
-} from './firebase.js';
-import { sendEmailCode, verifyEmailCode } from './emailAuth.js';
-import {
-  saveUserProfile as fssSaveProfile,
-  getUserProfile  as fssGetProfile,
-  checkNicknameAvailable as fssCheckNick,
-} from './firestoreService.js';
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  sendPasswordResetEmail,
+  signOut,
+  updateProfile,
+} from "firebase/auth";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db, googleProvider } from "../firebase";
 
-export { sendEmailCode, verifyEmailCode, onFirebaseAuthChange, FIREBASE_CONFIGURED };
+// BUG REPARAT — cauza reală a "Jucător nou" pentru conturile email/parolă:
+// createUserWithEmailAndPassword() declanșează onAuthStateChanged() în
+// App.jsx aproape imediat ce contul e creat — ÎNAINTE ca linia următoare,
+// updateProfile(displayName), să apuce să se termine. App.jsx citește
+// u.displayName exact în acel interval și găsește null, deci
+// ensureUserProfile scrie definitiv "Jucător nou" (scrierea e o singură
+// dată, "dacă nu există deja"). Pentru Google, displayName vine deja
+// populat odată cu răspunsul OAuth — nicio cursă, de-asta funcționa doar
+// acolo.
+//
+// Fix: nickname-ul tastat la înregistrare e reținut sincron, ÎNAINTE de
+// apelul async care poate declanșa cursa — App.jsx îl poate citi
+// indiferent de ordinea reală a evenimentelor.
+let pendingNickname = null;
 
-const SESSION_KEY = 'wc2026_session';
+export function consumePendingNickname() {
+  const n = pendingNickname;
+  pendingNickname = null;
+  return n;
+}
 
-// ─── GOOGLE SIGN-IN ───────────────────────────────────────────────────────────
-// Throws if Firebase is not configured — caller must handle the error.
-export async function signInWithGoogle() {
-  if (!FIREBASE_CONFIGURED) {
-    throw new Error('FIREBASE_NOT_CONFIGURED');
+// Eroare dedicată pentru probleme de Firestore. Păstrează codul original al
+// erorii care a cauzat eșecul (ex: "permission-denied", "unavailable"), sau
+// un cod generic "profile-save-failed" dacă eroarea originală nu are cod —
+// NU presupune automat că e o problemă de permisiuni.
+export class ProfileSaveError extends Error {
+  constructor(cause) {
+    super("Contul de autentificare a fost creat, dar profilul nu a putut fi salvat.");
+    this.name = "ProfileSaveError";
+    this.cause = cause;
+    this.code = cause?.code || "profile-save-failed";
   }
-  return firebaseSignInWithGoogle();
 }
 
-export async function signInWithApple() {
-  throw new Error('coming_soon');
-}
+// Creează/actualizează profilul în Firestore (public + privat, separate).
+// NU se mai apelează din registerWithEmail/loginWithEmail/loginWithGoogle —
+// e responsabilitatea EXCLUSIVĂ a App.jsx, apelată o singură dată per
+// schimbare de stare de autentificare (vezi App.jsx). Asta elimină race-ul
+// dintre onAuthStateChanged și scrierea în Firestore, și previne apelurile
+// duplicate care existau înainte (authService + WelcomeScreen independent).
+export async function ensureUserProfile(user, nickname) {
+  const publicRef = doc(db, "users", user.uid);
+  const privateRef = doc(db, "users", user.uid, "private", "profile");
 
-// ─── SIGN-OUT ─────────────────────────────────────────────────────────────────
-// Always calls Firebase signOut (throws if not configured, which is fine —
-// if Firebase isn't configured there's no session to clear).
-// Also clears the localStorage cache.
-export async function signOut() {
   try {
-    await firebaseSignOut();
-  } catch {
-    // Ignore — if Firebase isn't configured there's nothing to sign out from.
+    const publicSnap = await getDoc(publicRef);
+    if (!publicSnap.exists()) {
+      await setDoc(publicRef, {
+        uid: user.uid,
+        nickname: nickname || user.displayName || "Jucător nou",
+        avatarId: null,
+        seasonPoints: 0,
+        gameweeksPlayed: 0,
+      });
+    }
+
+    const privateSnap = await getDoc(privateRef);
+    if (!privateSnap.exists()) {
+      await setDoc(privateRef, {
+        email: user.email || "",
+        createdAt: serverTimestamp(),
+        lastLoginAt: serverTimestamp(),
+      });
+    } else {
+      await setDoc(privateRef, { lastLoginAt: serverTimestamp() }, { merge: true });
+    }
+
+    const finalSnap = await getDoc(publicRef);
+    return finalSnap.exists() ? finalSnap.data() : null;
+  } catch (err) {
+    console.error("Eroare la salvarea profilului în Firestore:", err);
+    throw new ProfileSaveError(err);
   }
-  localStorage.removeItem(SESSION_KEY);
 }
 
-// ─── SESSION CACHE ────────────────────────────────────────────────────────────
-// localStorage is ONLY used as a read-cache to avoid a flash on refresh.
-// It is NOT an authentication gate. The real gate is onFirebaseAuthChange.
-export function getPersistedSession() {
-  try { return JSON.parse(localStorage.getItem(SESSION_KEY)); }
-  catch { return null; }
-}
-
-export function persistSession(user) {
-  if (user) {
-    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
-  } else {
-    localStorage.removeItem(SESSION_KEY);
+// Doar autentificare — NU ating Firestore aici. Dacă asta reușește, contul
+// Auth există garantat; profilul se creează separat, în App.jsx.
+export async function registerWithEmail(email, password, nickname) {
+  pendingNickname = nickname || null;
+  const cred = await createUserWithEmailAndPassword(auth, email, password);
+  if (nickname) {
+    await updateProfile(cred.user, { displayName: nickname });
   }
+  return cred.user;
 }
 
-// ─── PROFILE ──────────────────────────────────────────────────────────────────
-export async function saveUserProfile(uid, profile) {
-  return fssSaveProfile(uid, profile);
+export async function loginWithEmail(email, password) {
+  const cred = await signInWithEmailAndPassword(auth, email, password);
+  return cred.user;
 }
 
-export async function getUserProfile(uid) {
-  return fssGetProfile(uid);
+export async function loginWithGoogle() {
+  const cred = await signInWithPopup(auth, googleProvider);
+  return cred.user;
 }
 
-export async function updateUserAvatar(uid, avatarId) {
-  return fssSaveProfile(uid, { avatarId });
+export async function resetPassword(email) {
+  await sendPasswordResetEmail(auth, email);
 }
 
-// ─── NICKNAME CHECK ───────────────────────────────────────────────────────────
-export async function checkNicknameAvailable(nick) {
-  return fssCheckNick(nick);
+export async function logout() {
+  await signOut(auth);
+}
+
+// Traduce codurile de eroare (Firebase Auth SAU ProfileSaveError) în mesaje
+// înțelese, în română. Funcționează identic pentru ambele tipuri de erori,
+// pentru că ProfileSaveError expune acum `.code`.
+export function translateAuthError(code) {
+  const map = {
+    "auth/invalid-email": "Adresa de email nu e validă.",
+    "auth/user-disabled": "Contul a fost dezactivat.",
+    "auth/user-not-found": "Nu există niciun cont cu acest email.",
+    "auth/wrong-password": "Parola introdusă e greșită.",
+    "auth/invalid-credential": "Email sau parolă greșită.",
+    "auth/email-already-in-use": "Există deja un cont cu acest email.",
+    "auth/weak-password": "Parola trebuie să aibă cel puțin 6 caractere.",
+    "auth/too-many-requests": "Prea multe încercări greșite. Încearcă din nou peste câteva minute.",
+    "auth/popup-closed-by-user": "Fereastra de Google a fost închisă înainte de finalizare.",
+    "auth/network-request-failed": "Problemă de conexiune. Verifică internetul și încearcă din nou.",
+    "permission-denied": "Nu s-a putut salva profilul (permisiuni Firestore). Contactează admin-ul.",
+    "profile-save-failed": "Contul de autentificare există, dar profilul nu a putut fi salvat. Verifică conexiunea și încearcă din nou.",
+  };
+  return map[code] || "A apărut o eroare neașteptată. Încearcă din nou.";
 }
