@@ -1,648 +1,202 @@
-// ─── src/App.jsx ──────────────────────────────────────────────────────────────
-// Main application shell — v8 Firestore
-// ─────────────────────────────────────────────────────────────────────────────
+import { useCallback, useEffect, useRef, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "./firebase";
+import { ensureUserProfile, translateAuthError, logout, consumePendingNickname } from "./services/authService";
+import { checkIsAdmin } from "./services/adminService";
+import AuthScreen from "./screens/AuthScreen";
+import WelcomeScreen from "./screens/WelcomeScreen";
+import AdminScreen from "./screens/AdminScreen";
+import PredictionsScreen from "./screens/PredictionsScreen";
+import LeaderboardScreen from "./screens/LeaderboardScreen";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import CSS from './styles/globalCSS.js';
-import {
-  MATCHES, buildMatches, calcBreakdown, calcPoints, buildLeaderboard, calculateUserScore,
-  ADMIN_EMAILS, ADMIN_EMAILS_RUNTIME, QUALIFY_PCT, generateActivityFeed, matchLockState,
-} from './data/gameData.js';
-import { getAvatarById, getDefaultAvatarForNick, AVATARS } from './data/avatars.js';
-import { LoginScreen, NicknameScreen } from './screens/AuthScreens.jsx';
-import MatchesScreen     from './screens/MatchesScreen.jsx';
-import LeaderboardScreen from './screens/LeaderboardScreen.jsx';
-import AdminScreen, { loadAdminResults, loadGroupOverrides } from './screens/AdminScreen.jsx';
-import HowToPlayScreen   from './screens/HowToPlayScreen.jsx';
-import BracketScreen     from './screens/BracketScreen.jsx';
-import PredictionModal   from './components/PredictionModal.jsx';
-import { FootballAvatar, Spinner } from './components/UI.jsx';
-import {
-  getPersistedSession, persistSession, signOut,
-  saveUserProfile, getUserProfile, onFirebaseAuthChange,
-} from './services/authService.js';
-import {
-  savePrediction, loadUserPredictions,
-  loadAllPredictions, loadAllUsers, loadMatchResults,
-  subscribeToMatchResults, subscribeToPredictions, subscribeToUsers,
-  REALTIME_MODE,
-} from './services/firestoreService.js';
-import { FIREBASE_CONFIGURED, firebaseGetRedirectResult } from './services/firebase.js';
-import {
-  loadAllSpecialPredictions, loadSpecialResults, calcSpecialPoints,
-} from './services/specialEventsService.js';
+// profileState: "idle" | "checking" | "ready" | "error"
+// Stare centrală, unică — nimic altceva din aplicație nu mai apelează
+// ensureUserProfile. WelcomeScreen NU mai afișează nimic doar pentru că
+// există un user Firebase Auth — trebuie explicit profileState === "ready".
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [profile, setProfile] = useState(null);
+  const [profileState, setProfileState] = useState("idle");
+  const [profileError, setProfileError] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [view, setView] = useState("welcome"); // "welcome" | "admin"
 
-export const APP_VERSION = 'v8';
+  // Incrementat la fiecare loadProfile() nou și la logout — orice cerere
+  // în zbor care nu mai corespunde cu requestRef.current curent la momentul
+  // în care revine din await e ignorată (user schimbat/delogat între timp).
+  const requestRef = useRef(0);
 
-// ─── PERFECT HIT OVERLAY ──────────────────────────────────────────────────────
-function PerfectHitOverlay({ pts, onDone }) {
-  const particles = Array.from({length:14}, (_,i) => ({
-    x:Math.random()*90+5, y:Math.random()*80+5,
-    c:i%3===0?'#FFD700':i%3===1?'#fff':'#00E5A0',
-    s:4+Math.random()*6,
-    tx:(Math.random()-0.5)*160, ty:-40-Math.random()*80,
-  }));
-  return (
-    <div style={{ position:'fixed',inset:0,zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.92)',backdropFilter:'blur(10px)',animation:'fadeIn 0.15s' }} onClick={onDone}>
-      {particles.map((p,i) => <div key={i} style={{ position:'absolute',left:`${p.x}%`,top:`${p.y}%`,width:p.s,height:p.s,borderRadius:'50%',background:p.c,animation:`particlePop 1.4s ${i*0.06}s ease-out forwards`,'--tx':`${p.tx}px`,'--ty':`${p.ty}px`,pointerEvents:'none' }}/>)}
-      <div style={{ textAlign:'center',animation:'celebPop 0.5s cubic-bezier(0.34,1.56,0.64,1) both',padding:'0 32px' }}>
-        <div style={{ width:84,height:84,borderRadius:'50%',margin:'0 auto 16px',background:'rgba(212,175,55,0.1)',border:'1px solid rgba(212,175,55,0.3)',display:'flex',alignItems:'center',justifyContent:'center',animation:'goldPulse 1.8s ease-out forwards' }}>
-          <div style={{ fontSize:36 }}>🎯</div>
-        </div>
-        <div style={{ fontSize:9,color:'rgba(212,175,55,0.5)',letterSpacing:'0.22em',textTransform:'uppercase',marginBottom:6,fontWeight:700 }}>Predicție Perfectă</div>
-        <div style={{ fontSize:52,fontWeight:900,color:'#fff',fontFamily:"'Bebas Neue',sans-serif",letterSpacing:'0.04em',lineHeight:1,marginBottom:6 }}>+{pts} PTS</div>
-        <div style={{ fontSize:12,color:'rgba(255,255,255,0.3)',marginBottom:20 }}>Scor · cartonașe · cornere — toate exacte</div>
-        <div style={{ fontSize:10,color:'rgba(255,255,255,0.15)' }}>atinge pentru a închide</div>
+  const loadProfile = useCallback(async (u) => {
+    const myRequestId = ++requestRef.current;
+    setProfileState("checking");
+    setProfileError("");
+    try {
+      // u.displayName poate fi încă necompletat aici, dacă tocmai s-a
+      // înregistrat cu email/parolă (vezi comentariul din authService.js
+      // — cursă reală, nu ipotetică). pendingNickname acoperă exact acest
+      // interval; pentru orice alt caz (Google, sau login normal ulterior)
+      // e null și nu schimbă nimic.
+      const data = await ensureUserProfile(u, u.displayName || consumePendingNickname());
+      if (requestRef.current !== myRequestId) return; // cerere învechită, ignorăm
+      setProfile(data);
+      setProfileState("ready");
+      const adminStatus = await checkIsAdmin(u.uid);
+      if (requestRef.current !== myRequestId) return;
+      setIsAdmin(adminStatus);
+    } catch (err) {
+      if (requestRef.current !== myRequestId) return; // cerere învechită, ignorăm
+      console.error("Profil indisponibil:", err);
+      setProfileError(translateAuthError(err.code));
+      setProfileState("error");
+    }
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setAuthChecked(true);
+      if (u) {
+        loadProfile(u);
+      } else {
+        requestRef.current++; // invalidează orice cerere rămasă în zbor
+        setProfile(null);
+        setProfileState("idle");
+        setIsAdmin(false);
+        setView("welcome");
+      }
+    });
+    return unsubscribe;
+  }, [loadProfile]);
+
+
+  if (!authChecked) {
+    return (
+      <div style={loadingStyle}>
+        <div style={spinnerStyle} />
       </div>
-    </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthScreen />;
+  }
+
+  if (profileState === "checking" || profileState === "idle") {
+    return (
+      <div style={loadingStyle}>
+        <div style={spinnerStyle} />
+        <p style={loadingTextStyle}>Se pregătește contul…</p>
+      </div>
+    );
+  }
+
+  if (profileState === "error") {
+    return (
+      <div style={loadingStyle}>
+        <div style={errorCardStyle}>
+          <h2 style={errorTitleStyle}>Profilul nu s-a putut salva</h2>
+          <p style={errorTextStyle}>{profileError}</p>
+          <p style={errorTextMutedStyle}>
+            Ești autentificat, dar contul tău nu e încă gata de folosit. Poți încerca din nou.
+          </p>
+          <div style={errorBtnRowStyle}>
+            <button style={retryBtnStyle} onClick={() => loadProfile(user)}>
+              Încearcă din nou
+            </button>
+            <button style={logoutBtnStyle} onClick={logout}>
+              Deconectează-te
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "admin" && isAdmin) {
+    return <AdminScreen onBack={() => setView("welcome")} />;
+  }
+
+  if (view === "predictions") {
+    return <PredictionsScreen user={user} onBack={() => setView("welcome")} />;
+  }
+
+  if (view === "leaderboard") {
+    return <LeaderboardScreen user={user} onBack={() => setView("welcome")} />;
+  }
+
+  return (
+    <WelcomeScreen
+      user={user}
+      profile={profile}
+      isAdmin={isAdmin}
+      onOpenAdmin={() => setView("admin")}
+      onOpenPredictions={() => setView("predictions")}
+      onOpenLeaderboard={() => setView("leaderboard")}
+    />
   );
 }
 
-// ─── RARITY CONFIG (mirrors AuthScreens) ─────────────────────────────────────
-const RARITY_CFG = {
-  common:    { label:'',        color:'transparent',             bg:'transparent' },
-  rare:      { label:'Rar',     color:'#4A9EFF',                bg:'rgba(74,158,255,0.08)' },
-  epic:      { label:'Epic',    color:'#9B59B6',                bg:'rgba(155,89,182,0.10)' },
-  legendary: { label:'Legendar',color:'#FFD700',                bg:'rgba(255,215,0,0.08)' },
+const loadingStyle = {
+  minHeight: "100vh",
+  background: "#0A0E1A",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 14,
+  padding: "24px 16px",
 };
 
-const AV_CATS = [
-  { id:'all',      label:'Toate' },
-  { id:'nations',  label:'Natiuni',   filter: a => a.kind === 'nation' },
-  { id:'jerseys',  label:'Tricouri',  filter: a => a.kind === 'jersey' },
-  { id:'players',  label:'Jucători',  filter: a => a.kind === 'jersey' && a.rarity === 'epic' },
-  { id:'trophies', label:'Trofee',    filter: a => a.kind === 'achievement' },
-  { id:'fantasy',  label:'Personaje', filter: a => a.kind === 'achievement' && (a.rarity === 'rare' || a.rarity === 'common') },
-];
+const spinnerStyle = {
+  width: 34,
+  height: 34,
+  borderRadius: "50%",
+  border: "3px solid #232B42",
+  borderTopColor: "#C9A227",
+  animation: "spin 0.8s linear infinite",
+};
 
-// ─── AVATAR CHANGE MODAL ──────────────────────────────────────────────────────
-function AvatarChangeModal({ currentId, takenAvatarIds = new Set(), onSelect, onClose }) {
-  const [sel, setSel] = useState(currentId);
-  const [err, setErr] = useState('');
-  const [cat, setCat] = useState('all');
-  const av  = AVATARS.find(a => a.id === sel) || AVATARS[0];
-  const rc  = av?.rarity ? RARITY_CFG[av.rarity] : null;
-  const catObj = AV_CATS.find(c => c.id === cat);
-  const visible = cat === 'all' ? AVATARS : AVATARS.filter(catObj?.filter || (()=>true));
+const loadingTextStyle = {
+  color: "#8B93A8",
+  fontSize: 13,
+  fontFamily: "'Helvetica Neue', Arial, sans-serif",
+};
 
-  const handleSave = () => {
-    if (takenAvatarIds.has(sel) && sel !== currentId) {
-      setErr('Acest avatar este deja folosit de un alt jucător.');
-      return;
-    }
-    setErr('');
-    onSelect(sel);
-  };
+const errorCardStyle = {
+  width: "100%",
+  maxWidth: 400,
+  background: "#12182B",
+  borderRadius: 20,
+  padding: "28px 24px",
+  border: "1px solid #232B42",
+  textAlign: "center",
+  fontFamily: "'Helvetica Neue', Arial, sans-serif",
+};
 
-  return (
-    <div style={{ position:'fixed',inset:0,zIndex:90,background:'rgba(0,0,0,0.85)',backdropFilter:'blur(8px)',display:'flex',flexDirection:'column',justifyContent:'flex-end',animation:'fadeIn 0.15s' }} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{ background:'#111820',borderRadius:'22px 22px 0 0',padding:'16px 14px 32px',border:'1px solid rgba(255,255,255,0.08)',borderBottom:'none',animation:'slideUp 0.28s ease',maxHeight:'82dvh',overflowY:'auto' }}>
-        <div style={{ width:36,height:3,background:'rgba(255,255,255,0.15)',borderRadius:2,margin:'0 auto 14px' }}/>
-        <div style={{ display:'flex',alignItems:'center',gap:10,marginBottom:10 }}>
-          <FootballAvatar avatarId={av.id} nickname={av.name} size={42}/>
-          <div>
-            <div style={{ fontSize:14,fontWeight:800,color:'#fff',display:'flex',alignItems:'center',gap:6 }}>
-              {av.name}
-              {rc?.label && <span style={{ fontSize:9,padding:'2px 7px',borderRadius:10,background:rc.bg,color:rc.color,fontWeight:700 }}>{rc.label}</span>}
-              {takenAvatarIds.has(sel) && sel !== currentId && (
-                <span style={{ fontSize:9,padding:'2px 7px',borderRadius:10,background:'rgba(239,68,68,0.15)',color:'#EF4444',fontWeight:700 }}>🔒 Ocupat</span>
-              )}
-            </div>
-            <div style={{ fontSize:10,color:'rgba(255,255,255,0.3)' }}>{av.desc}</div>
-          </div>
-        </div>
-        {/* Category filter */}
-        <div style={{ display:'flex',gap:4,overflowX:'auto',marginBottom:10 }}>
-          {AV_CATS.map(c => (
-            <button key={c.id} onClick={()=>setCat(c.id)} style={{ flexShrink:0,padding:'3px 9px',borderRadius:20,fontSize:10,fontWeight:700,cursor:'pointer',background:cat===c.id?'rgba(255,255,255,0.1)':'rgba(255,255,255,0.03)',border:`1px solid ${cat===c.id?'rgba(255,255,255,0.2)':'rgba(255,255,255,0.07)'}`,color:cat===c.id?'#fff':'rgba(255,255,255,0.38)' }}>
-              {c.label}
-            </button>
-          ))}
-        </div>
-        {/* Grid */}
-        <div style={{ display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:6,marginBottom:14,maxHeight:200,overflowY:'auto' }}>
-          {visible.map(a => {
-            const isSel  = sel === a.id;
-            const isMine = a.id === currentId;
-            const isTaken = takenAvatarIds.has(a.id) && !isMine;
-            const arc = a.rarity ? RARITY_CFG[a.rarity] : null;
-            return (
-              <div
-                key={a.id}
-                onClick={() => { if (!isTaken) { setSel(a.id); setErr(''); } }}
-                title={isTaken ? 'Ocupat de alt jucător' : a.name}
-                style={{ width:'100%',aspectRatio:'1',borderRadius:11,background:a.bg,
-                  border:`2px solid ${isSel ? a.accent : isTaken ? 'rgba(239,68,68,0.25)' : 'rgba(255,255,255,0.06)'}`,
-                  display:'flex',alignItems:'center',justifyContent:'center',fontSize:21,
-                  cursor:isTaken?'default':'pointer',
-                  opacity:isTaken?0.35:1,
-                  boxShadow:isSel?`0 0 12px ${a.accent}55`:a.shine?`0 0 5px ${a.accent}22`:'none',
-                  transition:'all 0.12s',position:'relative',padding:0 }}
-              >
-                <FootballAvatar avatarId={a.id} nickname={a.name} size={36} style={{border:'none',boxShadow:'none'}}/>
-                {isTaken && <div style={{ position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14 }}>🔒</div>}
-                {!isTaken && arc?.label && <div style={{ position:'absolute',bottom:0,right:0,width:8,height:8,borderRadius:'50%',background:arc.color,border:'1px solid rgba(0,0,0,0.6)' }}/>}
-              </div>
-            );
-          })}
-        </div>
-        {err && <div style={{ fontSize:11,color:'#EF4444',marginBottom:8,textAlign:'center' }}>⚠️ {err}</div>}
-        <button
-          onClick={handleSave}
-          disabled={takenAvatarIds.has(sel) && sel !== currentId}
-          style={{ width:'100%',padding:13,background:(takenAvatarIds.has(sel)&&sel!==currentId)?'rgba(255,255,255,0.06)':'linear-gradient(135deg,#00E5A0,#00C27A)',border:'none',borderRadius:12,color:(takenAvatarIds.has(sel)&&sel!==currentId)?'rgba(255,255,255,0.3)':'#060C09',fontSize:15,fontWeight:900,cursor:(takenAvatarIds.has(sel)&&sel!==currentId)?'default':'pointer',fontFamily:"'Bebas Neue',sans-serif",letterSpacing:'0.08em' }}
-        >
-          Salvează avatarul
-        </button>
-      </div>
-    </div>
-  );
-}
+const errorTitleStyle = { fontSize: 18, fontWeight: 800, color: "#F5F5F0", margin: "0 0 12px" };
+const errorTextStyle = { fontSize: 13.5, color: "#E08A82", lineHeight: 1.5, margin: "0 0 10px" };
+const errorTextMutedStyle = { fontSize: 12.5, color: "#5A6280", lineHeight: 1.5, margin: "0 0 22px" };
+const errorBtnRowStyle = { display: "flex", gap: 10, justifyContent: "center" };
 
-// ─── PROFILE DRAWER ───────────────────────────────────────────────────────────
-function ProfileDrawer({ user, totalPts, matchPts = 0, specialPts = 0, myRank, streak, onClose, onLogout, onAdmin, onAvatarChange }) {
-  const adminEmails = [...ADMIN_EMAILS, ...ADMIN_EMAILS_RUNTIME];
-  const isAdmin = adminEmails.includes(user?.email) || user?.isAdmin;
-  const av = getAvatarById(user?.avatarId) || getDefaultAvatarForNick(user?.nickname||'?');
+const retryBtnStyle = {
+  background: "linear-gradient(180deg, #E0BC4A, #C9A227)",
+  color: "#0A0E1A",
+  border: "none",
+  borderRadius: 10,
+  padding: "11px 20px",
+  fontSize: 13,
+  fontWeight: 800,
+  cursor: "pointer",
+};
 
-  return (
-    <div style={{ position:'fixed',inset:0,zIndex:80,background:'rgba(0,0,0,0.65)',backdropFilter:'blur(5px)',animation:'fadeIn 0.15s' }} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{ position:'absolute',top:0,right:0,width:264,height:'100%',background:'#0E1520',borderLeft:'1px solid rgba(255,255,255,0.06)',padding:'56px 18px 36px',display:'flex',flexDirection:'column',animation:'slideIn 0.2s ease' }}>
-
-        {/* Avatar + name */}
-        <div style={{ display:'flex',flexDirection:'column',alignItems:'center',marginBottom:20 }}>
-          <div onClick={onAvatarChange} style={{ cursor:'pointer',position:'relative' }}>
-            <FootballAvatar nickname={user?.nickname||'?'} avatarId={user?.avatarId} size={68}/>
-            <div style={{ position:'absolute',bottom:0,right:0,width:20,height:20,borderRadius:'50%',background:'rgba(10,14,20,0.9)',border:'1px solid rgba(255,255,255,0.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11 }}>✏️</div>
-          </div>
-          <div style={{ fontSize:15,fontWeight:700,color:'#fff',marginTop:10 }}>{user?.nickname}</div>
-          <div style={{ fontSize:10,color:'rgba(255,255,255,0.28)' }}>{user?.email}</div>
-          <div style={{ fontSize:10,color:'rgba(255,255,255,0.2)',marginTop:3 }}>{av.name}</div>
-        </div>
-
-        {/* Stats */}
-        <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginBottom:20 }}>
-          {[{l:'Locul',v:myRank?`#${myRank}`:'—',c:'#FFD700'},{l:'Streak',v:streak?`🔥${streak}`:'—',c:'#FF9800'},{l:'Puncte',v:totalPts,c:'#00E5A0'}].map((s,i)=>(
-            <div key={i} style={{ background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:10,padding:'10px 6px',textAlign:'center' }}>
-              <div style={{ fontSize:15,fontWeight:800,color:s.c,fontFamily:"'DM Mono',monospace" }}>{s.v}</div>
-              <div style={{ fontSize:9,color:'rgba(255,255,255,0.22)',marginTop:2,letterSpacing:'0.05em' }}>{s.l}</div>
-            </div>
-          ))}
-        </div>
-        {specialPts > 0 && (
-          <div style={{ textAlign:'center', fontSize:11, color:'rgba(255,255,255,0.35)', marginBottom:10, fontFamily:"'DM Mono',monospace" }}>
-            meciuri {matchPts} + speciale <span style={{ color:'#FFD700', fontWeight:700 }}>⭐{specialPts}</span>
-          </div>
-        )}
-
-        {!FIREBASE_CONFIGURED && (
-          <div style={{ padding:'7px 10px',background:'rgba(245,158,11,0.07)',border:'1px solid rgba(245,158,11,0.15)',borderRadius:8,fontSize:10,color:'rgba(245,158,11,0.6)',marginBottom:16,lineHeight:1.4 }}>
-            ⚠️ Demo mode — configurează Firebase pentru auth real
-          </div>
-        )}
-
-        <div style={{ flex:1 }}/>
-
-        {isAdmin && (
-          <button onClick={onAdmin} style={{ width:'100%',padding:'11px 14px',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',borderRadius:11,color:'#EF4444',fontSize:12,fontWeight:700,cursor:'pointer',marginBottom:8,textAlign:'left' }}>
-            ⚙️ Panou Admin
-          </button>
-        )}
-        <button onClick={onLogout} style={{ width:'100%',padding:'11px 14px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:11,color:'rgba(255,255,255,0.45)',fontSize:12,fontWeight:600,cursor:'pointer',textAlign:'left' }}>
-          Deconectează-te
-        </button>
-        <div style={{ fontSize:9,color:'rgba(255,255,255,0.08)',textAlign:'center',marginTop:14 }}>World Cup Arena {APP_VERSION}</div>
-      </div>
-    </div>
-  );
-}
-
-// ─── APP ──────────────────────────────────────────────────────────────────────
-export default function App() {
-  const [stage,      setStage]      = useState('init');
-  const [googleUser, setGoogleUser] = useState(null);
-  const [user,       setUser]       = useState(null);
-  const [tab,        setTab]        = useState('matches');
-  const [adminMode,  setAdminMode]  = useState(false);
-  const [showProfile,setShowProfile]= useState(false);
-  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
-  const [predictions,setPredictions]= useState({});
-  const [predictingMatch, setPredictingMatch] = useState(null);
-  const [perfectHit, setPerfectHit] = useState(null);
-  const [finishedResults,  setFinishedResults]  = useState(() => loadAdminResults()); // persist across reloads
-  const [allPredictions,   setAllPredictions]   = useState({});
-  const [groupOverrides,   setGroupOverrides]   = useState(() => loadGroupOverrides()); // { uid: { matchId: pred } } — all users
-  const [allUsers,         setAllUsers]         = useState({}); // { uid: { nickname, avatarId, ... } }
-  const [allSpecialPreds,  setAllSpecialPreds]  = useState({}); // { uid: specialPredObject }
-  const [specialResults,   setSpecialResults]   = useState(null); // { winner, semifinalists, topScorerCountry }
-  const [activityFeed,     setActivityFeed]     = useState([]);
-  // prevLeaderboard: snapshot of leaderboard from BEFORE the most recent finishedResults change.
-  // FIX: previous implementation had a race condition between two useEffects sharing a ref —
-  // the cleanup-based snapshot could be overwritten before the finishedResults-effect read it.
-  // New approach: track previous finishedResults value directly; only update the snapshot
-  // when finishedResults has ACTUALLY changed (deep-ish check via JSON length/keys), and always
-  // snapshot the CURRENT leaderboard (computed from the OLD finishedResults, captured this render)
-  // before it flips to the new one.
-  const prevFinishedResultsRef = useRef(finishedResults);
-  const lastLeaderboardSnapshotRef = useRef([]);
-  const [prevLeaderboard,   setPrevLeaderboard]  = useState([]);
-
-  // ── Auth listener — sole gate into the app ───────────────────────────────
-  // Firestore subscriptions are opened ONLY after Firebase confirms a valid user.
-  // Opening them before auth causes "Missing or insufficient permissions" errors
-  // because Firestore rules require request.auth != null.
-  useEffect(() => {
-    // Guard: if Firebase env vars are missing, go straight to login immediately.
-    if (!FIREBASE_CONFIGURED) {
-      setStage('login');
-      return;
-    }
-
-    // Pick up Google redirect result if returning from signInWithRedirect.
-    firebaseGetRedirectResult().catch(console.error);
-
-    // Track Firestore data subscriptions so we can clean them up when user logs out.
-    let unsubResults = () => {};
-    let unsubPreds   = () => {};
-    let unsubUsers   = () => {};
-
-    const startSubscriptions = () => {
-      // Start realtime listeners — called only after auth confirms a valid user.
-      unsubResults = subscribeToMatchResults(results => setFinishedResults(results));
-      unsubPreds   = subscribeToPredictions(preds   => setAllPredictions(preds));
-      unsubUsers   = subscribeToUsers(users         => setAllUsers(users));
-      loadAllPredictions().then(setAllPredictions);
-      loadAllUsers().then(setAllUsers);
-      loadAllSpecialPredictions().then(setAllSpecialPreds);
-      loadSpecialResults().then(r => { if (r) setSpecialResults(r); });
-    };
-
-    const stopSubscriptions = () => {
-      unsubResults();
-      unsubPreds();
-      unsubUsers();
-      unsubResults = () => {};
-      unsubPreds   = () => {};
-      unsubUsers   = () => {};
-    };
-
-    // Auth state — sole gate into the app. Only real Firebase tokens allowed.
-    const unsubAuth = onFirebaseAuthChange(async (fbUser) => {
-      if (fbUser) {
-        // Start Firestore subscriptions now that we have an authenticated user.
-        startSubscriptions();
-
-        // Firebase authenticated user (Google or Email/Password)
-        const profile = await getUserProfile(fbUser.uid);
-        if (profile?.nickname) {
-          // Known user with a nickname — go straight to app
-          const fullUser = {
-            uid:      fbUser.uid,
-            email:    fbUser.email,
-            name:     fbUser.displayName || profile.nickname,
-            photoURL: fbUser.photoURL    || null,
-            provider: fbUser.providerData?.[0]?.providerId === 'google.com' ? 'google' : 'email',
-            ...profile,
-          };
-          setUser(fullUser);
-          setGoogleUser(fullUser);
-          persistSession(fullUser);
-          const preds = await loadUserPredictions(fbUser.uid);
-          setPredictions(preds);
-          setStage('app');
-          return;
-        } else {
-          // Firebase user exists but has no nickname yet → pick nickname
-          const partialUser = {
-            uid:      fbUser.uid,
-            email:    fbUser.email,
-            name:     fbUser.displayName || fbUser.email.split('@')[0],
-            photoURL: fbUser.photoURL    || null,
-            provider: fbUser.providerData?.[0]?.providerId === 'google.com' ? 'google' : 'email',
-          };
-          setGoogleUser(partialUser);
-          setStage('pick-nick');
-          return;
-        }
-      }
-
-      // No Firebase user (signed out).
-      // Stop Firestore subscriptions and clear state.
-      stopSubscriptions();
-      persistSession(null);
-      setUser(null);
-      setGoogleUser(null);
-      setPredictions({});
-      setAllPredictions({});
-      setAllUsers({});
-      setStage('login');
-    });
-
-    return () => { stopSubscriptions(); unsubAuth(); };
-  }, []);
-
-  // ── Computed state ────────────────────────────────────────────────────────
-  const liveMatches = buildMatches(finishedResults); // official WC only
-
-  // Single source of truth for current user's score
-  const myPredsByNumber = Object.fromEntries(Object.entries(predictions).map(([id,p])=>[Number(id),p]));
-  const mySpecialPred   = user?.uid ? (allSpecialPreds[user.uid] || null) : null;
-  const mySpecialPts    = calcSpecialPoints(mySpecialPred, specialResults);
-  const myScore         = calculateUserScore(myPredsByNumber, finishedResults, mySpecialPts);
-  const totalPts        = myScore.points;
-
-  // ── Leaderboard from real multi-user data ────────────────────────────────
-  // allPredictions: { uid: { matchId: pred } } — from all registered users
-  // allUsers:       { uid: { nickname, avatarId, ... } }
-  // Map uid → nickname for buildLeaderboard
-  const predsByNick = Object.entries(allPredictions).reduce((acc, [uid, preds]) => {
-    const nick = allUsers[uid]?.nickname || (uid === user?.uid ? user?.nickname : null);
-    if (nick) acc[nick] = Object.fromEntries(Object.entries(preds).map(([id,p])=>[Number(id),p]));
-    return acc;
-  }, {});
-  // Always include current user even if allPredictions hasn't caught up yet
-  if (user?.nickname) {
-    predsByNick[user.nickname] = Object.fromEntries(Object.entries(predictions).map(([id,p])=>[Number(id),p]));
-  }
-  const allSpecialPredsByNick = Object.entries(allSpecialPreds).reduce((acc, [uid, pred]) => {
-    const nick = allUsers[uid]?.nickname || (uid === user?.uid ? user?.nickname : null);
-    if (nick) acc[nick] = pred;
-    return acc;
-  }, {});
-  if (user?.uid && user?.nickname && allSpecialPreds[user.uid]) {
-    allSpecialPredsByNick[user.nickname] = allSpecialPreds[user.uid];
-  }
-  const leaderboard = buildLeaderboard(predsByNick, user?.nickname||'Me', liveMatches.filter(m=>m.isFinished), allSpecialPredsByNick, specialResults);
-  const myEntry     = leaderboard.find(p => p.nickname === user?.nickname);
-  const myRank      = myEntry?.rank;
-  const streak      = myEntry?.exactScores || 0;
-
-  // Regenerate activity feed whenever leaderboard or results change (useMemo for perf)
-  // FIX: hourSeed inside generateActivityFeed only changes if the memo recomputes.
-  // Without a time-based dependency, the feed stayed frozen for hours when no other
-  // state (leaderboard, predictions, etc.) changed — this tick forces a recompute
-  // every 5 minutes so rotating manele/quotes/curiosities actually rotate over time.
-  const [feedTick, setFeedTick] = useState(0);
-  useEffect(() => {
-    const interval = setInterval(() => setFeedTick(t => t + 1), 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const activityFeedComputed = useMemo(() => generateActivityFeed({
-    leaderboard,
-    prevLeaderboard,
-    finishedResults,
-    allPredictions,
-    allUsers,
-    matches: liveMatches,
-  }), [leaderboard, prevLeaderboard, finishedResults, allPredictions, allUsers, feedTick]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Handlers ─────────────────────────────────────────────────────────────
-  const handleSavePrediction = async (id, pred) => {
-    // Lock check: allow 'open' and 'soon' (modal already validates isEditable)
-    const targetMatch = liveMatches.find(m => m.id === Number(id));
-    if (targetMatch) {
-      const lockInfo = matchLockState(targetMatch);
-      if (lockInfo.state !== 'open' && lockInfo.state !== 'soon') {
-        throw new Error('Meciul este blocat. Predicția nu a fost salvată.');
-      }
-    }
-    if (!user?.uid) throw new Error('Trebuie să fii autentificat pentru a salva predicția.');
-
-    // Persist to Firestore first — throw on failure so modal can show the error
-    await savePrediction(user.uid, id, pred);
-
-    // Only update local state after Firestore confirms success
-    setPredictions(prev => ({ ...prev, [id]: pred }));
-
-    // Refresh global predictions so leaderboard and friends view update
-    const [allPredsSnapshot, allUsersSnapshot] = await Promise.all([loadAllPredictions(), loadAllUsers()]);
-    setAllPredictions(allPredsSnapshot);
-    setAllUsers(allUsersSnapshot);
-
-    const m = liveMatches.find(m => m.id === Number(id));
-    if (m?.isFinished) {
-      const b = calcBreakdown(pred, m);
-      if (b?.isPerfect) setPerfectHit({ pts:b.total });
-    }
-  };
-
-  // FIX (race condition repair): on every render, if finishedResults reference changed since
-  // last render, it means new results just came in — at THIS point `leaderboard` in scope
-  // still reflects state computed from render timing, so we snapshot the last KNOWN leaderboard
-  // (captured on the previous render, before this change) as prevLeaderboard. This removes the
-  // dependency on a cleanup-based ref that could race against re-renders triggered by unrelated
-  // state (e.g. allPredictions updates arriving close together).
-  useEffect(() => {
-    if (prevFinishedResultsRef.current !== finishedResults) {
-      setPrevLeaderboard(lastLeaderboardSnapshotRef.current);
-      prevFinishedResultsRef.current = finishedResults;
-    }
-    // Always keep the snapshot ref up to date with the latest leaderboard,
-    // so the NEXT finishedResults change has an accurate "before" state to compare against.
-    lastLeaderboardSnapshotRef.current = leaderboard;
-  }, [finishedResults, leaderboard]);
-
-  const handleMatchUpdate = useCallback(async (update) => {
-    if (update?._action === 'reset') {
-      setFinishedResults({});
-      setAllSpecialPreds({});
-      setSpecialResults(null);
-      return;
-    }
-    if (update?._action === 'lineup') {
-      setFinishedResults(prev => ({ ...prev }));
-      return;
-    }
-    if (update?._action === 'specialResults') {
-      loadAllSpecialPredictions().then(setAllSpecialPreds);
-      loadSpecialResults().then(r => { if (r) setSpecialResults(r); });
-      loadAllPredictions().then(setAllPredictions);
-      // Also reload THIS user's own predictions so PredictionModal joker count
-      // reflects jokerRepairs from specialResults/main. Without this, `predictions`
-      // stays stale and BogdanB/Pannnnn still see 2/2 available after repair.
-      if (user?.uid) loadUserPredictions(user.uid).then(setPredictions);
-      return;
-    }
-    setGroupOverrides(loadGroupOverrides());
-    const results = await loadMatchResults();
-    setFinishedResults(results);
-  }, []);
-
-  // handleLogin is called by LoginScreen after a successful Firebase sign-in.
-  // It does NOT set stage or user state — that is done exclusively by the
-  // onFirebaseAuthChange listener above, which is the single source of truth.
-  // This function exists only so LoginScreen has a callback to signal that
-  // the Firebase call completed without error (used for UI loading state reset).
-  // eslint-disable-next-line no-unused-vars
-  const handleLogin = (_authData) => {
-    // Intentionally empty: onFirebaseAuthChange handles all state transitions.
-    // Stage is set to 'app' or 'pick-nick' only from inside onFirebaseAuthChange.
-  };
-
-  const handleNickname = async (nick, avatarId) => {
-    const profile = { nickname:nick, avatarId };
-    await saveUserProfile(googleUser.uid, profile);
-    const fullUser = { ...googleUser, ...profile };
-    setUser(fullUser);
-    persistSession(fullUser);
-    setStage('app');
-  };
-
-  const handleLogout = () => {
-    signOut();
-    setUser(null); setGoogleUser(null); setPredictions({});
-    setAdminMode(false); setShowProfile(false);
-    setStage('login');
-  };
-
-  const handleAvatarChange = async (avatarId) => {
-    if (!user?.uid) return;
-    // Server-side uniqueness check: re-read allUsers to catch race conditions
-    const takenByOther = Object.entries(allUsers).some(
-      ([uid, u]) => uid !== user.uid && u.avatarId === avatarId
-    );
-    if (takenByOther) {
-      alert('Acest avatar a fost selectat de altcineva. Alege altul.');
-      return;
-    }
-    const updated = { ...user, avatarId };
-    await saveUserProfile(user.uid, { avatarId });
-    setUser(updated);
-    persistSession(updated);
-    // Refresh allUsers so other players see the change immediately
-    const [allPredsSnapshot, allUsersSnapshot] = await Promise.all([loadAllPredictions(), loadAllUsers()]);
-    setAllPredictions(allPredsSnapshot);
-    setAllUsers(allUsersSnapshot);
-    setShowAvatarPicker(false);
-  };
-
-  // ── Tabs ──────────────────────────────────────────────────────────────────
-  const TABS = [
-    { id:'matches',     label:'Meciuri',  icon:'⚽' },
-    { id:'leaderboard', label:'Clasament', icon:'🏆' },
-    { id:'bracket',     label:'Tablou',   icon:'🗂️' },
-    { id:'rules',       label:'Reguli',   icon:'📋' },
-  ];
-
-  // ── Render ────────────────────────────────────────────────────────────────
-  if (stage === 'init') return (
-    <><style>{CSS}</style>
-    <div style={{ minHeight:'100dvh',background:'#0A0E14',display:'flex',alignItems:'center',justifyContent:'center' }}>
-      <Spinner size={36} color="#00E5A0"/>
-    </div></>
-  );
-
-  if (stage === 'login') return (
-    <><style>{CSS}</style>
-    <div style={{ fontFamily:"'Space Grotesk','Syne',sans-serif" }}>
-      <LoginScreen onLogin={handleLogin}/>
-    </div></>
-  );
-
-  if (stage === 'pick-nick') return (
-    <><style>{CSS}</style>
-    <div style={{ fontFamily:"'Space Grotesk','Syne',sans-serif" }}>
-      <NicknameScreen googleUser={googleUser} onComplete={handleNickname}/>
-    </div></>
-  );
-
-  return (
-    <><style>{CSS}</style>
-    <div style={{ fontFamily:"'Space Grotesk','Syne',sans-serif",background:'#0A0E14',minHeight:'100dvh',color:'#fff',maxWidth:430,margin:'0 auto',display:'flex',flexDirection:'column',position:'relative' }}>
-
-      {/* ── Header ── */}
-      <div style={{ position:'sticky',top:0,zIndex:50,background:'rgba(10,14,20,0.97)',backdropFilter:'blur(20px)',borderBottom:'1px solid rgba(255,255,255,0.06)',padding:'10px 14px 9px',display:'flex',justifyContent:'space-between',alignItems:'center' }}>
-        <div>
-          <div style={{ fontSize:8,color:'rgba(212,175,55,0.45)',letterSpacing:'0.22em',textTransform:'uppercase',fontWeight:700,marginBottom:1 }}>FIFA World Cup 2026™</div>
-          <div style={{ display:'flex', alignItems:'center', gap:7 }}>
-            <div style={{ fontSize:17,fontWeight:800,color:'#fff',lineHeight:1.1,letterSpacing:'-0.02em' }}>World Cup Arena</div>
-            <div style={{ fontSize:8,fontWeight:800,color:'rgba(0,229,160,0.7)',background:'rgba(0,229,160,0.08)',border:'1px solid rgba(0,229,160,0.2)',padding:'2px 6px',borderRadius:5,letterSpacing:'0.06em',flexShrink:0 }}>v8 Firestore</div>
-          </div>
-        </div>
-        {/* Compact stats strip */}
-        <div style={{ display:'flex',alignItems:'center',gap:8 }}>
-          {(myRank || totalPts > 0) && (
-            <div style={{ display:'flex',alignItems:'center',gap:7,background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.09)',borderRadius:20,padding:'4px 10px' }}>
-              {myRank && <span style={{ fontSize:11,fontWeight:700,color:'#FFD700' }}>🏆 #{myRank}</span>}
-              {streak > 0 && <span style={{ fontSize:11,fontWeight:700,color:'#FF9800' }}>🔥{streak}</span>}
-              {totalPts > 0 && <span style={{ fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.7)',fontFamily:"'DM Mono',monospace" }}>⚡{totalPts}</span>}
-            </div>
-          )}
-          {[...ADMIN_EMAILS, ...ADMIN_EMAILS_RUNTIME].includes(user?.email) && !adminMode && (
-            <button
-              onClick={() => setAdminMode(true)}
-              style={{ padding:'5px 10px', background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.35)', borderRadius:20, color:'#EF4444', fontSize:11, fontWeight:800, cursor:'pointer', flexShrink:0 }}
-            >
-              ⚙️ Admin
-            </button>
-          )}
-          <div onClick={()=>setShowProfile(true)} style={{ cursor:'pointer', border:`2px solid ${adminMode?'rgba(239,68,68,0.5)':'rgba(255,255,255,0.1)'}`, borderRadius:'50%' }}>
-            <FootballAvatar nickname={user?.nickname||'?'} avatarId={user?.avatarId} size={30}/>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Admin banner ── */}
-      {adminMode && (
-        <div style={{ background:'rgba(239,68,68,0.07)',borderBottom:'1px solid rgba(239,68,68,0.14)',padding:'7px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:12,color:'rgba(239,68,68,0.8)' }}>
-          <span>⚙️ Admin Test Mode — luciavram87@gmail.com</span>
-          <span style={{ cursor:'pointer',opacity:0.6 }} onClick={()=>setAdminMode(false)}>× Ieși</span>
-        </div>
-      )}
-
-      {/* ── Content ── */}
-      <div style={{ flex:1,overflowY:'auto',paddingBottom:72 }}>
-        {adminMode
-          ? <AdminScreen currentUser={user} finishedResults={finishedResults} onMatchUpdate={handleMatchUpdate} specialResultsInit={specialResults} allSpecialPreds={allSpecialPreds} allUsers={allUsers} allPredictions={allPredictions}/>
-          : tab==='matches'
-          ? <MatchesScreen predictions={predictions} onPredict={setPredictingMatch} finishedResults={finishedResults} groupOverrides={groupOverrides} allPredictions={allPredictions} allUsers={allUsers} activityFeed={activityFeedComputed} user={user} specialResults={specialResults} allSpecialPreds={allSpecialPreds}/>
-          : tab==='leaderboard'
-          ? <LeaderboardScreen currentUser={user?.nickname} predictions={predictions} allPredictions={predsByNick} allUsers={allUsers} finishedResults={finishedResults} allSpecialPredsByNick={allSpecialPredsByNick} specialResults={specialResults}/>
-          : tab==='bracket'
-          ? <BracketScreen/>
-          : <HowToPlayScreen/>
-        }
-      </div>
-
-      {/* ── Bottom Tab Bar — slimmer ── */}
-      {!adminMode && (
-        <div style={{ position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:430,background:'rgba(10,14,20,0.97)',backdropFilter:'blur(24px)',borderTop:'1px solid rgba(255,255,255,0.06)',padding:'7px 8px 20px',display:'flex',justifyContent:'space-around',gap:2 }}>
-          {TABS.map(t => {
-            const active = tab === t.id;
-            return (
-              <button key={t.id} onClick={()=>setTab(t.id)} style={{ flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:2,background:'transparent',border:'none',cursor:'pointer',color:active?'#fff':'rgba(255,255,255,0.3)',transition:'all 0.15s',padding:'5px 2px',position:'relative' }}>
-                {active && <div style={{ position:'absolute',top:-7,left:'50%',transform:'translateX(-50%)',width:20,height:2,borderRadius:1,background:'#00E5A0' }}/>}
-                <span style={{ fontSize:18,lineHeight:1 }}>{t.icon}</span>
-                <span style={{ fontSize:8,fontWeight:active?700:400,letterSpacing:'0.06em',textTransform:'uppercase' }}>{t.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* ── Modals ── */}
-      {predictingMatch && (
-        <PredictionModal match={predictingMatch} existing={predictions[predictingMatch.id]} onSave={handleSavePrediction} onClose={()=>setPredictingMatch(null)} allUserPredictions={predictions}/>
-      )}
-      {perfectHit && <PerfectHitOverlay pts={perfectHit.pts} onDone={()=>setPerfectHit(null)}/>}
-      {showProfile && (
-        <ProfileDrawer user={user} totalPts={totalPts} matchPts={myScore.matchPoints||0} specialPts={mySpecialPts} myRank={myRank} streak={streak} onClose={()=>setShowProfile(false)} onLogout={handleLogout} onAdmin={()=>{setAdminMode(true);setShowProfile(false);}} onAvatarChange={()=>{setShowProfile(false);setShowAvatarPicker(true);}}/>
-      )}
-      {showAvatarPicker && (
-        <AvatarChangeModal
-          currentId={user?.avatarId}
-          takenAvatarIds={new Set(
-            Object.entries(allUsers)
-              .filter(([uid]) => uid !== user?.uid)
-              .map(([, u]) => u.avatarId)
-              .filter(Boolean)
-          )}
-          onSelect={handleAvatarChange}
-          onClose={()=>setShowAvatarPicker(false)}
-        />
-      )}
-
-    </div></>
-  );
-}
+const logoutBtnStyle = {
+  background: "#0D1220",
+  border: "1px solid #232B42",
+  color: "#8B93A8",
+  borderRadius: 10,
+  padding: "11px 20px",
+  fontSize: 13,
+  fontWeight: 700,
+  cursor: "pointer",
+};
