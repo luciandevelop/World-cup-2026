@@ -1,713 +1,362 @@
-// ─── src/screens/LeaderboardScreen.jsx ───────────────────────────────────────
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from "react";
+import { getCurrentSeason, getCurrentGameweek } from "../services/predictionsService";
 import {
-  CURRENT_STAGE,
-  buildLeaderboard,
-  buildMatches,
-  calcBreakdown,
-  formatKickoffRO,
-  getPredictionStyle,
-  getAvatarRing,
-  getRivalryMessage,
-  getPlayerForm,
-} from '../data/gameData.js';
-import { FootballAvatar } from '../components/UI.jsx';
-import { isSpecialLocked, isQFLocked, calcQFPoints, R16_MATCHES, isSFPredLocked, calcSFPoints, SF_MATCHES } from '../services/specialEventsService.js';
+  listGameweekScores,
+  listSeasonLeaderboard,
+  listGeneralLeaderboard,
+  listenLiveGameweekScores,
+  getLastCompletedGameweek,
+  getPlayerCardStats,
+  listGameweeks,
+} from "../services/adminService";
+import { getUserPublicProfiles } from "../services/profilesService";
+import PlayerCard from "../components/PlayerCard";
+import PageHeader from "../components/PageHeader";
+import PlayerRankRow from "../components/PlayerRankRow";
+import StatusBadge from "../components/StatusBadge";
+import EmptyState from "../components/EmptyState";
+import { color, font, layout, radius } from "../theme";
 
-function normalizePredMap(preds = {}) {
-  return Object.fromEntries(
-    Object.entries(preds || {}).map(([id, p]) => [Number(id), p])
-  );
+// Normalizează rândurile la aceeași formă, indiferent dacă vin din
+// gameweekLiveScores (userId, document sanitizat de admin) sau din
+// gameweekScores (userId, scris definitiv la finalizare).
+function normalizeRow(r) {
+  return {
+    uid: r.userId,
+    rank: r.rank,
+    pointsFromMatches: r.pointsFromMatches,
+    rankingBonus: r.rankingBonus,
+    totalPoints: r.totalPoints,
+  };
 }
 
+export default function LeaderboardScreen({ onBack, user }) {
+  const [tab, setTab] = useState("gameweek"); // gameweek | season | general
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-// ─── PLAYER DETAIL MODAL ─────────────────────────────────────────────────────
-// Full-screen slide-up modal showing one player's predictions + points breakdown.
-// Only shows finished matches (isFinished=true) — predictions for open/upcoming
-// matches are never revealed here, same rule as Friends tab.
-function PlayerDetailModal({ nickname, avatarId, rank, points, exactScores,
-                              allPredictions, finishedMatches, onClose, specialPred = null, specialResults = null }) {
-  // Build this player's prediction map (normalised to numeric keys)
-  const preds = useMemo(() => {
-    const raw = allPredictions[nickname] || {};
-    return Object.fromEntries(Object.entries(raw).map(([id, p]) => [Number(id), p]));
-  }, [nickname, allPredictions]);
+  const [season, setSeason] = useState(null);
+  const [gameweek, setGameweek] = useState(null); // etapa curentă SAU ultima finalizată (fallback)
+  const [usedFallback, setUsedFallback] = useState(false);
+  const [gwRows, setGwRows] = useState([]);
+  const [gwLive, setGwLive] = useState(false);
 
-  // Only finished matches where the player has a prediction, newest first
-  const matchRows = useMemo(() =>
-    finishedMatches
-      .filter(m => preds[m.id])
-      .sort((a, b) => new Date(b.time) - new Date(a.time))
-      .map(m => {
-        const pred = preds[m.id];
-        const b    = calcBreakdown(pred, m);
-        return { match:m, pred, b };
-      }),
-    [finishedMatches, preds]
-  );
+  const [seasonRows, setSeasonRows] = useState([]);
+  const [generalRows, setGeneralRows] = useState([]);
+  const [profiles, setProfiles] = useState({});
 
-  const ptColor = (v) => v > 0 ? '#00E5A0' : 'rgba(255,255,255,0.2)';
+  // Etape anterioare — sub etapa curentă, fiecare se deschide DOAR la
+  // apăsare (nu se încarcă toate dinainte, ca să nu tragem degeaba date
+  // pentru etape pe care nimeni nu le mai deschide).
+  const [pastGameweeks, setPastGameweeks] = useState([]);
+  const [expandedGwId, setExpandedGwId] = useState("");
+  const [expandedGwRows, setExpandedGwRows] = useState({}); // cache: gwId -> rows
+  const [expandedGwLoading, setExpandedGwLoading] = useState("");
+
+  const [openUid, setOpenUid] = useState("");
+  const [cardStats, setCardStats] = useState(null);
+  const [cardLoading, setCardLoading] = useState(false);
+
+  // Setup inițial — sezon curent, etapă (curentă sau ultima finalizată,
+  // dacă nu există una a cărei săptămână conține azi), clasament sezon,
+  // clasament general. Etapa live e gestionată separat mai jos.
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const s = await getCurrentSeason();
+        setSeason(s);
+
+        if (s) {
+          let gw = await getCurrentGameweek(s.id);
+          let fallback = false;
+          if (!gw) {
+            gw = await getLastCompletedGameweek(s.id);
+            fallback = true;
+          }
+          setGameweek(gw);
+          setUsedFallback(fallback);
+
+          if (gw && gw.status === "completed") {
+            const rows = (await listGameweekScores(gw.id)).map(normalizeRow);
+            setGwRows(rows);
+            setGwLive(false);
+            const p = await getUserPublicProfiles(rows.map((r) => r.uid));
+            setProfiles((prev) => ({ ...prev, ...p }));
+          }
+
+          // Etape anterioare — doar lista (titlu + id), fără punctaje încă.
+          // Punctajele fiecărei etape se aduc STRICT la apăsare (vezi
+          // toggleExpandGw mai jos) — nu tragem degeaba date pentru etape
+          // pe care nimeni nu le deschide.
+          const allGws = await listGameweeks(s.id);
+          const past = allGws
+            .filter((g) => g.status === "completed" && g.id !== gw?.id)
+            .sort((a, b) => Number(b.number) - Number(a.number));
+          setPastGameweeks(past);
+
+          const sRows = await listSeasonLeaderboard(s.id);
+          setSeasonRows(sRows);
+          const p2 = await getUserPublicProfiles(sRows.map((r) => r.uid));
+          setProfiles((prev) => ({ ...prev, ...p2 }));
+        }
+
+        const general = await listGeneralLeaderboard();
+        setGeneralRows(general);
+      } catch (err) {
+        console.error(err);
+        setError(err.message || err.code);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [user?.uid]);
+
+  // Clasament LIVE — doar dacă etapa "curentă" (nu fallback) e chiar
+  // în desfășurare, nu deja finalizată.
+  useEffect(() => {
+    if (!gameweek || gameweek.status === "completed") return;
+    setGwLive(true);
+    const unsubscribe = listenLiveGameweekScores(gameweek.id, async (rawRows) => {
+      const rows = rawRows.map(normalizeRow);
+      setGwRows(rows);
+      const names = await getUserPublicProfiles(rows.map((r) => r.uid));
+      setProfiles((prev) => ({ ...prev, ...names }));
+    });
+    return unsubscribe;
+  }, [gameweek?.id, gameweek?.status]);
+
+  // Un singur card, indiferent din ce tab a fost apăsat — aceleași
+  // statistici (etapă/sezon/general), citite din aceeași sursă.
+  // O etapă anterioară se deschide DOAR la apăsare — dacă e deja deschisă,
+  // apăsarea o închide (accordion simplu). Rândurile se aduc o singură
+  // dată per etapă (cache local) — a doua deschidere nu mai cere Firestore.
+  async function toggleExpandGw(gw) {
+    if (expandedGwId === gw.id) {
+      setExpandedGwId("");
+      return;
+    }
+    setExpandedGwId(gw.id);
+    if (expandedGwRows[gw.id]) return; // deja în cache
+    setExpandedGwLoading(gw.id);
+    try {
+      const rows = (await listGameweekScores(gw.id)).map(normalizeRow);
+      setExpandedGwRows((prev) => ({ ...prev, [gw.id]: rows }));
+      const p = await getUserPublicProfiles(rows.map((r) => r.uid));
+      setProfiles((prev) => ({ ...prev, ...p }));
+    } catch (err) {
+      console.error("Eroare la încărcarea etapei anterioare:", err);
+    } finally {
+      setExpandedGwLoading("");
+    }
+  }
+
+  // `contextGwId` — etapa DIN CARE s-a apăsat rândul, nu mereu etapa
+  // curentă. BUG REPARAT: rândurile din accordion-ul "Etape anterioare"
+  // apelau asta fără să spună din ce etapă vin, deci cardul încerca
+  // mereu să arate meciurile etapei curente — dacă jucătorul ăla nu avea
+  // date acolo, lista ieșea goală, chiar dacă chiar avea meciuri în etapa
+  // pe care tocmai o deschisese.
+  async function handleOpenPlayer(uid, rank, contextGwId = gameweek?.id) {
+    // Card-ul de jucător e un sub-ecran din perspectiva Back-ului — Android
+    // Back trebuie să-l închidă întâi, nu să sară direct la Home. Se
+    // împinge o intrare de istoric LOCALĂ acestui ecran (nu afectează
+    // App.jsx), simetrică cu popstate-ul de mai jos.
+    window.history.pushState({ leaderboardPlayerCard: uid }, "");
+    setOpenUid(uid);
+    setCardStats(null);
+    setCardLoading(true);
+    try {
+      const stats = await getPlayerCardStats(uid, season?.id, contextGwId);
+      setCardStats({ ...stats, rank });
+    } catch (err) {
+      console.error("Eroare la încărcarea cardului:", err);
+    } finally {
+      setCardLoading(false);
+    }
+  }
+
+  // Închiderea din UI (✕) trece prin ACELAȘI drum ca Android Back —
+  // history.back() — nu setOpenUid("") direct. Popstate-ul de mai jos
+  // face efectiv închiderea, o singură sursă de adevăr pentru amândouă.
+  function closePlayerCard() {
+    window.history.back();
+  }
+
+  useEffect(() => {
+    function onPopState(event) {
+      if (!event.state?.leaderboardPlayerCard) {
+        setOpenUid("");
+      }
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  const scoredCount = gwRows.length;
 
   return (
-    <div
-      onClick={e => e.target === e.currentTarget && onClose()}
-      style={{ position:'fixed', inset:0, zIndex:100, background:'rgba(0,0,0,0.88)',
-               backdropFilter:'blur(6px)', display:'flex', flexDirection:'column',
-               justifyContent:'flex-end', animation:'fadeIn 0.15s' }}
-    >
-      <div style={{ background:'#0D1318', borderRadius:'20px 20px 0 0',
-                    border:'1px solid rgba(255,255,255,0.08)', borderBottom:'none',
-                    maxHeight:'92dvh', display:'flex', flexDirection:'column',
-                    animation:'slideUp 0.28s ease' }}>
+    <div style={layout.page}>
+      <div style={layout.wrap}>
+        <PageHeader title="Clasament" onBack={onBack} />
 
-        {/* ── Header ── */}
-        <div style={{ padding:'14px 16px 10px', borderBottom:'1px solid rgba(255,255,255,0.06)',
-                      display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
-          <FootballAvatar nickname={nickname} avatarId={avatarId} size={46}/>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:16, fontWeight:900, color:'#fff' }}>{nickname}</div>
-            <div style={{ fontSize:11, color:'rgba(255,255,255,0.35)', marginTop:1 }}>
-              Locul #{rank} · {points} puncte · {exactScores} scoruri exacte
-            </div>
-          </div>
-          <button onClick={onClose}
-            style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)',
-                     borderRadius:10, padding:'7px 12px', color:'rgba(255,255,255,0.6)',
-                     fontSize:13, cursor:'pointer', fontWeight:700 }}>
-            ✕
+        <div style={s.tabRow}>
+          <button style={{ ...s.tabBtn, ...(tab === "gameweek" ? s.tabBtnActive : {}) }} onClick={() => setTab("gameweek")}>
+            Etapă
+          </button>
+          <button style={{ ...s.tabBtn, ...(tab === "season" ? s.tabBtnActive : {}) }} onClick={() => setTab("season")}>
+            Sezon
+          </button>
+          <button style={{ ...s.tabBtn, ...(tab === "general" ? s.tabBtnActive : {}) }} onClick={() => setTab("general")}>
+            General
           </button>
         </div>
 
-        {/* ── Match list ── */}
-        <div style={{ overflowY:'auto', padding:'10px 14px 28px', flex:1 }}>
-          {matchRows.length === 0 && (
-            <div style={{ textAlign:'center', color:'rgba(255,255,255,0.2)', fontSize:13,
-                          paddingTop:32 }}>
-              Nicio predicție înregistrată pentru meciuri finalizate.
-            </div>
-          )}
+        {loading && <div style={s.centerBox}>Se încarcă…</div>}
+        {error && <div style={s.centerBox}>Eroare: {error}</div>}
 
-          {matchRows.map(({ match:m, pred, b }) => {
-            const rA = Number(m.realScoreA), rB = Number(m.realScoreB);
-            const pA = Number(pred.scoreA), pB = Number(pred.scoreB);
-            const isExact = b?.exactScore === 100;
-
-            return (
-              <div key={m.id} style={{ marginBottom:10, borderRadius:14,
-                border:`1px solid ${isExact ? 'rgba(0,229,160,0.25)' : 'rgba(255,255,255,0.07)'}`,
-                background: isExact ? 'rgba(0,229,160,0.03)' : 'rgba(255,255,255,0.02)',
-                overflow:'hidden' }}>
-
-                {/* Match header */}
-                <div style={{ padding:'9px 12px 7px', borderBottom:'1px solid rgba(255,255,255,0.05)',
-                              display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <div>
-                    <div style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.8)' }}>
-                      {m.flagA} {m.teamA} vs {m.teamB} {m.flagB}
-                    </div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', marginTop:1 }}>
-                      {formatKickoffRO(m.time)}
-                      {m.group && m.group !== 'AMICALE' ? ` · Grupa ${m.group}` : ''}
-                    </div>
-                  </div>
-                  {/* Total pts badge */}
-                  <div style={{ textAlign:'right', flexShrink:0 }}>
-                    {/* Joker badge — display-only, same condition as MatchesScreen:
-                        usedJoker===true AND match.stage is a knockout stage. */}
-                    {pred.usedJoker === true && ['R32','R16','QF'].includes(m.stage) && (
-                      <div style={{ fontSize:9, fontWeight:800, color:"#FF6B00", background:"rgba(255,107,0,0.12)", border:"1px solid rgba(255,107,0,0.3)", padding:"1px 6px", borderRadius:6, letterSpacing:"0.02em", whiteSpace:"nowrap", marginBottom:3 }}>
-                        🔥 JOKER ×2
-                      </div>
-                    )}
-                    <div style={{ fontSize:18, fontWeight:900, fontFamily:"'DM Mono',monospace",
-                                  color: b?.total > 0 ? '#FFD700' : 'rgba(255,255,255,0.25)' }}>
-                      {b?.total ?? '—'}
-                    </div>
-                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)' }}>pts</div>
-                  </div>
-                </div>
-
-                {/* Scores row */}
-                <div style={{ padding:'8px 12px 6px', display:'flex', gap:8, alignItems:'center' }}>
-                  {/* Prediction */}
-                  <div style={{ flex:1, textAlign:'center' }}>
-                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.3)', marginBottom:2 }}>
-                      PREDICȚIE
-                    </div>
-                    <div style={{ fontSize:20, fontWeight:900, fontFamily:"'DM Mono',monospace",
-                                  color: isExact ? '#00E5A0' : '#fff' }}>
-                      {pA} – {pB}
-                    </div>
-                  </div>
-                  <div style={{ fontSize:11, color:'rgba(255,255,255,0.2)' }}>vs</div>
-                  {/* Real result */}
-                  <div style={{ flex:1, textAlign:'center' }}>
-                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.3)', marginBottom:2 }}>
-                      REAL
-                    </div>
-                    <div style={{ fontSize:20, fontWeight:900, fontFamily:"'DM Mono',monospace",
-                                  color:'rgba(255,255,255,0.7)' }}>
-                      {rA} – {rB}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Points breakdown */}
-                {b && (
-                  <div style={{ padding:'4px 12px 10px',
-                                display:'grid', gridTemplateColumns:'1fr 1fr 1fr',
-                                gap:'4px 8px', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
-                    {[
-                      { label:'Scor exact',  val: b.exactScore },
-                      { label:'Rezultat',    val: b.correctRes },
-                      { label:'Total goluri',val: b.totalGoals },
-                      {
-                        label: `Cart (${pred.possession ?? '—'} vs ${m.realPossession ?? '—'})`,
-                        val: b.possession,
-                      },
-                      {
-                        label: `Cor (${pred.corners ?? '—'} vs ${m.realCorners ?? '—'})`,
-                        val: b.corners,
-                      },
-                      b.isPerfect ? { label:'⭐ Perfect', val:'+bonus', special:true } : null,
-                    ].filter(Boolean).map(({ label, val, special }) => (
-                      <div key={label} style={{ padding:'4px 0' }}>
-                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)',
-                                      lineHeight:1.3, whiteSpace:'nowrap', overflow:'hidden',
-                                      textOverflow:'ellipsis' }}>
-                          {label}
-                        </div>
-                        <div style={{ fontSize:12, fontWeight:800,
-                                      color: special ? '#FFD700' : ptColor(Number(val) || 0),
-                                      fontFamily:"'DM Mono',monospace" }}>
-                          {special ? val : `+${val}`}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+        {!loading && !error && tab === "gameweek" && (
+          <div style={s.list}>
+            {!gameweek && <EmptyState icon="📅" title="Încă nu există nicio etapă." />}
+            {gameweek && gwRows.length === 0 && (
+              <EmptyState icon="🏆" title={`Etapa "${gameweek.title}" nu are încă rezultate introduse.`} />
+            )}
+            {gameweek && gwRows.length > 0 && (
+              <div style={s.liveRow}>
+                {gwLive ? (
+                  <StatusBadge tone="live" dot>LIVE · {scoredCount} jucători</StatusBadge>
+                ) : (
+                  <StatusBadge tone="gold">{gameweek.title}{usedFallback ? " · ultima finalizată" : " · FINAL"}</StatusBadge>
                 )}
               </div>
-            );
-          })}
+            )}
+            {gwRows.map((r) => (
+              <PlayerRankRow
+                key={r.uid}
+                rank={r.rank}
+                nickname={profiles[r.uid]?.nickname || r.uid}
+                avatarId={profiles[r.uid]?.avatarId}
+                pointsFromMatches={r.pointsFromMatches}
+                rankingBonus={r.rankingBonus}
+                totalPoints={r.totalPoints}
+                top3={r.rank <= 3}
+                showBonus={!gwLive}
+                onClick={() => handleOpenPlayer(r.uid, r.rank)}
+              />
+            ))}
 
-          <div style={{ textAlign:'center', fontSize:10, color:'rgba(255,255,255,0.1)',
-                        paddingTop:8 }}>
-            {matchRows.length} meciuri finalizate cu predicții
-          </div>
-
-          {/* ── Special predictions — read-only, shown only when locked ── */}
-          {isSpecialLocked() && (
-            <div style={{ marginTop:16, padding:'12px 14px', background:'rgba(255,215,0,0.04)',
-                          border:'1px solid rgba(255,215,0,0.15)', borderRadius:10 }}>
-              <div style={{ fontSize:11, fontWeight:800, color:'#FFD700',
-                            letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:10 }}>
-                ⭐ Predicții speciale
-              </div>
-              {!specialPred ? (
-                <div style={{ fontSize:12, color:'rgba(255,255,255,0.3)', fontStyle:'italic' }}>
-                  Nu a completat predicțiile speciale.
-                </div>
-              ) : (
-                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-
-                  {/* Câștigătoare */}
-                  {(() => {
-                    const picked = specialPred.winner || null;
-                    const real   = specialResults?.winner || null;
-                    const cor    = real && picked === real;
-                    const wrg    = real && picked && picked !== real;
-                    return (
-                      <div style={{ padding:'7px 9px', borderRadius:8,
-                        background: cor?'rgba(0,229,160,0.07)':wrg?'rgba(239,68,68,0.06)':'rgba(255,255,255,0.03)',
-                        border:`1px solid ${cor?'rgba(0,229,160,0.15)':wrg?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.05)'}` }}>
-                        <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:3 }}>🏆 Campioană · 500 pts</div>
-                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                          <span style={{ fontSize:13, fontWeight:700, color: cor?'#00E5A0':wrg?'#EF4444':'#fff' }}>
-                            {picked || '—'}
-                          </span>
-                          {cor && <span style={{ fontSize:11, fontWeight:700, color:'#00E5A0' }}>✅ +500</span>}
-                          {wrg && <span style={{ fontSize:11, fontWeight:700, color:'#EF4444' }}>❌ +0 <span style={{fontSize:9,opacity:0.7}}>({real})</span></span>}
-                          {!real && picked && <span style={{ fontSize:10, color:'rgba(255,180,0,0.7)' }}>⏳</span>}
+            {pastGameweeks.length > 0 && (
+              <div style={s.pastSection}>
+                <div style={s.pastSectionLabel}>Etape anterioare</div>
+                {pastGameweeks.map((gw) => {
+                  const isOpen = expandedGwId === gw.id;
+                  const rows = expandedGwRows[gw.id] || [];
+                  const isLoadingThis = expandedGwLoading === gw.id;
+                  return (
+                    <div key={gw.id} style={s.pastGwBlock}>
+                      <button type="button" style={s.pastGwHeader} onClick={() => toggleExpandGw(gw)}>
+                        <span>{gw.title}</span>
+                        <span style={{ ...s.pastGwChevron, transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+                      </button>
+                      {isOpen && (
+                        <div style={s.pastGwBody}>
+                          {isLoadingThis && <div style={s.centerBox}>Se încarcă…</div>}
+                          {!isLoadingThis && rows.map((r) => (
+                            <PlayerRankRow
+                              key={r.uid}
+                              rank={r.rank}
+                              nickname={profiles[r.uid]?.nickname || r.uid}
+                              avatarId={profiles[r.uid]?.avatarId}
+                              pointsFromMatches={r.pointsFromMatches}
+                              rankingBonus={r.rankingBonus}
+                              totalPoints={r.totalPoints}
+                              top3={r.rank <= 3}
+                              showBonus={true}
+                              onClick={() => handleOpenPlayer(r.uid, r.rank, gw.id)}
+                            />
+                          ))}
                         </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Semifinaliste */}
-                  {(() => {
-                    const picked = specialPred.semifinalists || [];
-                    const real   = specialResults?.semifinalists || [];
-                    const hasReal = real.length > 0;
-                    const correct = picked.filter(t => real.includes(t));
-                    const pts = correct.length * 200;
-                    return (
-                      <div style={{ padding:'7px 9px', borderRadius:8,
-                        background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)' }}>
-                        <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:5 }}>
-                          🥈 Semifinaliste · 200 pts / echipă
-                          {hasReal && pts > 0 && <span style={{ color:'#FFD700', marginLeft:6, fontWeight:700 }}>+{pts}</span>}
-                          {!hasReal && <span style={{ color:'rgba(255,180,0,0.6)', marginLeft:6 }}>⏳</span>}
-                        </div>
-                        <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-                          {picked.length > 0 ? picked.map(team => {
-                            const cor = hasReal && real.includes(team);
-                            const wrg = hasReal && !real.includes(team);
-                            return (
-                              <span key={team} style={{
-                                fontSize:11, padding:'3px 8px', borderRadius:6, fontWeight:600,
-                                background: cor?'rgba(0,229,160,0.12)':wrg?'rgba(239,68,68,0.1)':'rgba(255,255,255,0.07)',
-                                color: cor?'#00E5A0':wrg?'#EF4444':'rgba(255,255,255,0.7)',
-                                border:`1px solid ${cor?'rgba(0,229,160,0.25)':wrg?'rgba(239,68,68,0.2)':'rgba(255,255,255,0.08)'}`,
-                              }}>
-                                {cor?'✓ ':wrg?'✗ ':''}{team}
-                              </span>
-                            );
-                          }) : <span style={{ color:'rgba(255,255,255,0.25)', fontStyle:'italic', fontSize:12 }}>—</span>}
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Golgheter */}
-                  {(() => {
-                    const picked = specialPred.topScorerCountry || null;
-                    const real   = specialResults?.topScorerCountry || null;
-                    const cor    = real && picked === real;
-                    const wrg    = real && picked && picked !== real;
-                    return (
-                      <div style={{ padding:'7px 9px', borderRadius:8,
-                        background: cor?'rgba(0,229,160,0.07)':wrg?'rgba(239,68,68,0.06)':'rgba(255,255,255,0.03)',
-                        border:`1px solid ${cor?'rgba(0,229,160,0.15)':wrg?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.05)'}` }}>
-                        <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:3 }}>⚽ Țara golgheterului · 300 pts</div>
-                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                          <span style={{ fontSize:13, fontWeight:700, color: cor?'#00E5A0':wrg?'#EF4444':'#fff' }}>
-                            {picked || '—'}
-                          </span>
-                          {cor && <span style={{ fontSize:11, fontWeight:700, color:'#00E5A0' }}>✅ +300</span>}
-                          {wrg && <span style={{ fontSize:11, fontWeight:700, color:'#EF4444' }}>❌ +0 <span style={{fontSize:9,opacity:0.7}}>({real})</span></span>}
-                          {!real && picked && <span style={{ fontSize:10, color:'rgba(255,180,0,0.7)' }}>⏳</span>}
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                </div>
-              )}
-            </div>
-          )}
-          {/* ── Calificate în Sferturi — read-only after lock ── */}
-          {isQFLocked() && specialPred?.quarterFinalists && (
-            <div style={{ marginTop:12, padding:'12px 14px', background:'rgba(255,255,255,0.02)',
-                          border:'1px solid rgba(255,255,255,0.07)', borderRadius:10 }}>
-              <div style={{ fontSize:11, fontWeight:800, color:'rgba(255,255,255,0.6)',
-                            letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:10 }}>
-                🏆 Calificate în Sferturi
-              </div>
-              {(() => {
-                const qfPts  = calcQFPoints(specialPred, specialResults);
-                const realQF = specialResults?.quarterFinalists || {};
-                const entered = Object.keys(realQF).length;  // how many results admin has entered
-                return (
-                  <>
-                    {/* Per-match rows: ✅ correct | ❌ wrong | ⏳ pending */}
-                    <div style={{ display:'flex', flexDirection:'column', gap:5, marginBottom:12 }}>
-                      {R16_MATCHES.map(m => {
-                        const picked     = qfPts.repairedQF[m.id];  // use repaired picks
-                        const realWin    = realQF[m.id];
-                        const hasResult  = !!realWin;
-                        const correct    = hasResult && picked === realWin;
-                        const wrong      = hasResult && picked && picked !== realWin;
-                        const pending    = !hasResult;
-                        const pickedFlag = picked === m.home ? m.homeFlag : picked === m.away ? m.awayFlag : '';
-                        return (
-                          <div key={m.id} style={{
-                            borderRadius:8, overflow:'hidden',
-                            border:`1px solid ${correct?'rgba(0,229,160,0.15)':wrong?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.05)'}`,
-                          }}>
-                            <div style={{ padding:'4px 8px', background:'rgba(255,255,255,0.02)',
-                              fontSize:10, color:'rgba(255,255,255,0.4)' }}>
-                              {m.homeFlag} {m.home} vs {m.awayFlag} {m.away}
-                            </div>
-                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
-                              padding:'5px 8px',
-                              background: correct?'rgba(0,229,160,0.07)':wrong?'rgba(239,68,68,0.06)':'rgba(255,255,255,0.01)' }}>
-                              <span style={{ fontSize:11, fontWeight:600,
-                                color: picked ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)',
-                                fontStyle: picked ? 'normal' : 'italic' }}>
-                                {picked ? <>{pickedFlag} {picked}</> : '— nepredis'}
-                              </span>
-                              {pending && <span style={{ fontSize:11, color:'rgba(255,180,0,0.7)' }}>⏳ În așteptare</span>}
-                              {correct && <span style={{ fontSize:11, fontWeight:700, color:'#00E5A0' }}>✅ +50</span>}
-                              {wrong && (
-                                <span style={{ fontSize:11, fontWeight:700, color:'#EF4444' }}>
-                                  ❌ +0 <span style={{ fontSize:9, opacity:0.7 }}>({realWin})</span>
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
+                      )}
                     </div>
-
-                    {/* Live summary card */}
-                    {entered > 0 && (
-                      <div style={{
-                        padding:'10px 12px', borderRadius:10,
-                        background:'rgba(255,255,255,0.03)',
-                        border:'1px solid rgba(255,255,255,0.08)',
-                      }}>
-                        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
-                          <span style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>Calificate corecte:</span>
-                          <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>
-                            {qfPts.correct} / {entered}
-                          </span>
-                        </div>
-                        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
-                          <span style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>Puncte calificări:</span>
-                          <span style={{ fontSize:11, fontWeight:700, color:'#FFD700' }}>+{qfPts.base}</span>
-                        </div>
-                        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
-                          <span style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>Bonus:</span>
-                          {qfPts.allDone ? (
-                            <span style={{ fontSize:11, fontWeight:700,
-                              color: qfPts.bonus > 0 ? '#00E5A0' : 'rgba(255,255,255,0.35)' }}>
-                              {qfPts.bonus > 0 ? `+${qfPts.bonus}` : '—'}
-                            </span>
-                          ) : (
-                            <span style={{ fontSize:11, color:'rgba(255,180,0,0.6)', fontStyle:'italic' }}>
-                              Se acordă după toate cele 8 rezultate
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ borderTop:'1px solid rgba(255,255,255,0.07)', paddingTop:7,
-                          display:'flex', justifyContent:'space-between' }}>
-                          <span style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.7)' }}>
-                            {qfPts.allDone ? 'TOTAL:' : 'TOTAL momentan:'}
-                          </span>
-                          <span style={{ fontSize:12, fontWeight:900, color:'#FFD700' }}>
-                            +{qfPts.total}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-          )}
-
-          {/* ── Calificate în Semifinale — read-only after lock ── */}
-          {isSFPredLocked() && specialPred?.qualifiedToSemis && (
-            <div style={{ marginTop:12, padding:'12px 14px', background:'rgba(255,255,255,0.02)',
-                          border:'1px solid rgba(255,255,255,0.07)', borderRadius:10 }}>
-              <div style={{ fontSize:11, fontWeight:800, color:'rgba(255,255,255,0.6)',
-                            letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:10 }}>
-                🏅 Calificate în Semifinale
-              </div>
-              {(() => {
-                const sfPts  = calcSFPoints(specialPred, specialResults);
-                const realSF = specialResults?.qualifiedToSemis || {};
-                const entered = Object.keys(realSF).length;
-                return (
-                  <>
-                    <div style={{ display:'flex', flexDirection:'column', gap:5, marginBottom:10 }}>
-                      {SF_MATCHES.map(m => {
-                        const picked     = specialPred.qualifiedToSemis[m.id];
-                        const realWin    = realSF[m.id];
-                        const hasResult  = !!realWin;
-                        const correct    = hasResult && picked === realWin;
-                        const wrong      = hasResult && picked && picked !== realWin;
-                        const pickedFlag = picked === m.home ? m.homeFlag : picked === m.away ? m.awayFlag : '';
-                        return (
-                          <div key={m.id} style={{ borderRadius:8, overflow:'hidden',
-                            border:`1px solid ${correct?'rgba(0,229,160,0.15)':wrong?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.05)'}` }}>
-                            <div style={{ padding:'4px 8px', background:'rgba(255,255,255,0.02)', fontSize:10, color:'rgba(255,255,255,0.4)' }}>
-                              {m.homeFlag} {m.home} vs {m.awayFlag} {m.away}
-                            </div>
-                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px',
-                              background:correct?'rgba(0,229,160,0.07)':wrong?'rgba(239,68,68,0.06)':'rgba(255,255,255,0.01)' }}>
-                              <span style={{ fontSize:11, fontWeight:600, color:picked?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.3)', fontStyle:picked?'normal':'italic' }}>
-                                {picked?<>{pickedFlag} {picked}</>:'— nepredis'}
-                              </span>
-                              {!hasResult && <span style={{ fontSize:11, color:'rgba(255,180,0,0.7)' }}>⏳ În așteptare</span>}
-                              {correct    && <span style={{ fontSize:11, fontWeight:700, color:'#00E5A0' }}>✅ +100</span>}
-                              {wrong      && <span style={{ fontSize:11, fontWeight:700, color:'#EF4444' }}>❌ +0 <span style={{fontSize:9,opacity:0.7}}>({realWin})</span></span>}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {entered > 0 && (
-                      <div style={{ padding:'10px 12px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)' }}>
-                        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
-                          <span style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>Calificate corecte:</span>
-                          <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{sfPts.correct} / {entered}</span>
-                        </div>
-                        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
-                          <span style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>Puncte calificări:</span>
-                          <span style={{ fontSize:11, fontWeight:700, color:'#FFD700' }}>+{sfPts.base}</span>
-                        </div>
-                        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
-                          <span style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>Bonus:</span>
-                          {sfPts.allDone
-                            ? <span style={{ fontSize:11, fontWeight:700, color:sfPts.bonus>0?'#00E5A0':'rgba(255,255,255,0.35)' }}>{sfPts.bonus>0?`+${sfPts.bonus}`:'—'}</span>
-                            : <span style={{ fontSize:11, color:'rgba(255,180,0,0.6)', fontStyle:'italic' }}>Se acordă după toate 4 rezultate</span>}
-                        </div>
-                        <div style={{ borderTop:'1px solid rgba(255,255,255,0.07)', paddingTop:7, display:'flex', justifyContent:'space-between' }}>
-                          <span style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.7)' }}>{sfPts.allDone?'TOTAL:':'TOTAL momentan:'}</span>
-                          <span style={{ fontSize:12, fontWeight:900, color:'#FFD700' }}>+{sfPts.total}</span>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-          )}
-
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default function LeaderboardScreen({
-  currentUser = '',
-  predictions = {},
-  allPredictions = {},
-  finishedResults = {},
-  allUsers = {},
-  allSpecialPredsByNick = {},
-  specialResults = null,
-}) {
-  const currentNickname =
-    typeof currentUser === 'string'
-      ? currentUser
-      : (currentUser?.nickname || currentUser?.displayName || currentUser?.email || '');
-
-  const [selectedPlayer, setSelectedPlayer] = useState(null); // nickname of tapped player
-
-  // Build nickname→avatarId map from allUsers for accurate avatar display
-  const avatarByNick = useMemo(() => {
-    const map = {};
-    Object.values(allUsers).forEach(u => {
-      if (u?.nickname && u?.avatarId) map[u.nickname] = u.avatarId;
-    });
-    return map;
-  }, [allUsers]);
-
-  const data = useMemo(() => {
-    try {
-      const safeFinishedResults = finishedResults || {};
-      const liveMatches = buildMatches(safeFinishedResults); // official WC only
-      const finishedMatches = liveMatches.filter(m => m && m.isFinished);
-      const finishedCount = finishedMatches.length;
-
-      const myPreds = normalizePredMap(predictions);
-      const normalizedAllPreds = Object.fromEntries(
-        Object.entries(allPredictions || {}).map(([nick, preds]) => [nick, normalizePredMap(preds)])
-      );
-
-      const allPlayerPreds = {
-        ...normalizedAllPreds,
-        ...(currentNickname ? { [currentNickname]: myPreds } : {}),
-      };
-
-      const sorted = buildLeaderboard(allPlayerPreds, currentNickname || 'Me', finishedMatches, allSpecialPredsByNick, specialResults);
-      return { sorted, finishedCount, error: null };
-    } catch (err) {
-      console.error('LEADERBOARD CRASH', err);
-      return { sorted: [], finishedCount: 0, error: err?.message || String(err) };
-    }
-  }, [currentUser, currentNickname, predictions, allPredictions, finishedResults, allSpecialPredsByNick, specialResults]);
-
-  const { sorted, finishedCount, error } = data;
-  const total = sorted.length;
-
-  const my = sorted.find(p => p.nickname === currentNickname)
-    || { rank: '?', points: 0, exactScores: 0, lastMatchPts: null, qualified: true };
-
-  const medals = ['🥇', '🥈', '🥉'];
-
-  const getPrevRanks = () => {
-    try { return JSON.parse(sessionStorage.getItem('prevRanks') || '{}'); } catch { return {}; }
-  };
-  const prevRanks = getPrevRanks();
-  const getMovement = (nick, rank) => {
-    const prev = prevRanks[nick];
-    return prev != null ? prev - rank : 0;
-  };
-
-  const movements = sorted.map(p => ({ nick: p.nickname, mov: getMovement(p.nickname, p.rank) }));
-  const climber = movements.reduce((best, x) => x.mov > best.mov ? x : best, { mov: -Infinity });
-  const dropper = movements.reduce((best, x) => x.mov < best.mov ? x : best, { mov: Infinity });
-
-  if (error) {
-    return (
-      <div style={{ padding: '16px 14px' }}>
-        <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 14, padding: 14, color: '#FF6B6B' }}>
-          <div style={{ fontWeight: 900, marginBottom: 6 }}>Leaderboard temporarily unavailable</div>
-          <div style={{ fontSize: 11, opacity: 0.8 }}>{error}</div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <>
-    <div style={{ padding: '0 14px' }}>
-      <div style={{ display: 'flex', gap: 6, marginTop: 12, marginBottom: 14 }}>
-        {[
-          { label: 'Jucători', value: total },
-          { label: 'Top 3', value: Math.min(total, 3) },
-          { label: 'Meciuri ✓', value: finishedCount },
-          { label: 'Etapă', value: CURRENT_STAGE, wide: true },
-        ].map((s, i) => (
-          <div key={i} style={{ flex: s.wide ? 2 : 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 8px 6px', textAlign: 'center' }}>
-            <div style={{ fontSize: s.wide ? 10 : 15, fontWeight: 800, color: '#fff', fontFamily: s.wide ? 'inherit' : "'DM Mono',monospace", lineHeight: 1 }}>{s.value}</div>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', marginTop: 3, letterSpacing: '0.04em' }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {(() => {
-        const rivalry = getRivalryMessage(my.rank, my.points, sorted, currentNickname);
-        const myStyle = getPredictionStyle(my.exactScores, my.points, my.exactScores);
-        return (
-          <div style={{ background: 'linear-gradient(135deg,rgba(212,175,55,0.1),rgba(212,175,55,0.04))', border: '1px solid rgba(212,175,55,0.18)', borderRadius: 18, padding: '16px 18px', marginBottom: 14, animation: 'fadeUp 0.3s ease both' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <FootballAvatar nickname={currentNickname} avatarId={avatarByNick[currentNickname]} size={48}/>
-                <div>
-                  <div style={{ fontSize: 9, color: 'rgba(212,175,55,0.4)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 2 }}>Tu ești</div>
-                  <div style={{ fontSize: 32, fontWeight: 900, color: '#FFD700', fontFamily: "'DM Mono',monospace", lineHeight: 1 }}>#{my.rank}</div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{currentNickname}</div>
-                  <div style={{ marginTop: 5, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    <span style={{ fontSize: 10 }}>{myStyle.icon}</span>
-                    <span style={{ fontSize: 9, fontWeight: 700, color: myStyle.color, letterSpacing: '0.03em' }}>{myStyle.label}</span>
-                  </div>
-                </div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 36, fontWeight: 900, color: '#FFD700', fontFamily: "'DM Mono',monospace", lineHeight: 1 }}>{my.points}</div>
-                <div style={{ fontSize: 9, color: 'rgba(212,175,55,0.3)', letterSpacing: '0.06em' }}>PUNCTE</div>
-                {my.lastMatchPts !== null && <div style={{ fontSize: 11, color: '#00E5A0', marginTop: 3, fontWeight: 700 }}>+{my.lastMatchPts} ultimul meci</div>}
-
-              </div>
-            </div>
-            {rivalry && (
-              <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 7 }}>
-                <span style={{ fontSize: 14 }}>{rivalry.urgency === 'high' ? '🔥' : rivalry.urgency === 'medium' ? '⚠' : '👀'}</span>
-                <span style={{ fontSize: 11, color: rivalry.urgency === 'high' ? '#FF9800' : rivalry.urgency === 'medium' ? '#FFC107' : 'rgba(255,255,255,0.35)', fontWeight: rivalry.urgency === 'high' ? 700 : 400, lineHeight: 1.4 }}>{rivalry.text}</span>
+                  );
+                })}
               </div>
             )}
           </div>
-        );
-      })()}
+        )}
 
-      {climber.mov > 0 && dropper.mov < 0 && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-          <div style={{ flex: 1, background: 'rgba(0,229,160,0.05)', border: '1px solid rgba(0,229,160,0.12)', borderRadius: 12, padding: '9px 12px' }}>
-            <div style={{ fontSize: 9, color: 'rgba(0,229,160,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>↑ Urcuș</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#00E5A0' }}>{climber.nick}</div>
-            <div style={{ fontSize: 10, color: 'rgba(0,229,160,0.5)' }}>+{climber.mov} locuri 🚀</div>
+        {!loading && !error && tab === "season" && (
+          <div style={s.list}>
+            {seasonRows.length === 0 && <EmptyState icon="🏆" title="Sezonul ăsta nu are încă etape finalizate." />}
+            {seasonRows.map((r, i) => (
+              <PlayerRankRow
+                key={r.uid}
+                rank={i + 1}
+                nickname={profiles[r.uid]?.nickname || r.uid}
+                avatarId={profiles[r.uid]?.avatarId}
+                totalPoints={r.totalPoints}
+                top3={i < 3}
+                onClick={() => handleOpenPlayer(r.uid, i + 1)}
+              />
+            ))}
           </div>
-          <div style={{ flex: 1, background: 'rgba(255,107,107,0.05)', border: '1px solid rgba(255,107,107,0.12)', borderRadius: 12, padding: '9px 12px' }}>
-            <div style={{ fontSize: 9, color: 'rgba(255,107,107,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>↓ Cădere</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#FF6B6B' }}>{dropper.nick}</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,107,107,0.5)' }}>{dropper.mov} locuri 💀</div>
+        )}
+
+        {!loading && !error && tab === "general" && (
+          <div style={s.list}>
+            {generalRows.length === 0 && <EmptyState icon="🏆" title="Niciun user încă." />}
+            {generalRows.map((r, i) => (
+              <PlayerRankRow
+                key={r.uid}
+                rank={i + 1}
+                nickname={r.nickname || r.uid}
+                avatarId={r.avatarId}
+                totalPoints={r.seasonPoints || 0}
+                top3={i < 3}
+                onClick={() => handleOpenPlayer(r.uid, i + 1)}
+              />
+            ))}
           </div>
-        </div>
-      )}
-
-      {sorted.map((e, i) => {
-        const isMe = e.nickname === currentNickname;
-        const mov = getMovement(e.nickname, e.rank);
-        const pStyle = getPredictionStyle(e.exactScores, e.points, e.exactScores);
-        const ring = getAvatarRing(pStyle);
-
-        return (
-          <div key={e.nickname || i}>
-            <div onClick={() => setSelectedPlayer(e.nickname)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', borderRadius: 14, marginBottom: 6, background: isMe ? 'rgba(212,175,55,0.07)' : 'rgba(255,255,255,0.035)', border: `1px solid ${isMe ? 'rgba(212,175,55,0.22)' : 'rgba(255,255,255,0.06)'}`, animation: `staggerIn 0.35s ${Math.min(i,10)*0.04}s both`, cursor:'pointer' }}>
-              <div style={{ width: 24, textAlign: 'center', fontSize: i < 3 ? 18 : 11, color: i < 3 ? '#fff' : 'rgba(255,255,255,0.25)', fontWeight: 700, flexShrink: 0 }}>
-                {i < 3 ? medals[i] : e.rank}
-              </div>
-
-              <div style={{ position: 'relative', flexShrink: 0 }}>
-                <div style={{ padding: 2, borderRadius: '50%', background: ring, display: 'inline-flex' }}>
-                  <FootballAvatar nickname={e.nickname} avatarId={avatarByNick[e.nickname]} size={34}/>
-                </div>
-                {isMe && <div style={{ position: 'absolute', bottom: -1, right: -1, width: 10, height: 10, borderRadius: '50%', background: '#FFD700', border: '2px solid #0A0E14' }}/>} 
-              </div>
-
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: isMe ? '#FFD700' : '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {e.nickname}
-                </div>
-                {(() => {
-                  const form = getPlayerForm(e.nickname, e.exactScores, mov);
-                  return form
-                    ? <div style={{ fontSize: 9, color: form.color, marginTop: 2, fontWeight: 700 }}>{form.icon} {form.text}</div>
-                    : <div style={{ fontSize: 9, color: pStyle.color, marginTop: 2, opacity: 0.5, fontWeight: 600 }}>{pStyle.icon} {pStyle.label}</div>;
-                })()}
-              </div>
-
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: 16, fontWeight: 900, fontFamily: "'DM Mono',monospace", color: i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : 'rgba(255,255,255,0.5)', lineHeight: 1 }}>
-                  {e.points}
-                </div>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', marginTop: 1 }}>🎯 {e.exactScores}</div>
-                {mov !== 0 && (
-                  <div style={{ fontSize: 10, fontWeight: 700, color: mov > 0 ? '#00E5A0' : '#FF6B6B', animation: 'popIn 0.35s cubic-bezier(0.34,1.56,0.64,1)' }}>
-                    {mov > 0 ? `↑${mov}` : `↓${Math.abs(mov)}`}
-                  </div>
-                )}
-              </div>
-            </div>
-
-
-          </div>
-        );
-      })}
-
-      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.1)', textAlign: 'center', marginTop: 10, paddingBottom: 8 }}>
-        Actualizat după fiecare meci · {finishedCount} meciuri finalizate ⚡
+        )}
       </div>
-    </div>
 
-    {/* Player detail modal */}
-    {selectedPlayer && (() => {
-      const entry = sorted.find(p => p.nickname === selectedPlayer);
-      return (
-        <PlayerDetailModal
-          nickname={selectedPlayer}
-          avatarId={avatarByNick[selectedPlayer]}
-          rank={entry?.rank ?? '?'}
-          points={entry?.points ?? 0}
-          exactScores={entry?.exactScores ?? 0}
-          allPredictions={
-            (() => {
-              // Merge allPredictions (nick-keyed) with current user's own preds
-              const normalised = Object.fromEntries(
-                Object.entries(allPredictions || {}).map(([n, p]) =>
-                  [n, Object.fromEntries(Object.entries(p || {}).map(([id, v]) => [Number(id), v]))]
-                )
-              );
-              if (currentNickname) {
-                normalised[currentNickname] = Object.fromEntries(
-                  Object.entries(predictions || {}).map(([id, v]) => [Number(id), v])
-                );
-              }
-              return normalised;
-            })()
-          }
-          finishedMatches={buildMatches(finishedResults).filter(m => m.isFinished)}
-          specialPred={allSpecialPredsByNick[selectedPlayer] || null}
-          specialResults={specialResults}
-          onClose={() => setSelectedPlayer(null)}
+      {openUid && !cardLoading && cardStats && (
+        <PlayerCard
+          uid={openUid}
+          nickname={profiles[openUid]?.nickname || openUid}
+          avatarId={profiles[openUid]?.avatarId}
+          rank={cardStats.rank}
+          stats={cardStats}
+          onClose={closePlayerCard}
         />
-      );
-    })()}
-    </>
+      )}
+    </div>
   );
 }
+
+const s = {
+  tabRow: { display: "flex", gap: 8, marginBottom: 16 },
+  tabBtn: {
+    flex: 1, background: color.surfaceInset, border: `1px solid ${color.border}`, color: color.textMuted,
+    borderRadius: radius.sm, padding: "10px 0", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: font.body,
+  },
+  tabBtnActive: { background: color.goldGradient, color: color.goldOn, border: "none" },
+  centerBox: { textAlign: "center", color: color.textMuted, fontSize: 13.5, padding: "30px 16px" },
+  liveRow: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
+  list: { display: "flex", flexDirection: "column", gap: 7 },
+
+  pastSection: { marginTop: 14, display: "flex", flexDirection: "column", gap: 6 },
+  pastSectionLabel: {
+    fontSize: 10, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase",
+    color: color.textFaint, marginBottom: 2, fontFamily: font.body,
+  },
+  pastGwBlock: { background: color.surfaceInset, border: `1px solid ${color.border}`, borderRadius: radius.md, overflow: "hidden" },
+  pastGwHeader: {
+    width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+    background: "none", border: "none", padding: "11px 14px", cursor: "pointer",
+    fontSize: 12.5, fontWeight: 700, color: color.textPrimary, fontFamily: font.body,
+  },
+  pastGwChevron: { color: color.textFaint, fontSize: 11, transition: "transform 200ms ease" },
+  pastGwBody: { padding: "0 8px 8px", display: "flex", flexDirection: "column", gap: 6 },
+};
