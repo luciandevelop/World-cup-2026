@@ -1,1324 +1,4341 @@
-// ─── src/screens/AdminScreen.jsx ─────────────────────────────────────────────
-// Real admin panel — gated by ADMIN_EMAILS.
-// Results persist in localStorage so the test flow works across page reloads.
-// PRODUCTION: replace localStorage.setItem calls with Firestore/Supabase writes.
-// ─────────────────────────────────────────────────────────────────────────────
-
-import { useState, useMemo, useEffect } from 'react';
-import { ScoreInput } from '../components/UI.jsx';
+import { useEffect, useState } from "react";
+import { doc, getDoc, collection, getDocs, query, where, updateDoc, serverTimestamp, runTransaction } from "firebase/firestore";
+import { db, auth } from "../firebase";
+import { listAllSpecialCompetitions, listSpecialPhases, openSpecialPhase, closeSpecialPhase, resolveSpecialPhase, listAllSpecialPicksForPhases, SPECIALS_EDITION_ID, migrateSpecialPhasesToEdition } from "../services/specialsService";
+import { PICK_TYPES, getPhaseDefinition } from "../specialDefinitions";
+import { resolveTeamOptions } from "../teamRegistry";
+import SpecialResolvePicker from "../components/SpecialResolvePicker";
+import SpecialsCompletionOverview from "../components/SpecialsCompletionOverview";
+import useNow from "../hooks/useNow";
+import { getMatchStatus } from "../utils/matchStatus";
 import {
-  MATCHES, ADMIN_EMAILS, ADMIN_EMAILS_RUNTIME,
-  formatKickoffRO, buildGroupStandings, buildQualifiedTeams, buildMatches, calcBreakdown,
-} from '../data/gameData.js';
-import { ALL_GROUPS } from '../data/matches.js';
-import { saveMatchResult, REALTIME_MODE, adminRepairSetJokerViaSpecialResults } from '../services/firestoreService.js'; // resetTestData removed
-import { saveSpecialResults, resetSpecialData, WC_TEAMS, R16_MATCHES, saveQFResults, repairQFPicks, SF_MATCHES, saveSFResults, calcSFPoints } from '../services/specialEventsService.js';
-import { sendPasswordReset } from '../services/emailAuth.js';
+  createSeason,
+  listSeasons,
+  createOrGetWeeklyGameweek,
+  listGameweeks,
+  bulkCreateMatches,
+  listMatches,
+  resetAllTestData, migrateSpecialPointsFromScores,
+  setFeaturedMatches,
+  deleteMatch,
+  saveMatchResult,
+  updateMatchStatus,
+  previewGameweekResults,
+  listActiveUserIds,
+  publishLiveScores,
+  finalizeGameweek,
+  listAllMatches,
+  runMatchHealthCheck,
+  updateMatch,
+  listAllUsers, getPlayerStatus, listJokersForGameweek,
+  getPlayerCardStats,
+  republishAllMatchPointsForGameweek,
+  listGameweekScoresForStats,
+} from "../services/adminService";
+import { getUserPublicProfiles, updateOwnAvatar } from "../services/profilesService";
+import { claimNickname } from "../services/authService";
+import { getCurrentSeason, getCurrentGameweek } from "../services/predictionsService";
+import { COMPETITION_THEMES } from "../competitionThemes";
+import CompetitionLogo from "../components/CompetitionLogo";
+import MatchCard from "../components/MatchCard";
+import MatchResultCard from "../components/MatchResultCard";
+import PlayerCard from "../components/PlayerCard";
+import PageHeader from "../components/PageHeader";
+import SectionCard from "../components/SectionCard";
+import StatusBadge from "../components/StatusBadge";
+import { generatePlayLeagueBackup, downloadBackupJson } from "../services/backupService";
+import PlayerRankRow from "../components/PlayerRankRow";
+import EmptyState from "../components/EmptyState";
+import {
+  listRecentEventsForAdmin, listAdminFunItems, addFunItem, deleteFunItem, deleteAllLiveMatchEvents,
+  regenerateCurrentGameweekFeed, processLiveRankChangesCapped, processTeamDuelPulse, processRankChanges,
+  publishManualFeedNews, deleteManualFeedNews, listRecentManualNews,
+  processPendingFinishedMatchesFeed, processSurpriseCreated, processSurpriseMatchup, processSurpriseResult,
+  processUpcomingMatches, processClubFactsForMatchGuarded,
+  publishFeedEvent, ignoreFeedEvent, setFeedEventPriority,
+} from "../services/feedService";
+import { activateGameweekStory, deactivateGameweekStory, activateSeasonStory, deactivateSeasonStory, storyKey } from "../services/storyService";
+import {
+  generateBetBuilderDuels, getBetBuilder, setMatchQuestions, activateBetBuilder,
+  resolveQuestion, resolveTiebreaker, resolveAllDuels,
+  getBetBuilderSubmissionStatus, BET_BUILDER_DEADLINE_HOURS,
+} from "../services/betBuilderService";
+import BetBuilderScreen from "./BetBuilderScreen";
+import {
+  generateHigherLower, getHigherLower, setHigherLowerQuestions, activateHigherLower,
+  resolveHigherLowerQuestion, revealHigherLowerTiebreakers, resolveAllHigherLowerDuels, computeRealGoalsTotal,
+  getHigherLowerSubmissionStatus,
+} from "../services/higherLowerService";
+import { HIGHER_LOWER_PREVIEW_STATES } from "../higherLowerMockData";
+import HigherLowerScreen from "./HigherLowerScreen";
+import { TREASURE_HUNT_PREVIEW_STATES } from "../treasureHuntMockData";
+import TreasureHuntScreen from "./TreasureHuntScreen";
+import PenaltyPreviewScreen from "./PenaltyPreviewScreen";
+import { slideUrl, seasonNumberFromList } from "../storyAssets";
+import StoryViewer from "../components/StoryViewer";
+import { EDITORIAL_ARTICLES } from "../feedContent/editorialContent";
+import LiveEventPanel from "../components/LiveEventPanel";
+import {
+  listAllUsersWithStatus, approveUser, rejectUser, deactivateUser, reactivateUser, getMissingPredictionsForMatch,
+} from "../services/adminService";
+import {
+  MAIN_CATALOG, BONUS_CATALOG, getWeeklySurprise, getSecretMain, getSecretBonus,
+  configureSurprise, revealMain, revealBonus, resolveMain, resolveBonus, getSurpriseStatus, revealRemainingMysteryBoxes,
+  configureTriviaQuestions, markTriviaCorrectAnswer, getTriviaSubmissionStatus, setTriviaLocked, publishTriviaAnswers,
+  configureZaruriQuestions, markZaruriTarget, getZaruriSubmissionStatus,
+  getSabotajPublicProgress, revealSabotajNetwork, undoLastSabotajChoice,
+  getPenaltySubmittedUids,
+} from "../services/surprisesService";
+import { DUEL_THEMES, getFighterUrl } from "../assets/fighters";
+import DuelExperience from "../components/DuelExperience";
+import TeamDuelExperience from "../components/TeamDuelExperience";
+import DuelFighterPortrait from "../components/DuelFighterPortrait";
+import PlayerAvatar from "../components/PlayerAvatar";
+import { color, font, layout, radius } from "../theme";
 
-// localStorage key for admin-set results (shared across all users on same device)
-const RESULTS_KEY   = 'wc2026_admin_results';
-const OVERRIDES_KEY = 'wc2026_group_overrides';
+// Ordonare operațională pentru secțiunea de Rezultate: meciurile FĂRĂ
+// rezultat introdus încă vin primele (sortate după kickoffAt), apoi cele
+// care au deja rezultat salvat (tot sortate după kickoffAt). Nu inventăm
+// un status "live" — nu există sursă live, doar kickoffAt + existența
+// rezultatului.
+// Prioritate obligatorie pentru tab-ul Rezultate: LIVE/Pauză primele
+// (permanent), apoi programate (cronologic), apoi finalizate — jos. Bug
+// real semnalat: un meci LIVE "se pierdea" mai jos în listă în timpul
+// serii, cât Admin actualiza manual scorurile și avea nevoie să ajungă
+// instant la el. ACEASTA e funcția chiar folosită la randare (linia
+// resultsOrderedMatches = sortForResults(filteredMatches)) — nu una nouă,
+// separată, care ar fi fost calculată degeaba.
+const STATUS_PRIORITY = { live: 0, paused: 0, scheduled: 1, finished: 2, postponed: 1, cancelled: 2 };
+function sortForResults(matches) {
+  return [...matches].sort((a, b) => {
+    const pa = STATUS_PRIORITY[getMatchStatus(a)] ?? 1;
+    const pb = STATUS_PRIORITY[getMatchStatus(b)] ?? 1;
+    if (pa !== pb) return pa - pb;
+    return a.kickoffAt.toMillis() - b.kickoffAt.toMillis();
+  });
+}
 
-export function loadAdminResults() {
-  try { return JSON.parse(localStorage.getItem(RESULTS_KEY)) || {}; } catch { return {}; }
-}
-function saveAdminResults(results) {
-  localStorage.setItem(RESULTS_KEY, JSON.stringify(results));
-}
-export function loadGroupOverrides() {
-  try { return JSON.parse(localStorage.getItem(OVERRIDES_KEY)) || {}; } catch { return {}; }
-}
-function saveGroupOverrides(overrides) {
-  localStorage.setItem(OVERRIDES_KEY, JSON.stringify(overrides));
+function matchesSearch(m, term) {
+  if (!term.trim()) return true;
+  const t = term.trim().toLowerCase();
+  return (m.homeTeam || "").toLowerCase().includes(t) || (m.awayTeam || "").toLowerCase().includes(t);
 }
 
-const STATUS_OPTIONS = [
-  { value:'scheduled', label:'Planificat', color:'#4A9EFF' },
-  { value:'live',      label:'🔴 Live',    color:'#EF4444' },
-  { value:'ht',        label:'⏸ Pauză',   color:'#F59E0B' },
-  { value:'ft',        label:'✓ Final',    color:'#00E5A0' },
-  { value:'locked',    label:'🔒 Blocat',  color:'#6B7280' },
+const TABS = [
+  { id: "results", label: "Rezultate" },
+  { id: "live", label: "Live" },
+  { id: "featured", label: "Săptămânii" },
+  { id: "speciale", label: "Speciale" },
+  { id: "surprises", label: "🎭 Surprize" },
+  { id: "feed", label: "Feed" },
+  { id: "players", label: "👥 Jucători" },
+  { id: "stats", label: "📊 Statistici etape" },
+  { id: "health", label: "Health Check" },
+  { id: "config", label: "Config" },
 ];
 
-
-// ─── ADMIN HELP SECTION ──────────────────────────────────────────────────────
-function AdminHelp({ open, onToggle }) {
-  if (!open) return (
-    <button onClick={onToggle} style={{ width:"100%", padding:"8px 12px", background:"rgba(74,158,255,0.06)", border:"1px solid rgba(74,158,255,0.15)", borderRadius:10, color:"rgba(74,158,255,0.7)", fontSize:11, fontWeight:700, cursor:"pointer", textAlign:"left", marginBottom:10 }}>
-      ? Ghid testare admin
-    </button>
-  );
-
-  const Section = ({ title, children }) => (
-    <div style={{ marginBottom:12 }}>
-      <div style={{ fontSize:10, fontWeight:800, color:"rgba(255,255,255,0.55)", textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:6 }}>{title}</div>
-      {children}
-    </div>
-  );
-  const Step = ({ n, text }) => (
-    <div style={{ display:"flex", gap:8, marginBottom:4 }}>
-      <div style={{ width:18, height:18, borderRadius:"50%", background:"rgba(255,255,255,0.08)", fontSize:9, fontWeight:700, color:"rgba(255,255,255,0.4)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>{n}</div>
-      <div style={{ fontSize:11, color:"rgba(255,255,255,0.45)", lineHeight:1.5 }}>{text}</div>
-    </div>
-  );
-
-  return (
-    <div style={{ background:"rgba(74,158,255,0.04)", border:"1px solid rgba(74,158,255,0.15)", borderRadius:12, padding:"12px 14px", marginBottom:12, animation:"fadeUp 0.18s ease" }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-        <div style={{ fontSize:11, fontWeight:800, color:"rgba(74,158,255,0.8)" }}>Ghid testare admin</div>
-        <button onClick={onToggle} style={{ background:"none", border:"none", color:"rgba(255,255,255,0.3)", fontSize:16, cursor:"pointer", padding:2 }}>x</button>
-      </div>
-
-      <Section title="A) Acces admin">
-        <Step n="1" text="Adauga email-ul tau in src/data/gameData.js la ADMIN_EMAILS, sau seteaza VITE_ADMIN_EMAILS in Vercel." />
-        <Step n="2" text="Logheaza-te cu acel email. Apasa avatarul (dreapta sus) -> Panou Admin." />
-        <Step n="3" text="Butonul admin apare DOAR daca emailul este in lista." />
-      </Section>
-
-      <Section title="B) Testare clasamente">
-        <Step n="1" text="Selecteaza un meci din lista. Ex: Gr.A -> Mexic vs Africa de Sud." />
-        <Step n="2" text="Seteaza scorul (ex: 2-0) si Status: Final (FT)." />
-        <Step n="3" text="Apasa Salveaza rezultat. Clasamentul Gr.A se actualizeaza imediat." />
-        <Step n="4" text="Repeta pentru mai multe meciuri din acelasi grup." />
-        <Step n="5" text="Apasa Recalculeaza clasamente pentru a vedea calificatii." />
-        <Step n="6" text="Sectiunea Tabloul Calificarilor arata castigatorii, locurile 2 si cele mai bune locuri 3." />
-      </Section>
-
-      <Section title="C) Testare echipe oficiale">
-        <Step n="1" text="Selecteaza un meci -> Adauga / actualizeaza echipe." />
-        <Step n="2" text="Completeaza formatia si XI titular (un jucator pe rand: 1. Portar)." />
-        <Step n="3" text="Bifeaza Echipa OFICIALA (FIFA Match Centre)." />
-        <Step n="4" text="Salveaza. Deschide meciul din tab Meciuri -> tab Echipe." />
-        <Step n="5" text="Echipa oficiala inlocuieste prognoza cu 45 min inainte de start." />
-        <Step n="6" text="Inainte de 45 min se afiseaza echipa Bulinews (prognozata)." />
-      </Section>
-
-      <Section title="D) Reset date test">
-        <Step n="1" text="Apasa Reset rezultate test pentru a sterge toate scorurile salvate." />
-        <Step n="2" text="Pentru linii oficiale: DevTools -> localStorage.removeItem('wc2026_lineups')" />
-        <Step n="3" text="Reset complet: DevTools -> Object.keys(localStorage).filter(k=>k.startsWith('wc2026_')).forEach(k=>localStorage.removeItem(k)); location.reload()" />
-      </Section>
-    </div>
-  );
+// Starea vizuală instant a unei faze — 🟢/🟡/🔴/⚪/✅, exact ca în
+// exemplul lui Lu. Pură, testabilă separat de UI.
+function specialPhaseStatusInfo(state, now) {
+  if (!state) return { dot: "⚪", text: "Neactivată" };
+  if (state.status === "resolved") return { dot: "✅", text: "Rezolvată" };
+  if (state.status === "closed") return { dot: "🔴", text: "Închisă — în așteptarea rezultatului" };
+  // "open"
+  const closesAtMs = state.closesAt?.toMillis ? state.closesAt.toMillis() : state.closesAt;
+  const msLeft = closesAtMs ? closesAtMs - now : null;
+  if (msLeft != null && msLeft <= 0) return { dot: "🔴", text: "Închisă — în așteptarea rezultatului" };
+  if (msLeft != null && msLeft < 3 * 86400000) {
+    const days = Math.max(1, Math.round(msLeft / 86400000));
+    return { dot: "🟡", text: `Se închide peste ${days} ${days === 1 ? "zi" : "zile"}` };
+  }
+  return { dot: "🟢", text: "Deschisă" };
 }
 
-export default function AdminScreen({ currentUser, finishedResults, onMatchUpdate, specialResultsInit = null, allUsers = {}, allPredictions = {}, allSpecialPreds = {} }) {
-  const [sel,     setSel]    = useState(null);
-  const [specialRes, setSpecialRes] = useState(
-    specialResultsInit
-      ? { winner:specialResultsInit.winner||'', semifinalists:specialResultsInit.semifinalists||[], topScorerCountry:specialResultsInit.topScorerCountry||'' }
-      : { winner:'', semifinalists:[], topScorerCountry:'' }
-  );
-  const [specialMsg, setSpecialMsg] = useState('');
-  const [qfSel, setQFSel]       = useState(specialResultsInit?.quarterFinalists || {});
-  const [qfMsg, setQFMsg]       = useState('');
-  const [sfSel, setSFSel]       = useState(specialResultsInit?.qualifiedToSemis || {});
-  const [sfMsg, setSFMsg]       = useState('');
-
-  // Sync qfSel and sfSel whenever specialResultsInit is updated by App.jsx
-  // (happens after save + onMatchUpdate reloads specialResults from Firestore).
-  // useState initial value is only used at mount, so we need this effect
-  // to keep the UI in sync with what's actually in Firestore.
-  useEffect(() => {
-    if (specialResultsInit?.quarterFinalists) setQFSel(specialResultsInit.quarterFinalists);
-    if (specialResultsInit?.qualifiedToSemis) setSFSel(specialResultsInit.qualifiedToSemis);
-    if (specialResultsInit) setSpecialRes({
-      winner:           specialResultsInit.winner           || '',
-      semifinalists:    specialResultsInit.semifinalists    || [],
-      topScorerCountry: specialResultsInit.topScorerCountry || '',
+// ── 📊 Statistici etape — calcul PUR, local, doar pentru afișare. ──
+// Primește snapshot-urile brute din gameweekScores (deja calculate,
+// nu recalculăm nimic) + un map uid -> nickname, și produce un rând
+// per jucător. Nu scrie nimic, nu atinge Firestore.
+function computeEtapaStatsRows(scoreRows, nicknameByUid) {
+  return scoreRows.map((r) => {
+    const breakdown = r.breakdown || {};
+    let exact = 0, oneXTwo = 0, cornersExact = 0, cardsExact = 0, evaluated = 0;
+    Object.values(breakdown).forEach((m) => {
+      if (m.status !== "scored") return;
+      evaluated += 1;
+      if (m.scorePoints === 120) exact += 1;
+      if (m.scorePoints >= 50) oneXTwo += 1;
+      if (m.cornersPoints === 15) cornersExact += 1;
+      if (m.cardsPoints === 15) cardsExact += 1;
     });
-  }, [specialResultsInit]);
-  const [resetMsgs, setResetMsgs]     = useState({}); // uid → message
-  const [manualEmails, setManualEmails] = useState({}); // uid → manually typed email
-  const [sA,      setSA]     = useState(0);
-  const [sB,      setSB]     = useState(0);
-  const [possA,   setPossA]  = useState('');
-  const [possB,   setPossB]  = useState('');
-  const [cornA,   setCornA]  = useState('');
-  const [cornB,   setCornB]  = useState('');
-  const [minute,  setMinute] = useState(0);
-  const [status,  setStatus] = useState('ft');
-  const [goalScorers,  setGoalScorers]  = useState(''); // legacy — kept for backward compat
-  const [homeScorers,  setHomeScorers]  = useState('');
-  const [awayScorers,  setAwayScorers]  = useState('');
-  const [liveCards,   setLiveCards]   = useState('');
-  const [liveCorners, setLiveCorners] = useState('');
-  const [saved,   setSaved]  = useState(false);
-  const [groupF,  setGroupF] = useState('all');
-  const [statusF, setStatusF]= useState('all');
-  const [search,  setSearch] = useState('');
-  const [history, setHistory]= useState([]); // last 5 saves
-  const [showLineupPanel, setShowLineupPanel] = useState(false);
-  const [showHelp,         setShowHelp]          = useState(false);
-  const [showOverridePanel,setShowOverridePanel] = useState(false);
-  const [showDebug,        setShowDebug]         = useState(false);
-  const [groupOverrides,   setGroupOverrides]    = useState(() => loadGroupOverrides());
-  const [lineupFormation, setLineupFormation] = useState('4-3-3');
+    return {
+      uid: r.userId,
+      nickname: nicknameByUid[r.userId] || r.userId,
+      exact, oneXTwo, cornersExact, cardsExact, evaluated,
+    };
+  });
+}
 
-  // ── TEMPORARY EMERGENCY REPAIR — one-time use, see button below ──────────
-  const [jokerRepairMsg, setJokerRepairMsg] = useState('');
-  const [jokerRepairBusy, setJokerRepairBusy] = useState(false);
+// Pentru rezumat: cine are valoarea maximă la o anumită cheie —
+// TOȚI jucătorii aflați la egalitate, dacă maximul > 0.
+function findEtapaStatsLeaders(rows, key) {
+  if (rows.length === 0) return { max: 0, players: [] };
+  const max = Math.max(...rows.map((r) => r[key]));
+  if (max <= 0) return { max: 0, players: [] };
+  return { max, players: rows.filter((r) => r[key] === max).map((r) => r.nickname) };
+}
 
-  // ── JOKER AUDIT (read-only) ───────────────────────────────────────────────
-  // Derives joker usage purely from existing prediction data. No new Firestore
-  // field/collection is created here — this only reads what PredictionModal
-  // already writes via the normal savePrediction flow.
-  const jokerAudit = useMemo(() => {
-    const JOKER_ELIGIBLE_STAGES = ['R32', 'R16', 'QF'];
-    const matchById = Object.fromEntries(MATCHES.map(m => [m.id, m]));
+// ── Date de sezon introduse ca ZZ.LL.AAAA. Câmpurile type="date" nu pot fi
+// completate pe unele telefoane, așa că folosim text numeric, formatat pe
+// măsură ce scrii (08102026 → 08.10.2026), apoi convertit în YYYY-MM-DD —
+// exact formatul pe care createSeason îl primea și înainte. ──
+function formatRoDateTyping(raw) {
+  const d = String(raw || "").replace(/\D/g, "").slice(0, 8);
+  if (d.length <= 2) return d;
+  if (d.length <= 4) return `${d.slice(0, 2)}.${d.slice(2)}`;
+  return `${d.slice(0, 2)}.${d.slice(2, 4)}.${d.slice(4)}`;
+}
+function parseRoDateToIso(text) {
+  const m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(String(text || "").trim());
+  if (!m) return "";
+  const day = Number(m[1]), month = Number(m[2]), year = Number(m[3]);
+  if (year < 2000 || year > 2100 || month < 1 || month > 12 || day < 1) return "";
+  const test = new Date(Date.UTC(year, month - 1, day));
+  if (test.getUTCFullYear() !== year || test.getUTCMonth() !== month - 1 || test.getUTCDate() !== day) return "";
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
 
-    return Object.entries(allPredictions).map(([uid, preds]) => {
-      const nickname = allUsers[uid]?.nickname || uid;
-      const jokerMatches = Object.entries(preds || {})
-        .filter(([matchId, pred]) => {
-          // Defensive: ignore usedJoker on anything that isn't a real
-          // joker-eligible knockout stage, even if malformed data exists
-          // (e.g. a stray usedJoker:true on a group match).
-          if (pred?.usedJoker !== true) return false;
-          const m = matchById[Number(matchId)];
-          if (!m) return false; // unknown match id — ignore rather than guess
-          return JOKER_ELIGIBLE_STAGES.includes(m.stage);
-        })
-        .map(([matchId]) => {
-          const m = matchById[Number(matchId)];
-          return { matchId: Number(matchId), label: m ? `${m.teamA} – ${m.teamB}` : `#${matchId}` };
-        });
-      return { uid, nickname, count: jokerMatches.length, matches: jokerMatches };
-    })
-    .filter(row => row.count > 0 || allUsers[row.uid]) // show known users even at 0, skip ghost uids with 0
-    .sort((a, b) => b.count - a.count || a.nickname.localeCompare(b.nickname));
-  }, [allPredictions, allUsers]);
+export default function AdminScreen({ onBack }) {
+  const [tab, setTab] = useState("results");
+  const [seasons, setSeasons] = useState([]);
+  const [gameweeks, setGameweeks] = useState([]);
+  const [matches, setMatches] = useState([]);
+  const [missingPredictions, setMissingPredictions] = useState({}); // matchId -> [{uid,nickname}] | "loading" | undefined
+  const [openMissingFor, setOpenMissingFor] = useState(null); // matchId deschis, sau null
+  const [selectedSeasonId, setSelectedSeasonId] = useState("");
+  const [selectedGameweekId, setSelectedGameweekId] = useState("");
+  // ── 📖 PLAY LEAGUE Stories — control minim în Admin. ──
+  const [gwStorySlideCount, setGwStorySlideCount] = useState(7);
+  const [seasonStorySlideCount, setSeasonStorySlideCount] = useState(6);
+  const [storyBusy, setStoryBusy] = useState(false);
+  const [storyPreview, setStoryPreview] = useState(null); // { slideUrls, isSeasonStory } | null
 
-  const [lineupHome, setLineupHome] = useState('');
-  const [lineupAway, setLineupAway] = useState('');
-  const [lineupOfficial, setLineupOfficial] = useState(false);
-  const [lineupSaved, setLineupSaved] = useState(false);
+  // ── 🎟️ Bet Builder ──────────────────────────────────────────────
+  const [betBuilder, setBetBuilder] = useState(null);
+  // ── 👁 Preview Bet Builder — 100% izolat, mock, ZERO Firestore.
+  // Nu atinge deloc betBuilder/surpriza reală de mai sus. ──
+  const [betBuilderPreviewOpen, setBetBuilderPreviewOpen] = useState(false);
+  const [betBuilderPreviewState, setBetBuilderPreviewState] = useState("A");
+  const [betBuilderBusy, setBetBuilderBusy] = useState(false);
+  const [betBuilderMsg, setBetBuilderMsg] = useState("");
+  // „Cine a trimis biletul” — panou doar pentru Admin, încărcat la apăsare (fără listener).
+  const [betBuilderStatusOpen, setBetBuilderStatusOpen] = useState(null); // gwId cu panoul deschis
+  const [betBuilderStatusRows, setBetBuilderStatusRows] = useState([]);
+  const [betBuilderStatusLoading, setBetBuilderStatusLoading] = useState(false);
+  const [betBuilderStatusAt, setBetBuilderStatusAt] = useState(null);
+  const [questionDrafts, setQuestionDrafts] = useState({}); // { matchId: { questions:[{text,options:[a,b]}]x5, tiebreakerText } }
 
-  const adminEmails = [...ADMIN_EMAILS, ...ADMIN_EMAILS_RUNTIME];
-  const isAdmin = adminEmails.includes(currentUser?.email) || currentUser?.isAdmin === true;
+  // ── 📈📉 Mai Mare / Mai Mic — izolat de Bet Builder, propriul state. ──
+  const [higherLower, setHigherLower] = useState(null);
+  const [higherLowerPreviewOpen, setHigherLowerPreviewOpen] = useState(false);
+  const [higherLowerPreviewState, setHigherLowerPreviewState] = useState("A");
+  // ── 🏴‍☠️ Comoara Blestemată — PREVIEW MOCK ONLY, runda asta. Nicio
+  // stare de generare/Admin reală încă — doar toggle-ul de preview. ──
+  const [treasureHuntPreviewOpen, setTreasureHuntPreviewOpen] = useState(false);
+  const [treasureHuntPreviewState, setTreasureHuntPreviewState] = useState("A");
+  // ── ⚽ Penalty PvP — PREVIEW MOCK ONLY. Jocul real (Firestore) nu e
+  // atins — doar toggle-ul de preview, ca la celelalte. ──
+  const [penaltyPreviewOpen, setPenaltyPreviewOpen] = useState(false);
+  const [higherLowerBusy, setHigherLowerBusy] = useState(false);
+  const [higherLowerMsg, setHigherLowerMsg] = useState("");
+  const [hlQuestionDrafts, setHlQuestionDrafts] = useState([]); // [{matchId, criteria, threshold, unit}] x6
 
-  if (!isAdmin) {
-    return (
-      <div style={{ padding:'60px 20px', textAlign:'center' }}>
-        <div style={{ fontSize:40, marginBottom:12 }}>🔒</div>
-        <div style={{ fontSize:15, fontWeight:700, color:'rgba(255,255,255,0.4)', marginBottom:8 }}>Acces restricționat</div>
-        <div style={{ fontSize:12, color:'rgba(255,255,255,0.2)', lineHeight:1.6 }}>
-          Email-ul tău nu e în lista adminilor.<br/>
-          <span style={{ color:'rgba(255,255,255,0.12)' }}>Adaugă-l în VITE_ADMIN_EMAILS sau în gameData.js</span>
-        </div>
-      </div>
-    );
+  async function loadHigherLower(gameweekId) {
+    if (!gameweekId) { setHigherLower(null); return; }
+    try {
+      const hl = await getHigherLower(gameweekId);
+      setHigherLower(hl);
+    } catch (err) {
+      console.error("Eroare la încărcarea Mai Mare/Mai Mic:", err);
+      setHigherLowerMsg("❌ Eroare la încărcare: " + (err.message || String(err)));
+    }
   }
 
-  const selectMatch = (m) => {
-    const fr = finishedResults?.[m.id];
-    setSel(m); setSaved(false);
-    setSA(fr?.homeScore ?? fr?.realScoreA ?? 0);
-    setSB(fr?.awayScore ?? fr?.realScoreB ?? 0);
-    setPossA(fr?.homePossession != null ? String(fr.homePossession) : '');
-    setPossB(fr?.awayPossession != null ? String(fr.awayPossession) : '');
-    setCornA(fr?.homeCorners    != null ? String(fr.homeCorners)    : '');
-    setCornB(fr?.awayCorners    != null ? String(fr.awayCorners)    : '');
-    setMinute(fr?.liveMinute ?? 0);
-    setStatus(fr?.liveStatus ?? (m.isFinished ? 'ft' : m.isLive ? 'live' : 'scheduled'));
-    setGoalScorers(fr?.goalScorers  ?? '');
-    setHomeScorers(fr?.homeScorers  ?? '');
-    setAwayScorers(fr?.awayScorers  ?? '');
-    setLiveCards(fr?.liveCards     ?? '');
-    setLiveCorners(fr?.liveCorners ?? '');
-  };
+  async function handleGenerateHigherLower(gameweekId, featuredMatchIds) {
+    setHigherLowerBusy(true);
+    setHigherLowerMsg("");
+    try {
+      const matches = await listMatches(gameweekId);
+      const kickoffMsByMatchId = {};
+      matches.forEach((m) => { kickoffMsByMatchId[m.id] = m.kickoffAt?.toMillis ? m.kickoffAt.toMillis() : null; });
+      await generateHigherLower(gameweekId, featuredMatchIds, kickoffMsByMatchId);
+      await loadHigherLower(gameweekId);
+      setHigherLowerMsg("✅ 9 perechi generate RANDOM.");
+    } catch (err) {
+      setHigherLowerMsg("❌ " + (err.message || String(err)));
+      // Chiar dacă generarea a eșuat (ex. perechile există deja),
+      // reîncărcăm starea reală — altfel UI-ul rămâne blocat doar pe
+      // eroare și butonul de generare, fără să arate perechile/
+      // întrebările deja persistate în Firestore.
+      await loadHigherLower(gameweekId);
+    } finally {
+      setHigherLowerBusy(false);
+    }
+  }
 
-  const saveResult = async () => {
-    if (!sel) return;
-    const isFT = status === 'ft';
+  async function handleSaveHigherLowerQuestions(gameweekId) {
+    setHigherLowerBusy(true);
+    setHigherLowerMsg("");
+    try {
+      await setHigherLowerQuestions(gameweekId, hlQuestionDrafts.map((q) => ({ ...q, threshold: Number(q.threshold) })));
+      await loadHigherLower(gameweekId);
+      setHigherLowerMsg("✅ Cele 6 întrebări salvate.");
+    } catch (err) {
+      setHigherLowerMsg("❌ " + (err.message || String(err)));
+    } finally {
+      setHigherLowerBusy(false);
+    }
+  }
 
-    // Parse optional stats — store null if empty
-    // possA now stores total cards (displayed as "Cartonașe totale")
-    // Stored in homePossession field for scoring compatibility (pred.possession vs match.realPossession)
-    const hPoss = possA !== '' ? Number(possA) : null;
-    const aPoss = null; // awayPossession no longer used
-    const hCorn = cornA !== '' ? Math.max(0, parseInt(cornA, 10)) : null;
-    const aCorn = cornB !== '' ? Math.max(0, parseInt(cornB, 10)) : null;
+  async function handleActivateHigherLower(gameweekId) {
+    setHigherLowerBusy(true);
+    setHigherLowerMsg("");
+    try {
+      await activateHigherLower(gameweekId);
+      await loadHigherLower(gameweekId);
+      setHigherLowerMsg("✅ Mai Mare/Mai Mic activat — vizibil jucătorilor.");
+    } catch (err) {
+      setHigherLowerMsg("❌ " + (err.message || String(err)));
+    } finally {
+      setHigherLowerBusy(false);
+    }
+  }
 
-    // Canonical result object — matchId is the unique key
-    const update = {
-      matchId:         sel.id,
-      group:           sel.group,
-      homeTeam:        sel.teamA,
-      awayTeam:        sel.teamB,
-      homeScore:       isFT ? Number(sA) : null,
-      awayScore:       isFT ? Number(sB) : null,
-      // legacy fields — kept for buildMatches compat
-      realScoreA:      isFT ? Number(sA) : null,
-      realScoreB:      isFT ? Number(sB) : null,
-      liveScoreA:      Number(sA),
-      liveScoreB:      Number(sB),
-      liveMinute:      minute,
-      goalScorers:     goalScorers.trim()  || null, // legacy field kept
-      homeScorers:     homeScorers.trim()  || null,
-      awayScorers:     awayScorers.trim()  || null,
-      liveCards:       liveCards.trim()   || null,
-      liveCorners:     liveCorners.trim() || null,
-      liveStatus:      status,
-      homePossession:  hPoss,
-      awayPossession:  aPoss,
-      homeCorners:     hCorn,
-      awayCorners:     aCorn,
-      realPossession:  hPoss,
-      realCorners:     (hCorn != null && aCorn != null) ? hCorn + aCorn : null,
-      updatedAt:       Date.now(),
-      updatedBy:       currentUser?.uid ?? 'admin',
-    };
+  async function handleResolveHigherLowerQuestion(gameweekId, questionId, result) {
+    setHigherLowerBusy(true);
+    try {
+      await resolveHigherLowerQuestion(gameweekId, questionId, result);
+      await loadHigherLower(gameweekId);
+    } catch (err) {
+      setHigherLowerMsg("❌ " + (err.message || String(err)));
+    } finally {
+      setHigherLowerBusy(false);
+    }
+  }
 
-    // Upsert to Firestore (or localStorage) — keyed by matchId, no duplicates
-    await saveMatchResult(currentUser?.uid, update);
+  async function handleRevealHigherLowerTiebreakers(gameweekId) {
+    setHigherLowerBusy(true);
+    try {
+      await revealHigherLowerTiebreakers(gameweekId);
+      setHigherLowerMsg("✅ Barajele au fost dezvăluite.");
+    } catch (err) {
+      setHigherLowerMsg("❌ " + (err.message || String(err)));
+    } finally {
+      setHigherLowerBusy(false);
+    }
+  }
 
-    // Upsert local cache — always overwrite by matchId
-    const current = loadAdminResults();
-    current[sel.id] = update;   // object key = matchId → automatic dedup
-    saveAdminResults(current);
+  async function handleResolveAllHigherLowerDuels(gameweekId) {
+    setHigherLowerBusy(true);
+    setHigherLowerMsg("");
+    try {
+      const matches = await listMatches(gameweekId);
+      const starMatches = matches.filter((m) => (higherLower?.matchIds || []).includes(m.id));
+      const realGoalsTotal = await computeRealGoalsTotal(starMatches);
+      const outcomes = await resolveAllHigherLowerDuels(gameweekId, realGoalsTotal);
+      const done = outcomes.filter((o) => o.computed).length;
+      setHigherLowerMsg(`✅ Recalculat — ${done}/9 dueluri complete. Total goluri real: ${realGoalsTotal ?? "— (nu toate 3 meciuri s-au terminat)"}`);
+    } catch (err) {
+      setHigherLowerMsg("❌ " + (err.message || String(err)));
+    } finally {
+      setHigherLowerBusy(false);
+    }
+  }
 
-    // Propagate to App state
-    onMatchUpdate?.(update);
+  async function loadBetBuilder(gameweekId) {
+    if (!gameweekId) { setBetBuilder(null); return; }
+    try {
+      const bb = await getBetBuilder(gameweekId);
+      setBetBuilder(bb);
+      if (bb) {
+        const drafts = {};
+        bb.matchGroups.forEach((g) => {
+          drafts[g.matchId] = {
+            questions: g.questions.length ? g.questions.map((q) => ({ text: q.text, options: q.options })) : Array.from({ length: 5 }, () => ({ text: "", options: ["", ""] })),
+            tiebreakerText: g.tiebreakerText || "",
+          };
+        });
+        setQuestionDrafts(drafts);
+      }
+    } catch (err) {
+      console.error("Eroare la încărcarea Bet Builder:", err);
+    }
+  }
 
-    // History: upsert by matchId — replace existing entry for same match
-    const statsLabel = (hPoss != null && aPoss != null) ? ` · Pos: ${hPoss}%-${aPoss}%` : '';
-    const cornLabel  = (hCorn != null && aCorn != null) ? ` · Cornere: ${hCorn}-${aCorn}` : '';
-    const label = `${sel.flagA}${sel.teamA} ${sA}–${sB} ${sel.teamB}${sel.flagB}${statsLabel}${cornLabel}`;
-    setHistory(h => {
-      const without = h.filter(x => x.id !== sel.id);   // remove old entry for same match
-      return [{ label, status, id:sel.id, ts:Date.now() }, ...without].slice(0, 5);
+  async function handleGenerateBetBuilder(gameweekId, featuredMatchIds) {
+    if (!gameweekId) return;
+    const featured = featuredMatchIds || [];
+    if (featured.length !== 3) { window.alert(`Trebuie exact 3 Meciuri ale Săptămânii setate pentru această etapă — sunt ${featured.length}.`); return; }
+    if (!window.confirm("Generezi cele 9 dueluri Bet Builder ACUM? Se face o SINGURĂ DATĂ — nu se poate regenera după.")) return;
+    setBetBuilderBusy(true);
+    setBetBuilderMsg("");
+    try {
+      await generateBetBuilderDuels(gameweekId, featured);
+      await loadBetBuilder(gameweekId);
+      setBetBuilderMsg("✅ Dueluri generate.");
+    } catch (err) {
+      setBetBuilderMsg("❌ " + (err.message || String(err)));
+    } finally {
+      setBetBuilderBusy(false);
+    }
+  }
+
+  async function handleSaveQuestions(gameweekId, matchId) {
+    const draft = questionDrafts[matchId];
+    if (!draft) return;
+    const cleanQuestions = draft.questions.map((q, i) => ({ id: `q${i + 1}`, text: q.text, options: q.options }));
+    if (cleanQuestions.some((q) => !q.text || q.options.some((o) => !o))) {
+      window.alert("Completează toate cele 5 selecții (text + ambele opțiuni) pentru acest meci.");
+      return;
+    }
+    if (!draft.tiebreakerText) { window.alert("Completează întrebarea de baraj pentru acest meci."); return; }
+    setBetBuilderBusy(true);
+    try {
+      await setMatchQuestions(gameweekId, matchId, cleanQuestions, draft.tiebreakerText);
+      await loadBetBuilder(gameweekId);
+      setBetBuilderMsg("✅ Selecții salvate pentru meci.");
+    } catch (err) {
+      window.alert(err.message || String(err));
+    } finally {
+      setBetBuilderBusy(false);
+    }
+  }
+
+  async function handleActivateBetBuilder(gameweekId) {
+    if (!window.confirm("Activezi Bet Builder pentru toți cei 18 jucători repartizați?")) return;
+    setBetBuilderBusy(true);
+    try {
+      await activateBetBuilder(gameweekId);
+      await loadBetBuilder(gameweekId);
+      setBetBuilderMsg("✅ Bet Builder activat.");
+    } catch (err) {
+      window.alert(err.message || String(err));
+    } finally {
+      setBetBuilderBusy(false);
+    }
+  }
+
+  async function handleResolveQuestion(gameweekId, matchId, questionId, result) {
+    setBetBuilderBusy(true);
+    try {
+      await resolveQuestion(gameweekId, matchId, questionId, result);
+      await loadBetBuilder(gameweekId);
+    } catch (err) {
+      window.alert(err.message || String(err));
+    } finally {
+      setBetBuilderBusy(false);
+    }
+  }
+
+  async function handleResolveTiebreaker(gameweekId, matchId, value) {
+    setBetBuilderBusy(true);
+    try {
+      await resolveTiebreaker(gameweekId, matchId, value);
+      await loadBetBuilder(gameweekId);
+    } catch (err) {
+      window.alert(err.message || String(err));
+    } finally {
+      setBetBuilderBusy(false);
+    }
+  }
+
+  async function handleRecomputeAllDuels(gameweekId) {
+    setBetBuilderBusy(true);
+    setBetBuilderMsg("");
+    try {
+      const outcomes = await resolveAllDuels(gameweekId);
+      const done = outcomes.filter((o) => o.computed).length;
+      setBetBuilderMsg(`✅ Recalculat — ${done}/9 dueluri au ambele bilete confirmate și au primit punctaj.`);
+    } catch (err) {
+      window.alert(err.message || String(err));
+    } finally {
+      setBetBuilderBusy(false);
+    }
+  }
+
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  // Auto-detecție sezon activ + etapă curentă la intrarea în Admin — fără
+  // click-uri manuale. Selectoarele rămân disponibile mai jos, pentru
+  // etape vechi/viitoare sau administrare manuală.
+  const [autoDetecting, setAutoDetecting] = useState(true);
+  const [autoDetectedLabel, setAutoDetectedLabel] = useState("");
+  const [showManualSelectors, setShowManualSelectors] = useState(false);
+
+  const [seasonName, setSeasonName] = useState("");
+  const [seasonStart, setSeasonStart] = useState("");
+  const [seasonEnd, setSeasonEnd] = useState("");
+
+  const [matchesText, setMatchesText] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const [featuredIds, setFeaturedIds] = useState([]);
+  const [featuredSaving, setFeaturedSaving] = useState(false);
+  const [featuredMessage, setFeaturedMessage] = useState("");
+
+  // ── Avatar utilizator (config) ──
+  const [allUsers, setAllUsers] = useState([]);
+  // ── Preview Duel (Surprize) — 100% local, nu scrie NIMIC în Firestore,
+  // nu atinge duelul activ/etapa curentă. Reutilizează `allUsers` (deja
+  // încărcat mai sus), nicio citire suplimentară. ──
+  const [previewDuelTheme, setPreviewDuelTheme] = useState(DUEL_THEMES[0]?.id || "");
+  const [previewDuelMode, setPreviewDuelMode] = useState("1v1"); // "1v1" | "2v2"
+  const [previewDuelPlayers, setPreviewDuelPlayers] = useState(["", "", "", ""]); // [mine1, opp1, mine2, opp2]
+  // ── Joker săptămânal — vizibilitate Admin, cine l-a folosit și pe ce
+  // meci, cine nu. Reutilizează `allUsers`/`matches` deja încărcate;
+  // singura citire nouă e lista de jokeri ai etapei curente (nu exista
+  // deja în starea Admin) — o dată per etapă selectată, nu la fiecare
+  // randare. ──
+  const [weeklyJokers, setWeeklyJokers] = useState(null);
+  const [weeklyJokersGwId, setWeeklyJokersGwId] = useState(null);
+  // ── Speciale (config) ──
+  const now = useNow(60000); // "se închide peste 3 zile" nu are nevoie de secunde live, doar Home/SpecialsScreen
+  const [specialCompId, setSpecialCompId] = useState("");
+  const [specialPhaseId, setSpecialPhaseId] = useState("");
+  const [specialPhasesForSeason, setSpecialPhasesForSeason] = useState([]);
+  const [completionPicksByPhase, setCompletionPicksByPhase] = useState({});
+  const [completionLoading, setCompletionLoading] = useState(false);
+  const [completionActiveUsers, setCompletionActiveUsers] = useState([]);
+  const [optionsText, setOptionsText] = useState("");
+  const [closesAtInput, setClosesAtInput] = useState("");
+  const [openSaving, setOpenSaving] = useState(false);
+  const [openMsg, setOpenMsg] = useState("");
+  const [resolveSelection, setResolveSelection] = useState(null);
+  const [resolveSaving, setResolveSaving] = useState(false);
+  const [resolveMsg, setResolveMsg] = useState("");
+  const [closeSaving, setCloseSaving] = useState(false);
+  const [closeMsg, setCloseMsg] = useState("");
+
+  // ── Jucători (Admin) ──
+  const [players, setPlayers] = useState([]);
+  const [playersLoading, setPlayersLoading] = useState(false);
+  const [playerActionUid, setPlayerActionUid] = useState(""); // uid-ul cu acțiune în curs, pt. disable pe buton
+
+  // ── Surprizele Săptămânii (Admin) ──
+  const [surprisesData, setSurprisesData] = useState({}); // gameweekId -> { public, secretMain, secretBonus }
+  // ── Bet Builder e controlat DOAR din zona Surpriza Săptămânii — se
+  // încarcă STRICT pentru etapa care are efectiv "betBuilder" ca tip
+  // ales, nicăieri altundeva, niciodată automat pentru alt tip.
+  // REPARAT — trebuie să vină DUPĂ declararea reală a surprisesData
+  // (mai sus), altfel aruncă "Cannot access before initialization"
+  // exact quando tab-ul Surprize randează (ecran negru confirmat). ──
+  const betBuilderGwId = tab === "surprises"
+    ? Object.keys(surprisesData).find((gwId) => surprisesData[gwId]?.secretMain?.type === "betBuilder")
+    : null;
+  useEffect(() => {
+    if (betBuilderGwId) loadBetBuilder(betBuilderGwId);
+    else setBetBuilder(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [betBuilderGwId]);
+
+  // ── Mai Mare/Mai Mic — exact același tipar izolat ca Bet Builder. ──
+  const higherLowerGwId = tab === "surprises"
+    ? Object.keys(surprisesData).find((gwId) => surprisesData[gwId]?.secretMain?.type === "higherLower")
+    : null;
+  useEffect(() => {
+    if (higherLowerGwId) loadHigherLower(higherLowerGwId);
+    else setHigherLower(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [higherLowerGwId]);
+  const [surprisesLoading, setSurprisesLoading] = useState(false);
+  const [backupRunning, setBackupRunning] = useState(false);
+  const [backupStatus, setBackupStatus] = useState(""); // "" | in-progress label | success text | error text
+  const [backupIsError, setBackupIsError] = useState(false);
+  const [surprisesArchiveOpen, setSurprisesArchiveOpen] = useState(false);
+  const [surprisesArchiveSelectedId, setSurprisesArchiveSelectedId] = useState(null);
+  const [surpriseActionKey, setSurpriseActionKey] = useState(""); // "{gwId}_{action}" cu acțiune în curs
+  const [sabotajProgress, setSabotajProgress] = useState({}); // gameweekId -> { chosenPickers, takenTargets }
+
+  // ── Trivia — editor întrebări, validare răspunsuri, status completare ──
+  const [triviaEditorOpen, setTriviaEditorOpen] = useState(null); // gwId cu editorul deschis, sau null
+  const [triviaDraft, setTriviaDraft] = useState([]); // 10 randuri, in curs de editare
+  const [triviaSaveMsg, setTriviaSaveMsg] = useState("");
+  const [triviaSaving, setTriviaSaving] = useState(false);
+  const [triviaMarking, setTriviaMarking] = useState(""); // questionId in curs de marcat
+  const [triviaSubmissionPanel, setTriviaSubmissionPanel] = useState(null); // gwId cu panoul deschis
+  const [triviaSubmissionRows, setTriviaSubmissionRows] = useState([]);
+  const [triviaSubmissionLoading, setTriviaSubmissionLoading] = useState(false);
+  const [triviaLockBusy, setTriviaLockBusy] = useState(false);
+
+  // ── Blocare/deblocare manuală Trivia — confirmare, scriere în docul
+  // public, actualizare LOCALĂ a stării (zero re-citire). ──
+  async function handleToggleTriviaLock(gwId, lock) {
+    if (triviaLockBusy) return;
+    const ok = window.confirm(lock
+      ? "Blochezi răspunsurile Trivia? Nimeni nu va mai putea trimite sau modifica răspunsuri. Răspunsurile vor deveni vizibile adversarilor."
+      : "Deblochezi răspunsurile Trivia? Jucătorii vor putea din nou să răspundă și să modifice. Răspunsurile publicate adversarilor se vor ascunde din nou.");
+    if (!ok) return;
+    setTriviaLockBusy(true);
+    try {
+      await setTriviaLocked(gwId, lock);
+      setSurprisesData((prev) => {
+        const pub = { ...(prev[gwId]?.public || {}), triviaLocked: lock };
+        if (!lock) { delete pub.triviaAnswersPublic; delete pub.triviaAnswersPublishedAt; }
+        return { ...prev, [gwId]: { ...prev[gwId], public: pub } };
+      });
+      if (lock) {
+        // Blocarea e deja făcută. Publicarea răspunsurilor adversarilor e un pas
+        // separat: dacă eșuează, rămâne butonul „Publică răspunsurile".
+        try {
+          await publishTriviaAnswers(gwId, (surprisesData[gwId]?.secretMain?.config?.questions || []).map((q) => q.id));
+          setSurprisesData((prev) => ({ ...prev, [gwId]: { ...prev[gwId], public: { ...(prev[gwId]?.public || {}), triviaAnswersPublishedAt: Date.now() } } }));
+        } catch (pubErr) {
+          window.alert("Răspunsurile sunt blocate, dar publicarea lor către adversari a eșuat: " + (pubErr.message || String(pubErr)) + "\nApasă „Publică răspunsurile\" pentru a reîncerca.");
+        }
+      }
+    } catch (err) {
+      window.alert("Eroare: " + (err.message || String(err)));
+    } finally {
+      setTriviaLockBusy(false);
+    }
+  }
+
+  // Publicare răspunsuri (adversarii le văd) — pentru Trivia deja blocată, sau reluare după eșec.
+  async function handlePublishTriviaAnswers(gwId) {
+    if (triviaLockBusy) return;
+    if (!window.confirm("Publici răspunsurile Trivia? Fiecare jucător va vedea ce a răspuns adversarul lui la fiecare întrebare.")) return;
+    setTriviaLockBusy(true);
+    try {
+      await publishTriviaAnswers(gwId, (surprisesData[gwId]?.secretMain?.config?.questions || []).map((q) => q.id));
+      setSurprisesData((prev) => ({ ...prev, [gwId]: { ...prev[gwId], public: { ...(prev[gwId]?.public || {}), triviaAnswersPublishedAt: Date.now() } } }));
+    } catch (err) {
+      window.alert("Eroare la publicare: " + (err.message || String(err)));
+    } finally {
+      setTriviaLockBusy(false);
+    }
+  }
+
+  function openTriviaEditor(gwId, existingQuestions) {
+    if (triviaEditorOpen === gwId) { setTriviaEditorOpen(null); return; }
+    const base = existingQuestions && existingQuestions.length > 0
+      ? existingQuestions
+      : Array.from({ length: 10 }, (_, i) => ({ id: `q${i + 1}`, text: "", optionALabel: "DA", optionBLabel: "NU", correctAnswer: null }));
+    setTriviaDraft(base);
+    setTriviaEditorOpen(gwId);
+    setTriviaSaveMsg("");
+  }
+
+  function updateTriviaDraftField(idx, field, value) {
+    setTriviaDraft((prev) => prev.map((q, i) => (i === idx ? { ...q, [field]: value } : q)));
+  }
+
+  async function handleSaveTriviaQuestions(gwId) {
+    setTriviaSaving(true);
+    setTriviaSaveMsg("");
+    try {
+      const cleaned = triviaDraft.map((q) => ({ ...q, text: q.text.trim(), optionALabel: q.optionALabel.trim() || "A", optionBLabel: q.optionBLabel.trim() || "B" }));
+      await configureTriviaQuestions(gwId, cleaned);
+      setTriviaSaveMsg("✓ Întrebări salvate.");
+      const sm = await getSecretMain(gwId);
+      setSurprisesData((prev) => ({ ...prev, [gwId]: { ...prev[gwId], secretMain: sm } }));
+    } catch (err) {
+      setTriviaSaveMsg(`Eroare: ${err.message || err}`);
+    } finally {
+      setTriviaSaving(false);
+    }
+  }
+
+  async function handleMarkCorrect(gwId, questionId, answer) {
+    setTriviaMarking(questionId);
+    try {
+      await markTriviaCorrectAnswer(gwId, questionId, answer);
+      const sm = await getSecretMain(gwId);
+      setSurprisesData((prev) => ({ ...prev, [gwId]: { ...prev[gwId], secretMain: sm } }));
+    } catch (err) {
+      console.error("Eroare la marcarea răspunsului corect:", err);
+    } finally {
+      setTriviaMarking("");
+    }
+  }
+
+  // ── Zaruri — editor întrebări, introducere țintă reală, status ──
+  const [zaruriEditorOpen, setZaruriEditorOpen] = useState(null);
+  const [zaruriDraft, setZaruriDraft] = useState([]);
+  const [zaruriSaveMsg, setZaruriSaveMsg] = useState("");
+  const [zaruriSaving, setZaruriSaving] = useState(false);
+  const [zaruriMarking, setZaruriMarking] = useState("");
+  const [zaruriTargetDrafts, setZaruriTargetDrafts] = useState({}); // questionId -> valoare text in curs de editare
+  const [zaruriSubmissionPanel, setZaruriSubmissionPanel] = useState(null);
+  const [zaruriSubmissionRows, setZaruriSubmissionRows] = useState([]);
+  const [zaruriSubmissionLoading, setZaruriSubmissionLoading] = useState(false);
+  const [higherLowerSubmissionPanel, setHigherLowerSubmissionPanel] = useState(null);
+  const [higherLowerSubmissionRows, setHigherLowerSubmissionRows] = useState([]);
+  const [higherLowerSubmissionLoading, setHigherLowerSubmissionLoading] = useState(false);
+  const [penaltySubmissionPanel, setPenaltySubmissionPanel] = useState(null);
+  const [penaltySubmissionRows, setPenaltySubmissionRows] = useState([]);
+  const [penaltySubmissionLoading, setPenaltySubmissionLoading] = useState(false);
+
+  function openZaruriEditor(gwId, existingQuestions) {
+    if (zaruriEditorOpen === gwId) { setZaruriEditorOpen(null); return; }
+    const base = existingQuestions && existingQuestions.length > 0
+      ? existingQuestions
+      : Array.from({ length: 5 }, (_, i) => ({ id: `zq${i + 1}`, text: "", correctTarget: null }));
+    setZaruriDraft(base);
+    setZaruriEditorOpen(gwId);
+    setZaruriSaveMsg("");
+  }
+
+  function updateZaruriDraftField(idx, field, value) {
+    setZaruriDraft((prev) => prev.map((q, i) => (i === idx ? { ...q, [field]: value } : q)));
+  }
+
+  async function handleSaveZaruriQuestions(gwId) {
+    setZaruriSaving(true);
+    setZaruriSaveMsg("");
+    try {
+      const cleaned = zaruriDraft.map((q) => ({ ...q, text: q.text.trim() }));
+      await configureZaruriQuestions(gwId, cleaned);
+      setZaruriSaveMsg("✓ Întrebări salvate.");
+      const sm = await getSecretMain(gwId);
+      setSurprisesData((prev) => ({ ...prev, [gwId]: { ...prev[gwId], secretMain: sm } }));
+    } catch (err) {
+      setZaruriSaveMsg(`Eroare: ${err.message || err}`);
+    } finally {
+      setZaruriSaving(false);
+    }
+  }
+
+  async function handleMarkTarget(gwId, questionId) {
+    const raw = zaruriTargetDrafts[questionId];
+    const value = Number(raw);
+    if (raw === undefined || raw === "" || Number.isNaN(value) || value < 0) return;
+    setZaruriMarking(questionId);
+    try {
+      await markZaruriTarget(gwId, questionId, value);
+      const sm = await getSecretMain(gwId);
+      setSurprisesData((prev) => ({ ...prev, [gwId]: { ...prev[gwId], secretMain: sm } }));
+    } catch (err) {
+      console.error("Eroare la marcarea țintei:", err);
+    } finally {
+      setZaruriMarking("");
+    }
+  }
+
+  async function loadBetBuilderStatus(gwId) {
+    setBetBuilderStatusLoading(true);
+    try {
+      const rows = await getBetBuilderSubmissionStatus(gwId, betBuilder && betBuilder.gameweekId === gwId ? betBuilder : null);
+      const names = await getUserPublicProfiles(rows.map((r) => r.uid));
+      setBetBuilderStatusRows(rows.map((r) => ({ ...r, nickname: names[r.uid]?.nickname || r.uid })));
+      setBetBuilderStatusAt(Date.now());
+    } catch (err) {
+      console.error("Eroare la statusul Bet Builder:", err);
+      setBetBuilderStatusRows([]);
+    } finally {
+      setBetBuilderStatusLoading(false);
+    }
+  }
+
+  async function openBetBuilderStatusPanel(gwId) {
+    if (betBuilderStatusOpen === gwId) { setBetBuilderStatusOpen(null); return; }
+    setBetBuilderStatusOpen(gwId);
+    await loadBetBuilderStatus(gwId);
+  }
+
+  async function openZaruriSubmissionPanel(gwId, questions) {
+    if (zaruriSubmissionPanel === gwId) { setZaruriSubmissionPanel(null); return; }
+    setZaruriSubmissionPanel(gwId);
+    setZaruriSubmissionLoading(true);
+    try {
+      const rows = await getZaruriSubmissionStatus(gwId, questions.map((q) => q.id));
+      const names = await getUserPublicProfiles(rows.map((r) => r.uid));
+      setZaruriSubmissionRows(rows.map((r) => ({ ...r, nickname: names[r.uid]?.nickname || r.uid })));
+    } catch (err) {
+      console.error("Eroare la statusul de completare:", err);
+    } finally {
+      setZaruriSubmissionLoading(false);
+    }
+  }
+
+  async function openHigherLowerSubmissionPanel(gwId) {
+    if (higherLowerSubmissionPanel === gwId) { setHigherLowerSubmissionPanel(null); return; }
+    setHigherLowerSubmissionPanel(gwId);
+    setHigherLowerSubmissionLoading(true);
+    try {
+      const rows = await getHigherLowerSubmissionStatus(gwId);
+      const names = await getUserPublicProfiles(rows.map((r) => r.uid));
+      setHigherLowerSubmissionRows(
+        rows
+          .map((r) => ({ ...r, nickname: names[r.uid]?.nickname || r.uid }))
+          .sort((a, b) => a.done - b.done)
+      );
+    } catch (err) {
+      console.error("Eroare la statusul de completare Mai Mare/Mai Mic:", err);
+    } finally {
+      setHigherLowerSubmissionLoading(false);
+    }
+  }
+
+  async function openPenaltySubmissionPanel(gwId) {
+    if (penaltySubmissionPanel === gwId) { setPenaltySubmissionPanel(null); return; }
+    setPenaltySubmissionPanel(gwId);
+    setPenaltySubmissionLoading(true);
+    try {
+      const [activeUids, submitted] = await Promise.all([listActiveUserIds(), getPenaltySubmittedUids(gwId)]);
+      const uids = [...activeUids];
+      const names = await getUserPublicProfiles(uids);
+      setPenaltySubmissionRows(
+        uids
+          .map((uid) => ({ uid, nickname: names[uid]?.nickname || uid, done: submitted.has(uid) }))
+          .sort((a, b) => Number(a.done) - Number(b.done))
+      );
+    } catch (err) {
+      console.error("Eroare la statusul de completare Penalty PvP:", err);
+    } finally {
+      setPenaltySubmissionLoading(false);
+    }
+  }
+
+
+  async function openTriviaSubmissionPanel(gwId, questions) {
+    if (triviaSubmissionPanel === gwId) { setTriviaSubmissionPanel(null); return; }
+    setTriviaSubmissionPanel(gwId);
+    setTriviaSubmissionLoading(true);
+    try {
+      const rows = await getTriviaSubmissionStatus(gwId, questions.map((q) => q.id));
+      const names = await getUserPublicProfiles(rows.map((r) => r.uid));
+      setTriviaSubmissionRows(rows.map((r) => ({ ...r, nickname: names[r.uid]?.nickname || r.uid })));
+    } catch (err) {
+      console.error("Eroare la statusul de completare:", err);
+    } finally {
+      setTriviaSubmissionLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (tab !== "surprises" || gameweeks.length === 0) return;
+    setSurprisesLoading(true);
+    Promise.all(gameweeks.map(async (gw) => {
+      const [pub, sm, sb] = await Promise.all([getWeeklySurprise(gw.id), getSecretMain(gw.id), getSecretBonus(gw.id)]);
+      return [gw.id, { public: pub, secretMain: sm, secretBonus: sb }];
+    })).then(async (entries) => {
+      setSurprisesData(Object.fromEntries(entries));
+      // Progresul Sabotajului — doar pentru etapele unde tipul chiar e
+      // Sabotaj și a fost deja dezvăluit (altfel `order` nici nu există).
+      const sabotajEntries = entries.filter(([, d]) => d.secretMain?.type === "sabotaj" && d.public?.mainRevealed);
+      const progressPairs = await Promise.all(sabotajEntries.map(async ([gwId, d]) => {
+        const order = d.secretMain?.config?.order || [];
+        const prog = await getSabotajPublicProgress(gwId, order);
+        return [gwId, prog];
+      }));
+      setSabotajProgress(Object.fromEntries(progressPairs));
+    }).finally(() => setSurprisesLoading(false));
+  }, [tab, gameweeks]);
+
+  async function handleConfigureSurprise(gameweekId, field, value) {
+    const key = `${gameweekId}_config`;
+    setSurpriseActionKey(key);
+    try {
+      await configureSurprise(gameweekId, { [field]: value });
+      setSurprisesData((prev) => ({
+        ...prev,
+        [gameweekId]: {
+          ...prev[gameweekId],
+          secretMain: field === "mainType"
+          ? { ...prev[gameweekId]?.secretMain, type: value }
+          : field === "duelTheme"
+          ? { ...prev[gameweekId]?.secretMain, duelTheme: value || null }
+          : prev[gameweekId]?.secretMain,
+          secretBonus: field === "bonusType" ? { ...prev[gameweekId]?.secretBonus, type: value } : prev[gameweekId]?.secretBonus,
+        },
+      }));
+    } catch (err) {
+      console.error("Eroare la configurare Surpriză:", err);
+    } finally {
+      setSurpriseActionKey("");
+    }
+  }
+
+  // ── FAZA 1 reads — generatorii GLOBALI de Feed rulează din Admin, nu
+  // pe fiecare telefon. Aceleași apeluri, aceleași texte/ID-uri
+  // deterministe ca înainte în Home (idempotente). ──
+  async function runSurpriseFeed(gwId, pub, sm, sb) {
+    const jobs = [];
+    if (sm && pub?.mainRevealed) {
+      const mainLabel = MAIN_CATALOG.find((c) => c.id === sm.type)?.label || sm.type;
+      jobs.push(processSurpriseCreated(gwId, "main", sm.type, mainLabel));
+      jobs.push(processSurpriseMatchup(gwId, "main", sm.type, sm.config));
+      if (pub.mainResolved) jobs.push(processSurpriseResult(gwId, "main", sm.type, sm.config, mainLabel));
+    }
+    if (sb && pub?.bonusRevealed) {
+      const bonusLabel = BONUS_CATALOG.find((c) => c.id === sb.type)?.label || sb.type;
+      jobs.push(processSurpriseCreated(gwId, "bonus", sb.type, bonusLabel));
+      jobs.push(processSurpriseMatchup(gwId, "bonus", sb.type, sb.config));
+      if (pub.bonusResolved) jobs.push(processSurpriseResult(gwId, "bonus", sb.type, sb.config, bonusLabel));
+    }
+    await Promise.all(jobs);
+  }
+
+  // Meciuri Final — DUPĂ publicarea punctajelor (apelat din recomputeAndPublish,
+  // care rulează numai după saveMatchResult/updateMatchStatus, ce așteaptă
+  // publishMatchPointsIfFinal). Listă proaspătă (o singură interogare, doar Admin).
+  async function runFinishedMatchesFeed(gwId) {
+    if (!gwId) return { processed: 0, events: 0 };
+    const gwMatches = await listMatches(gwId);
+    return processPendingFinishedMatchesFeed(gwMatches);
+  }
+
+  const [globalFeedBusy, setGlobalFeedBusy] = useState(false);
+  const [globalFeedMsg, setGlobalFeedMsg] = useState("");
+  // Reluare manuală — sigură de repetat: meciurile deja procesate sunt sărite
+  // (marker), evenimentele au ID-uri deterministe (fără duplicate).
+  async function handleRunGlobalFeed() {
+    if (globalFeedBusy || !selectedGameweekId) return;
+    setGlobalFeedBusy(true);
+    setGlobalFeedMsg("");
+    try {
+      const gwMatches = await listMatches(selectedGameweekId);
+      const fin = await processPendingFinishedMatchesFeed(gwMatches);
+      const [pub, sm, sb] = await Promise.all([getWeeklySurprise(selectedGameweekId), getSecretMain(selectedGameweekId), getSecretBonus(selectedGameweekId)]);
+      await runSurpriseFeed(selectedGameweekId, pub, sm, sb);
+      const gw = gameweeks.find((g) => g.id === selectedGameweekId);
+      await processUpcomingMatches(gwMatches, gw?.featuredMatchIds || [], selectedGameweekId);
+      await Promise.all(gwMatches.map((m) => processClubFactsForMatchGuarded(m).catch(() => [])));
+      setGlobalFeedMsg(`✓ Feed global procesat — meciuri Final noi: ${fin.processed}.`);
+    } catch (err) {
+      setGlobalFeedMsg(`Eroare: ${err.message || err} — poți relua în siguranță.`);
+    } finally {
+      setGlobalFeedBusy(false);
+    }
+  }
+
+  async function handleSurpriseAction(gameweekId, action) {
+    const key = `${gameweekId}_${action}`;
+    setSurpriseActionKey(key);
+    try {
+      if (action === "revealMain") await revealMain(gameweekId);
+      else if (action === "revealBonus") await revealBonus(gameweekId);
+      else if (action === "resolveMain") await resolveMain(gameweekId);
+      else if (action === "resolveBonus") await resolveBonus(gameweekId);
+      else if (action === "revealSabotaj") await revealSabotajNetwork(gameweekId);
+      else if (action === "undoSabotaj") await undoLastSabotajChoice(gameweekId);
+      else if (action === "revealRemainingMystery") await revealRemainingMysteryBoxes(gameweekId);
+      const [pub, sm, sb] = await Promise.all([getWeeklySurprise(gameweekId), getSecretMain(gameweekId), getSecretBonus(gameweekId)]);
+      runSurpriseFeed(gameweekId, pub, sm, sb).catch((err) => console.error("Eroare Feed Surprize (Admin):", err));
+      setSurprisesData((prev) => ({ ...prev, [gameweekId]: { public: pub, secretMain: sm, secretBonus: sb } }));
+      if (sm?.type === "sabotaj") {
+        const order = sm.config?.order || [];
+        const prog = await getSabotajPublicProgress(gameweekId, order);
+        setSabotajProgress((prev) => ({ ...prev, [gameweekId]: prog }));
+      }
+    } catch (err) {
+      console.error(`Eroare la ${action}:`, err);
+      alert(err.message || "Eroare — vezi consola.");
+    } finally {
+      setSurpriseActionKey("");
+    }
+  }
+
+  useEffect(() => {
+    if (tab !== "players") return;
+    setPlayersLoading(true);
+    listAllUsersWithStatus()
+      .then(setPlayers)
+      .catch((err) => console.error("Eroare la încărcarea jucătorilor:", err))
+      .finally(() => setPlayersLoading(false));
+  }, [tab]);
+
+  async function handlePlayerAction(uid, action) {
+    if (action === "deactivate") {
+      const ok = window.confirm(
+        "Elimini definitiv acest jucător din PLAY LEAGUE? Nu va mai participa la clasamente, bonusuri sau jocurile viitoare."
+      );
+      if (!ok) return;
+    }
+    setPlayerActionUid(uid);
+    try {
+      if (action === "approve") await approveUser(uid);
+      else if (action === "reject") await rejectUser(uid);
+      else if (action === "deactivate") await deactivateUser(uid);
+      else if (action === "reactivate") await reactivateUser(uid);
+      setPlayers((prev) => prev.map((p) => (p.uid === uid
+        ? { ...p, status: action === "approve" || action === "reactivate" ? "active" : "disabled" }
+        : p)));
+    } catch (err) {
+      console.error("Eroare la acțiunea asupra jucătorului:", err);
+    } finally {
+      setPlayerActionUid("");
+    }
+  }
+
+  // ── Feed (Admin) ──
+  const [feedEvents, setFeedEvents] = useState([]);
+  const [feedAdminFun, setFeedAdminFun] = useState([]);
+  const [feedLoading, setFeedLoading] = useState(false);
+  const [newFunLabel, setNewFunLabel] = useState("");
+  const [newFunText, setNewFunText] = useState("");
+  const [funSaving, setFunSaving] = useState(false);
+  const [cleaningLiveEvents, setCleaningLiveEvents] = useState(false);
+  const [cleanupMessage, setCleanupMessage] = useState("");
+  const [regeneratingFeed, setRegeneratingFeed] = useState(false);
+  const [regenerateMessage, setRegenerateMessage] = useState("");
+  // ── Selector DEDICAT pentru Regenerate Feed — complet izolat de
+  // selectedSeasonId/selectedGameweekId (cei doi controlează tab-urile
+  // cu acțiuni live). Regenerate trebuie să poată viza orice etapă
+  // trecută, fără să depindă sau să schimbe etapa curentă a Admin-ului. ──
+  const [regenerateSeasonId, setRegenerateSeasonId] = useState("");
+  const [regenerateGameweeks, setRegenerateGameweeks] = useState([]);
+  const [regenerateGameweekId, setRegenerateGameweekId] = useState("");
+
+  // ── Știre manuală în Feed — plasă de siguranță pentru Admin. Lista
+  // de știri manuale folosește interogarea DEDICATĂ (listRecentManualNews,
+  // where subtype=="manual") — NU se mai derivă din cele 50 evenimente
+  // recente (bug găsit: o știre veche ieșea din acea fereastră și
+  // devenea de negăsit/de neșters din Admin, deși documentul chiar exista
+  // în Firestore). ──
+  const [manualNewsTitle, setManualNewsTitle] = useState("");
+  const [manualNewsText, setManualNewsText] = useState("");
+  const [manualNewsType, setManualNewsType] = useState("clasament");
+  const [manualNewsPublishing, setManualNewsPublishing] = useState(false);
+  const [manualNewsMessage, setManualNewsMessage] = useState("");
+  const [manualNewsDeletingId, setManualNewsDeletingId] = useState(null);
+  const [manualNewsList, setManualNewsList] = useState([]);
+
+  async function handlePublishManualNews() {
+    if (!manualNewsTitle.trim()) { setManualNewsMessage("Titlul e obligatoriu."); return; }
+    setManualNewsPublishing(true);
+    setManualNewsMessage("");
+    try {
+      await publishManualFeedNews({
+        title: manualNewsTitle, text: manualNewsText, newsType: manualNewsType, adminUid: auth.currentUser.uid,
+      });
+      setManualNewsMessage("✅ Publicată în Feed.");
+      setManualNewsTitle("");
+      setManualNewsText("");
+      loadFeedAdminData();
+    } catch (err) {
+      console.error("Eroare la publicarea știrii manuale:", err);
+      setManualNewsMessage("❌ Eroare la publicare: " + (err.message || String(err)));
+    } finally {
+      setManualNewsPublishing(false);
+    }
+  }
+
+  async function handleDeleteManualNews(id, title) {
+    if (!window.confirm(`Ștergi definitiv știrea "${title}"? Nu se poate anula.`)) return;
+    setManualNewsDeletingId(id);
+    try {
+      await deleteManualFeedNews(id);
+      loadFeedAdminData();
+    } catch (err) {
+      console.error("Eroare la ștergerea știrii manuale:", err);
+      window.alert("Eroare la ștergere: " + (err.message || String(err)));
+    } finally {
+      setManualNewsDeletingId(null);
+    }
+  }
+
+  async function handleCleanupLiveEvents() {
+    setCleaningLiveEvents(true);
+    setCleanupMessage("");
+    try {
+      const count = await deleteAllLiveMatchEvents();
+      setCleanupMessage(count > 0 ? `Șterse ${count} evenimente vechi (goluri/cartonașe).` : "Nu erau evenimente vechi de șters.");
+      setFeedEvents((prev) => prev.filter((e) => !e.id.startsWith("liveevent_")));
+    } catch (err) {
+      console.error("Eroare la curățarea evenimentelor live:", err);
+      setCleanupMessage("Eroare — vezi consola.");
+    } finally {
+      setCleaningLiveEvents(false);
+    }
+  }
+
+
+  // Reconstruiește meciuri Final + scor exact + facts + starea CURENTĂ
+  // a clasamentului etapei. NU inventează istoricul pas-cu-pas al
+  // clasamentului (cine era lider după fiecare meci în parte) — dacă nu
+  // avem snapshot-uri reale pentru fiecare pas, acea parte rămâne
+  // needeterminată, semnalat explicit în mesaj, nu ascuns. ──
+  async function handleRegenerateFeed() {
+    if (!regenerateGameweekId) { setRegenerateMessage("Alege o etapă întâi."); return; }
+    const gwLabel = regenerateGameweeks.find((g) => g.id === regenerateGameweekId)?.title || regenerateGameweekId;
+    const confirmed = window.confirm(`Regenerezi Feed-ul pentru ${gwLabel}? Nu se șterge nimic existent (nici știrile manuale), doar se completează ce lipsește (idempotent).`);
+    if (!confirmed) return;
+    setRegeneratingFeed(true);
+    setRegenerateMessage("");
+    try {
+      const gwMatches = await listMatches(regenerateGameweekId);
+      const result = await regenerateCurrentGameweekFeed(regenerateGameweekId, gwMatches);
+      setRegenerateMessage(
+        `${gwLabel} — reconstruit: ${result.reconstructed.matchFinalEvents} evenimente de meci, ${result.reconstructed.currentRankEvents} evenimente de clasament (stare curentă). ${result.note}`
+      );
+    } catch (err) {
+      console.error("Eroare la regenerarea Feed-ului:", err);
+      setRegenerateMessage("Eroare — vezi consola.");
+    } finally {
+      setRegeneratingFeed(false);
+    }
+  }
+
+  useEffect(() => {
+    if (tab !== "feed") return;
+    loadFeedAdminData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  function loadFeedAdminData() {
+    setFeedLoading(true);
+    Promise.all([listRecentEventsForAdmin(), listAdminFunItems(), listRecentManualNews(50)])
+      .then(([events, adminFun, manualNews]) => {
+        setFeedEvents(events);
+        setFeedAdminFun(adminFun);
+        setManualNewsList(manualNews);
+      })
+      .catch((err) => console.error("Eroare la încărcarea Feed-ului (admin):", err))
+      .finally(() => setFeedLoading(false));
+  }
+
+  async function handlePublishFeedEvent(id) {
+    try {
+      await publishFeedEvent(id);
+      setFeedEvents((prev) => prev.map((e) => (e.id === id ? { ...e, status: "published" } : e)));
+    } catch (err) {
+      window.alert("Eroare la publicare: " + (err.message || String(err)));
+    }
+  }
+
+  async function handleIgnoreFeedEvent(id) {
+    try {
+      await ignoreFeedEvent(id);
+      setFeedEvents((prev) => prev.map((e) => (e.id === id ? { ...e, status: "ignored" } : e)));
+    } catch (err) {
+      window.alert("Eroare la ignorare: " + (err.message || String(err)));
+    }
+  }
+
+  async function handleSetFeedEventPriority(id, priority) {
+    try {
+      await setFeedEventPriority(id, priority);
+      setFeedEvents((prev) => prev.map((e) => (e.id === id ? { ...e, priority: Number(priority) } : e)));
+    } catch (err) {
+      window.alert("Eroare la schimbarea priorității: " + (err.message || String(err)));
+    }
+  }
+
+  async function handleAddFun() {
+    if (!newFunLabel.trim() || !newFunText.trim()) return;
+    setFunSaving(true);
+    try {
+      const id = await addFunItem({ label: newFunLabel.trim(), text: newFunText.trim() });
+      setFeedAdminFun((prev) => [...prev, { id, label: newFunLabel.trim(), text: newFunText.trim() }]);
+      setNewFunLabel("");
+      setNewFunText("");
+    } catch (err) {
+      console.error("Eroare la adăugarea FUN:", err);
+    } finally {
+      setFunSaving(false);
+    }
+  }
+
+  async function handleDeleteFun(id) {
+    try {
+      await deleteFunItem(id);
+      setFeedAdminFun((prev) => prev.filter((f) => f.id !== id));
+    } catch (err) {
+      console.error("Eroare la ștergerea FUN:", err);
+    }
+  }
+
+
+  const [avatarUserUid, setAvatarUserUid] = useState("");
+  const [avatarIdInput, setAvatarIdInput] = useState("");
+  const [avatarSaving, setAvatarSaving] = useState(false);
+  const [avatarSaveMsg, setAvatarSaveMsg] = useState("");
+
+  // ── Nickname utilizator (config) — remediu pentru userii deja afectați
+  // de bug-ul Google Sign-In (nickname = numele real din cont, sărind
+  // peste ecranul de alegere). Odată salvat orice text valid, userul nu
+  // mai e retrimis automat la picker — are nevoie de o corecție directă.
+  const [nicknameUserUid, setNicknameUserUid] = useState("");
+  const [nicknameInput, setNicknameInput] = useState("");
+  const [nicknameSaving, setNicknameSaving] = useState(false);
+  const [nicknameSaveMsg, setNicknameSaveMsg] = useState("");
+
+  // ── Health Check — doar detectare, nimic automat ──
+  const [healthIssues, setHealthIssues] = useState(null); // null = neîncă rulat
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [healthError, setHealthError] = useState("");
+  const [editingMatchId, setEditingMatchId] = useState("");
+  const [editDraft, setEditDraft] = useState({ kickoffAtWallClock: "", competitionSlug: "" });
+  const [editSaving, setEditSaving] = useState(false);
+  const [editMessage, setEditMessage] = useState("");
+
+  const [deletingMatchId, setDeletingMatchId] = useState("");
+  const [deleteMessage, setDeleteMessage] = useState("");
+
+  const [previewRows, setPreviewRows] = useState(null);
+  const [previewIncomplete, setPreviewIncomplete] = useState(0);
+  const [previewProfiles, setPreviewProfiles] = useState({});
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [republishLoading, setRepublishLoading] = useState(false);
+  const [republishMessage, setRepublishMessage] = useState("");
+  const [snapshotRegenLoading, setSnapshotRegenLoading] = useState(false);
+  const [snapshotRegenMessage, setSnapshotRegenMessage] = useState("");
+
+  // ── Buton separat, pentru cazul rar în care scrierea automată a
+  // snapshot-ului (din recomputeAndPublish) a eșuat — reface EXACT
+  // același calcul, din aceeași sursă (previewGameweekResults), fără
+  // risc de dublare (e o recalculare completă, nu un increment). ──
+  async function handleRegenerateSnapshot() {
+    if (!selectedGameweekId) return;
+    setSnapshotRegenLoading(true);
+    setSnapshotRegenMessage("");
+    try {
+      // FAZA 2 — aceeași regulă ca la publicarea automată: versiune
+      // capturată ÎNAINTE de calcul + scriere monotonă.
+      const preGwSnap = await getDoc(doc(db, "gameweeks", selectedGameweekId));
+      const capturedResultsVersion = preGwSnap.exists() ? (preGwSnap.data().resultsVersion || 0) : 0;
+      const result = await previewGameweekResults(selectedGameweekId);
+      const activeUids = await listActiveUserIds();
+      const pointsByUid = {};
+      result.rows.forEach((r) => { if (activeUids.has(r.uid)) pointsByUid[r.uid] = r.pointsFromMatches || 0; });
+      const gwRef = doc(db, "gameweeks", selectedGameweekId);
+      let skipped = false;
+      await runTransaction(db, async (tx) => {
+        const cur = await tx.get(gwRef);
+        const publishedVersion = cur.exists() ? (cur.data().liveSnapshotResultsVersion ?? -1) : -1;
+        if (publishedVersion > capturedResultsVersion) { skipped = true; return; }
+        tx.update(gwRef, {
+          liveSnapshotPointsByUid: pointsByUid,
+          liveSnapshotUpdatedAt: serverTimestamp(),
+          liveSnapshotResultsVersion: capturedResultsVersion,
+        });
+      });
+      setSnapshotRegenMessage(skipped ? "✅ Există deja un snapshot mai nou — nimic de suprascris." : "✅ Snapshot regenerat cu succes.");
+    } catch (err) {
+      console.error("Eroare la regenerarea snapshot-ului:", err);
+      setSnapshotRegenMessage("❌ " + (err.message || String(err)));
+    } finally {
+      setSnapshotRegenLoading(false);
+    }
+  }
+
+  async function handleRepublishMatchPoints() {
+    if (!currentGameweek) return;
+    setRepublishLoading(true);
+    setRepublishMessage("");
+    try {
+      const count = await republishAllMatchPointsForGameweek(currentGameweek.id);
+      setRepublishMessage(`✓ Republicat pentru ${count} meciuri Final.`);
+    } catch (err) {
+      console.error("Eroare la republicarea punctelor:", err);
+      setRepublishMessage("Eroare — vezi consola.");
+    } finally {
+      setRepublishLoading(false);
+    }
+  }
+  const [previewMessage, setPreviewMessage] = useState("");
+  const [finalizing, setFinalizing] = useState(false);
+  const [openPlayerUid, setOpenPlayerUid] = useState("");
+  const [openPlayerStats, setOpenPlayerStats] = useState(null);
+  const [openPlayerLoading, setOpenPlayerLoading] = useState(false);
+
+  // ── 📊 Statistici etape — stare COMPLET IZOLATĂ de selectedSeasonId/
+  // selectedGameweekId de mai sus (cei doi controlează tab-urile cu
+  // acțiuni live — Rezultate/Live/Speciale/Surprize/Feed). Navigarea
+  // prin etape trecute aici NU trebuie să le atingă niciodată.
+  const [statsSeasonId, setStatsSeasonId] = useState("");
+  const [statsGameweeks, setStatsGameweeks] = useState([]);
+  const [statsGameweekId, setStatsGameweekId] = useState("");
+  const [statsRows, setStatsRows] = useState([]);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState("");
+  const [statsSortKey, setStatsSortKey] = useState("exact");
+  const [statsSortDir, setStatsSortDir] = useState(-1);
+
+  async function refreshSeasons() {
+    const data = await listSeasons();
+    setSeasons(data);
+    return data;
+  }
+
+  async function refreshGameweeks(seasonId) {
+    if (!seasonId) return setGameweeks([]);
+    const data = await listGameweeks(seasonId);
+    setGameweeks(data);
+    return data;
+  }
+
+  // ── 📖 PLAY LEAGUE Stories ──────────────────────────────────────
+  function buildPreviewSlides(seasonNumber, etapaNumber, slideCount) {
+    return Array.from({ length: slideCount }, (_, i) =>
+      slideUrl({ seasonNumber, etapaNumber, slideIndex: i + 1 }));
+  }
+
+  async function handlePreviewGwStory() {
+    if (!currentGameweek) return;
+    const seasonNumber = seasonNumberFromList(currentGameweek.seasonId, seasons);
+    setStoryPreview({ slideUrls: buildPreviewSlides(seasonNumber, currentGameweek.number, gwStorySlideCount), isSeasonStory: false });
+  }
+
+  async function handleActivateGwStory() {
+    if (!currentGameweek) return;
+    if (!window.confirm(`Activezi Story-ul pentru Etapa ${currentGameweek.number} (${gwStorySlideCount} slide-uri)? Devine vizibil/pulsant pentru toți jucătorii care nu l-au văzut.`)) return;
+    setStoryBusy(true);
+    try {
+      await activateGameweekStory(currentGameweek.id, gwStorySlideCount);
+      await refreshGameweeks(selectedSeasonId);
+    } catch (err) {
+      window.alert("Eroare la activare: " + (err.message || String(err)));
+    } finally {
+      setStoryBusy(false);
+    }
+  }
+
+  async function handleDeactivateGwStory() {
+    if (!currentGameweek) return;
+    if (!window.confirm("Dezactivezi Story-ul acestei etape? Nu mai apare ca activ până îl reactivezi.")) return;
+    setStoryBusy(true);
+    try {
+      await deactivateGameweekStory(currentGameweek.id);
+      await refreshGameweeks(selectedSeasonId);
+    } catch (err) {
+      window.alert("Eroare la dezactivare: " + (err.message || String(err)));
+    } finally {
+      setStoryBusy(false);
+    }
+  }
+
+  const currentSeasonObj = seasons.find((s) => s.id === selectedSeasonId);
+
+  async function handlePreviewSeasonStory() {
+    if (!currentSeasonObj) return;
+    const seasonNumber = seasonNumberFromList(currentSeasonObj.id, seasons);
+    setStoryPreview({ slideUrls: buildPreviewSlides(seasonNumber, null, seasonStorySlideCount), isSeasonStory: true });
+  }
+
+  async function handleActivateSeasonStory() {
+    if (!currentSeasonObj) return;
+    if (!window.confirm(`Activezi Povestea Sezonului (${seasonStorySlideCount} slide-uri)?`)) return;
+    setStoryBusy(true);
+    try {
+      await activateSeasonStory(currentSeasonObj.id, seasonStorySlideCount);
+      await refreshSeasons();
+    } catch (err) {
+      window.alert("Eroare la activare: " + (err.message || String(err)));
+    } finally {
+      setStoryBusy(false);
+    }
+  }
+
+  async function handleDeactivateSeasonStory() {
+    if (!currentSeasonObj) return;
+    if (!window.confirm("Dezactivezi Povestea Sezonului?")) return;
+    setStoryBusy(true);
+    try {
+      await deactivateSeasonStory(currentSeasonObj.id);
+      await refreshSeasons();
+    } catch (err) {
+      window.alert("Eroare la dezactivare: " + (err.message || String(err)));
+    } finally {
+      setStoryBusy(false);
+    }
+  }
+
+  async function refreshMatches(gameweekId) {
+    if (!gameweekId) return setMatches([]);
+    const data = await listMatches(gameweekId);
+    setMatches(data);
+    return data;
+  }
+
+  // La montare: încarcă sezoanele, apoi detectează automat sezonul ACTIV
+  // (cel a cărui interval de date conține azi — via getCurrentSeason) și
+  // etapa CURENTĂ a acelui sezon (via getCurrentGameweek), le selectează
+  // direct, și încarcă meciurile. Nu alege pur și simplu "cel mai mare ID".
+  useEffect(() => {
+    (async () => {
+      setAutoDetecting(true);
+      try {
+        const allSeasons = await refreshSeasons();
+        const current = await getCurrentSeason();
+        if (current) {
+          setSelectedSeasonId(current.id);
+          await refreshGameweeks(current.id);
+          const currentGw = await getCurrentGameweek(current.id);
+          if (currentGw) {
+            setSelectedGameweekId(currentGw.id);
+            setAutoDetectedLabel(`${current.name} · ${currentGw.title}`);
+          } else {
+            setAutoDetectedLabel(`${current.name} · fără etapă activă săptămâna asta`);
+          }
+        } else if (allSeasons.length > 0) {
+          setAutoDetectedLabel("Niciun sezon activ azi — alege manual mai jos.");
+          setShowManualSelectors(true);
+        } else {
+          // REPARAT — caz negăsit înainte: ZERO sezoane există (ex. chiar
+          // după un Reset complet). Nici ramura de mai sus, nici cea de
+          // "sezon curent găsit" nu se activau — eticheta rămânea goală,
+          // selectoarele manuale nu se arătau, ecranul Admin părea "gol"
+          // și fără nicio acțiune posibilă. Acum: mesaj clar + selectoare
+          // deschise automat, ca să poți crea un sezon nou direct de-aici.
+          // Restul Admin-ului (tab-uri ca "Jucători") era deja accesibil
+          // indiferent de asta — nu era o blocare reală de rutare.
+          setAutoDetectedLabel("Niciun sezon nu există încă — creează unul mai jos, sau folosește tab-ul „Jucători” dacă vrei doar să gestionezi jucătorii.");
+          setShowManualSelectors(true);
+        }
+      } catch (err) {
+        console.error("Eroare la auto-detecție sezon/etapă:", err);
+      } finally {
+        setAutoDetecting(false);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedSeasonId) return;
+    refreshGameweeks(selectedSeasonId);
+  }, [selectedSeasonId]);
+
+  useEffect(() => {
+    refreshMatches(selectedGameweekId);
+    const gw = gameweeks.find((g) => g.id === selectedGameweekId);
+    setFeaturedIds(gw?.featuredMatchIds || []);
+    setFeaturedMessage("");
+    setPreviewRows(null);
+    setPreviewIncomplete(0);
+    setPreviewMessage("");
+    setOpenPlayerUid("");
+  }, [selectedGameweekId, gameweeks]);
+
+  function toggleFeatured(matchId) {
+    setFeaturedIds((prev) => {
+      if (prev.includes(matchId)) return prev.filter((id) => id !== matchId);
+      if (prev.length >= 3) return prev; // deja 3 alese, ignorăm click-ul
+      return [...prev, matchId];
     });
+  }
 
-    setSaved(isFT ? 'ft' : 'noft');
-    setTimeout(() => setSaved(false), 3500);
-  };
+  async function handleSaveFeatured() {
+    setFeaturedSaving(true);
+    setFeaturedMessage("");
+    try {
+      await setFeaturedMatches(selectedGameweekId, featuredIds);
+      await refreshGameweeks(selectedSeasonId);
+      setFeaturedMessage("✓ Meciurile Săptămânii salvate.");
+      if (currentGameweek?.status !== "completed") {
+        await recomputeAndPublish();
+      }
+    } catch (err) {
+      console.error(err);
+      setFeaturedMessage("Eroare: " + (err.message || err.code));
+    } finally {
+      setFeaturedSaving(false);
+    }
+  }
 
-  // Derived match status
-  const getStatus = (m) => {
-    const fr = finishedResults?.[m.id];
-    return fr?.liveStatus ?? (m.isFinished ? 'ft' : m.isLive ? 'live' : 'scheduled');
-  };
-  const getColor = (s) => STATUS_OPTIONS.find(o => o.value === s)?.color || '#6B7280';
+  async function handleCreateSeason(e) {
+    e.preventDefault();
+    const startIso = parseRoDateToIso(seasonStart);
+    const endIso = parseRoDateToIso(seasonEnd);
+    if (!seasonName.trim()) { setMessage("Scrie numele sezonului."); return; }
+    if (!startIso || !endIso) {
+      setMessage("Datele trebuie scrise ca ZZ.LL.AAAA, de exemplu 08.10.2026.");
+      return;
+    }
+    setLoading(true);
+    setMessage("");
+    try {
+      const id = await createSeason({ name: seasonName, startDate: startIso, endDate: endIso });
+      setSeasonName("");
+      setSeasonStart("");
+      setSeasonEnd("");
+      await refreshSeasons();
+      setSelectedSeasonId(id);
+      setMessage("Sezon creat.");
+    } catch (err) {
+      console.error(err);
+      setMessage("Eroare la crearea sezonului: " + (err.message || err.code));
+    } finally {
+      setLoading(false);
+    }
+  }
 
-  const filtered = useMemo(() => MATCHES
-    .filter(m => groupF === 'all' || m.group === groupF)
-    .filter(m => {
-      if (statusF === 'all') return true;
-      return getStatus(m) === statusF;
-    })
-    .filter(m => !search ||
-      m.teamA.toLowerCase().includes(search.toLowerCase()) ||
-      m.teamB.toLowerCase().includes(search.toLowerCase()) ||
-      m.venue.toLowerCase().includes(search.toLowerCase())
-    ),
-  [groupF, statusF, search, finishedResults]);
+  async function handleCreateNextGameweek() {
+    if (!selectedSeasonId) return;
+    setLoading(true);
+    setMessage("");
 
-  const statsRow = ['scheduled','live','ht','ft'].map(s => ({
-    label: s, color: getColor(s),
-    count: MATCHES.filter(m => getStatus(m) === s).length,
-  }));
+    let result;
+    try {
+      result = await createOrGetWeeklyGameweek(selectedSeasonId);
+    } catch (err) {
+      console.error("Eroare la crearea/deschiderea etapei:", err);
+      setMessage("Eroare la crearea etapei: " + (err.message || err.code));
+      setLoading(false);
+      return;
+    }
+
+    const { id, number, existed } = result;
+    setSelectedGameweekId(id);
+    setMessage(
+      existed
+        ? `Etapa acestei săptămâni există deja — Etapa ${number}, deschisă.`
+        : `Etapa ${number} creată pentru săptămâna curentă.`
+    );
+
+    try {
+      await refreshGameweeks(selectedSeasonId);
+    } catch (err) {
+      console.error("Eroare la reîncărcarea listei de etape:", err);
+      setMessage(
+        (prev) => `${prev} (Atenție: lista de etape nu s-a putut reîncărca — ${err.message || err.code})`
+      );
+    }
+
+    setLoading(false);
+  }
+
+  async function handleDeleteMatch(match) {
+    const confirmed = window.confirm(
+      `Ștergi meciul "${match.homeTeam} - ${match.awayTeam}"?\n\nSe șterg și predicțiile/Jokerii asociați. Ireversibil.`
+    );
+    if (!confirmed) return;
+
+    setDeletingMatchId(match.id);
+    setDeleteMessage("");
+    try {
+      await deleteMatch(match.id, selectedGameweekId);
+      await refreshMatches(selectedGameweekId);
+      setDeleteMessage(`✓ Meciul "${match.homeTeam} - ${match.awayTeam}" a fost șters.`);
+      // Republică live scores — publishLiveScores rescrie complet (nu
+      // adaugă) breakdown-ul fiecărui user din matches curente, deci
+      // meciul șters nu mai poate rămâne orfan în gameweekLiveScores.
+      if (currentGameweek?.status !== "completed") {
+        await recomputeAndPublish();
+      }
+    } catch (err) {
+      console.error(err);
+      setDeleteMessage("Eroare la ștergere: " + (err.message || err.code));
+    } finally {
+      setDeletingMatchId("");
+    }
+  }
+
+  async function handleSaveResult(matchId, values) {
+    await saveMatchResult(matchId, values);
+    await refreshMatches(selectedGameweekId);
+    // Recalculează + republică automat clasamentul live — Lu nu mai trebuie
+    // să apese separat "Calculează Preview" după fiecare rezultat.
+    if (currentGameweek?.status !== "completed") {
+      await recomputeAndPublish();
+    }
+  }
+
+  async function toggleMissingPredictions(matchId) {
+    if (openMissingFor === matchId) { setOpenMissingFor(null); return; }
+    setOpenMissingFor(matchId);
+    if (missingPredictions[matchId] === undefined) {
+      setMissingPredictions((prev) => ({ ...prev, [matchId]: "loading" }));
+      try {
+        const list = await getMissingPredictionsForMatch(matchId);
+        setMissingPredictions((prev) => ({ ...prev, [matchId]: list }));
+      } catch (err) {
+        console.error("Eroare la citirea pronosticurilor lipsă:", err);
+        setMissingPredictions((prev) => ({ ...prev, [matchId]: "error" }));
+      }
+    }
+  }
+
+  async function handleChangeStatus(matchId, newStatus) {
+    await updateMatchStatus(matchId, newStatus);
+    await refreshMatches(selectedGameweekId);
+    // ROOT CAUSE 2 din auditul Feed — reparat aici: schimbarea de status
+    // (spre deosebire de salvarea scorului) NU republica niciodată
+    // gameweekLiveScores. Un meci devine cu adevărat "final" (matchPoints
+    // se publică) abia AICI, la schimbarea de status — dar clasamentul
+    // live rămânea înghețat la starea de dinainte, deci Feed-ul nu mai
+    // detecta NICIODATĂ schimbările de poziție reale, cauzate de acest
+    // meci. Acum republicăm, exact ca la salvarea scorului.
+    if (currentGameweek?.status !== "completed") {
+      await recomputeAndPublish();
+    }
+  }
+
+  async function recomputeAndPublish() {
+    setPreviewLoading(true);
+    setPreviewMessage("");
+    try {
+      // ── FAZA 2 — versiunea e capturată ÎNAINTE de calcul (nu după).
+      // Snapshot-ul e etichetat cu versiunea datelor pe care chiar le-a
+      // calculat; o validare nouă apărută între timp îl face „depășit",
+      // nu corect-în-mod-fals. O singură citire (mutată, nu adăugată). ──
+      const preGwSnap = await getDoc(doc(db, "gameweeks", selectedGameweekId));
+      const capturedResultsVersion = preGwSnap.exists() ? (preGwSnap.data().resultsVersion || 0) : 0;
+      const result = await previewGameweekResults(selectedGameweekId);
+      setPreviewRows(result.rows);
+      setPreviewIncomplete(result.incompleteMatchIds.length);
+      const names = await getUserPublicProfiles(result.rows.map((r) => r.uid));
+      setPreviewProfiles(names);
+
+      if (result.rows.length > 0 && currentGameweek?.status !== "completed") {
+        await publishLiveScores(selectedGameweekId);
+        runFinishedMatchesFeed(selectedGameweekId).catch((err) => console.error("Eroare Feed meciuri Final (Admin):", err));
+        // Feed-ul viu — chiar acum, imediat după ce clasamentul etapei
+        // s-a schimbat, nu doar dacă Adminul apasă separat "Regenerează
+        // Feed" (asta era cauza reală a Feed-ului "mort": mecanismul de
+        // povești (feedStoryEngine.js) exista deja, complet, dar nu se
+        // apela niciodată automat). Best-effort — un eșec aici nu
+        // trebuie să blocheze deloc fluxul principal de validare.
+        // Repornit (7 sept) — motorul scump și redundant din WelcomeScreen
+        // (processRankChanges, înmulțit pe fiecare user conectat) a fost
+        // eliminat complet; acesta rămâne SINGURA sursă acum, rulează o
+        // singură dată per validare, indiferent de câți useri sunt
+        // conectați — mult mai ieftin, verificat.
+        processLiveRankChangesCapped(selectedGameweekId).catch((err) => console.error("Eroare la Feed (clasament etapei):", err));
+        processTeamDuelPulse(selectedGameweekId).catch((err) => console.error("Eroare la Feed (Duel de Echipe):", err));
+        // ── REPARAT — clasamentul GENERAL (Play League, seasonPoints+
+        // specialPoints) nu avea NICIUN apelant de când am optimizat
+        // citirile Firestore — de-asta n-a apărut nicio știre de
+        // clasament după primul meci real. Cost mic, o singură rulare
+        // per validare (1 citire clasament + 1 tranzacție mică),
+        // exact ca pentru etapa de mai sus — nu un mecanism nou. ──
+        processRankChanges().catch((err) => console.error("Eroare la Feed (clasament general):", err));
+
+        // ── SNAPSHOT LIVE AL CLASAMENTULUI — cerut explicit, ca Header/
+        // Clasament să nu mai recalculeze fiecare din matchPoints, la
+        // fiecare 2 minute, per user. Reutilizează result.rows, DEJA
+        // calculat mai sus (previewGameweekResults) — ZERO citire nouă.
+        // pointsFromMatches, NU totalPoints — totalPoints include și
+        // rankingBonus-ul PROVIZORIU ("dacă etapa s-ar termina acum"),
+        // care NU trebuie amestecat în punctajul live afișat în
+        // Etapă/Sezon/General (rămâne separat, exact ca azi). Scris pe
+        // gameweeks/{id} — colecție deja citibilă de toți userii și
+        // scriibilă de Admin, exact ca la Story — zero regulă nouă.
+        //
+        // REPARAT — garanție împotriva snapshot-ului învechit nedetectat.
+        // saveMatchResult/updateMatchStatus incrementează ATOMIC
+        // resultsVersion, PE ACELAȘI document, exact când se validează un
+        // rezultat — indiferent dacă scrierea de mai jos a snapshot-ului
+        // reușește sau nu. Snapshot-ul își reține versiunea PENTRU CARE a
+        // fost calculat. Clientul compară cele două — dacă diferă, știe
+        // SIGUR că snapshot-ul e depășit, fără nicio presupunere. ──
+        try {
+          // ── HOTFIX PRODUCȚIE — REGRESIE reparată. computeGameweekResults
+          // include DELIBERAT toți userii din users/ (necesar pentru
+          // finalizare/bonusuri — NEATINS, nu se schimbă asta). DAR
+          // snapshot-ul LIVE afișat jucătorilor nu avea acest filtru —
+          // un user dezactivat (ex. Dragalin16) reapărea în Clasament,
+          // cu penalizarea de ultim loc, exact fiindcă fallback-ul VECHI
+          // (getLiveGameweekPointsDiagnostic, deja corect filtrat pe
+          // listActiveUserIds) rula aproape mereu — iar snapshot-ul,
+          // netfiltrat, abia acum a început să fie citit cu succes de
+          // ambii consumatori (Header+Clasament), după hotfix-ul de azi.
+          // Filtrul se aplică STRICT aici, la construirea snapshot-ului —
+          // NU în computeGameweekResults, NU în finalizare, NU în scoring. ──
+          const activeUids = await listActiveUserIds();
+          const pointsByUid = {};
+          result.rows.forEach((r) => { if (activeUids.has(r.uid)) pointsByUid[r.uid] = r.pointsFromMatches || 0; });
+          // ── FAZA 2 — scriere MONOTONĂ: dacă între timp a fost publicat un
+          // snapshot pentru o versiune mai nouă (două validări rapide,
+          // publicări terminate în ordine inversă), cel vechi NU îl mai
+          // suprascrie. Tranzacție pe același document. ──
+          const gwRef = doc(db, "gameweeks", selectedGameweekId);
+          await runTransaction(db, async (tx) => {
+            const cur = await tx.get(gwRef);
+            const publishedVersion = cur.exists() ? (cur.data().liveSnapshotResultsVersion ?? -1) : -1;
+            if (publishedVersion > capturedResultsVersion) return; // există deja unul mai nou
+            tx.update(gwRef, {
+              liveSnapshotPointsByUid: pointsByUid,
+              liveSnapshotUpdatedAt: serverTimestamp(),
+              liveSnapshotResultsVersion: capturedResultsVersion,
+            });
+          });
+        } catch (err) {
+          console.error("Eroare la scrierea snapshot-ului live al clasamentului:", err);
+          setPreviewMessage((prev) => (prev ? prev + " " : "") +
+            "⚠️ Rezultatul a fost salvat corect, dar actualizarea clasamentului live a eșuat. Jucătorii vor vedea temporar un calcul de rezervă (mai lent, dar corect), nu date vechi — apasă „🔄 Regenerează snapshot clasament” mai jos, sau reîncearcă validarea.");
+        }
+      }
+
+      if (result.incompleteMatchIds.length > 0) {
+        setPreviewMessage(
+          `⚠️ ${result.incompleteMatchIds.length}/${result.totalMatches} meciuri nu au rezultat complet — finalizarea va fi refuzată până le completezi pe toate.`
+        );
+      } else if (result.rows.length === 0) {
+        setPreviewMessage("Niciun user în sistem — nimic de calculat.");
+      }
+    } catch (err) {
+      console.error(err);
+      setPreviewMessage("Eroare la calcul: " + (err.message || err.code));
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  async function handlePreview() {
+    await recomputeAndPublish();
+  }
+
+  async function handleFinalize() {
+    const confirmed = window.confirm(
+      "Finalizezi etapa? seasonPoints și gameweeksPlayed se actualizează pentru toți userii din clasament. Ireversibil (etapa devine 'completed')."
+    );
+    if (!confirmed) return;
+
+    setFinalizing(true);
+    setPreviewMessage("");
+    try {
+      const outcome = await finalizeGameweek(selectedGameweekId);
+      if (outcome.alreadyCompleted) {
+        setPreviewMessage("Etapa era deja finalizată — nu s-a modificat nimic (protecție anti-dublare).");
+      } else {
+        setPreviewMessage("✓ Etapa finalizată. Clasamentul general a fost actualizat.");
+      }
+      setPreviewRows(outcome.rows);
+      await refreshGameweeks(selectedSeasonId);
+    } catch (err) {
+      console.error(err);
+      setPreviewMessage("Eroare la finalizare: " + (err.message || err.code));
+    } finally {
+      setFinalizing(false);
+    }
+  }
+
+  async function handleRunHealthCheck() {
+    setHealthLoading(true);
+    setHealthError("");
+    setEditMessage("");
+    try {
+      const all = await listAllMatches();
+      setHealthIssues(runMatchHealthCheck(all));
+    } catch (err) {
+      console.error(err);
+      setHealthError(err.message || err.code);
+    } finally {
+      setHealthLoading(false);
+    }
+  }
+
+  function startEditingMatch(m) {
+    const d = m.kickoffAt?.toDate ? m.kickoffAt.toDate() : null;
+    const wallClock = d
+      ? new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Bucharest", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false })
+          .format(d)
+          .replace(",", "")
+      : "";
+    // căutăm slug-ul curent după numele deja salvat, ca select-ul să
+    // pornească pe opțiunea corectă dacă meciul are deja o competiție
+    const currentSlug = Object.entries(COMPETITION_THEMES).find(([, t]) => t.name === m.competitionName)?.[0] || "";
+    setEditingMatchId(m.id);
+    setEditDraft({ kickoffAtWallClock: wallClock, competitionSlug: currentSlug });
+    setEditMessage("");
+  }
+
+  async function handleSaveMatchEdit(matchId) {
+    setEditSaving(true);
+    setEditMessage("");
+    try {
+      const preset = editDraft.competitionSlug ? COMPETITION_THEMES[editDraft.competitionSlug] : null;
+      await updateMatch(matchId, {
+        kickoffAtWallClock: editDraft.kickoffAtWallClock || undefined,
+        // slug ales direct dintr-o listă — fără nicio ghicire de nume
+        competitionName: editDraft.competitionSlug ? preset?.name ?? undefined : undefined,
+        competitionId: editDraft.competitionSlug ? editDraft.competitionSlug : undefined,
+        competitionColor: editDraft.competitionSlug ? preset?.primaryColor ?? undefined : undefined,
+      });
+      setEditingMatchId("");
+      setEditMessage("Corectat.");
+      await handleRunHealthCheck();
+    } catch (err) {
+      console.error(err);
+      setEditMessage("Eroare: " + err.message);
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function handleDeleteFromHealthCheck(m) {
+    if (!window.confirm(`Ștergi definitiv meciul ${m.homeTeam} - ${m.awayTeam}?`)) return;
+    try {
+      await deleteMatch(m.id, m.gameweekId);
+      await handleRunHealthCheck();
+    } catch (err) {
+      console.error(err);
+      setEditMessage("Eroare la ștergere: " + err.message);
+    }
+  }
+
+  useEffect(() => {
+    if (tab !== "config" && tab !== "surprises") return;
+    // Reutilizată dacă a fost deja încărcată (ex. Admin a vizitat "Config"
+    // în aceeași sesiune) — nicio citire suplimentară în cazul ăla.
+    if (allUsers.length > 0) return;
+    listAllUsers()
+      .then(setAllUsers)
+      .catch((err) => console.error("Eroare la încărcarea listei de utilizatori:", err));
+  }, [tab]);
+
+  useEffect(() => {
+    if (tab !== "surprises" || !selectedGameweekId) return;
+    if (weeklyJokersGwId === selectedGameweekId) return; // deja încărcat pentru etapa asta
+    listJokersForGameweek(selectedGameweekId)
+      .then((jokers) => { setWeeklyJokers(jokers); setWeeklyJokersGwId(selectedGameweekId); })
+      .catch((err) => console.error("Eroare la încărcarea Jokerelor etapei:", err));
+  }, [tab, selectedGameweekId, weeklyJokersGwId]);
+
+  // ── 📊 Statistici etape — complet izolat de selectedSeasonId/selectedGameweekId. ──
+  // 1) Doar un default inițial de sezon (o singură dată, când intri prima
+  //    dată pe tab) — NU sincronizează ulterior cu selecția globală.
+  useEffect(() => {
+    if (tab !== "stats" || statsSeasonId || seasons.length === 0) return;
+    setStatsSeasonId(selectedSeasonId || seasons[0].id);
+  }, [tab, statsSeasonId, seasons, selectedSeasonId]);
+
+  // 2) Lista de etape a sezonului ales pentru statistici — se încarcă
+  //    DOAR cât timp ești efectiv pe tab-ul Statistici etape.
+  useEffect(() => {
+    if (tab !== "stats" || !statsSeasonId) return;
+    listGameweeks(statsSeasonId)
+      .then(setStatsGameweeks)
+      .catch((err) => console.error("Eroare la încărcarea etapelor pentru Statistici:", err));
+  }, [tab, statsSeasonId]);
+
+  // 3) Statisticile propriu-zise — citește STRICT etapa selectată aici,
+  //    niciodată toate deodată, și doar cât timp tab-ul e activ.
+  useEffect(() => {
+    if (tab !== "stats" || !statsGameweekId) { setStatsRows([]); return; }
+    let cancelled = false;
+    setStatsLoading(true);
+    setStatsError("");
+    (async () => {
+      try {
+        const scoreRows = await listGameweekScoresForStats(statsGameweekId);
+        const uids = scoreRows.map((r) => r.userId);
+        const profiles = await getUserPublicProfiles(uids);
+        const nicknameByUid = {};
+        uids.forEach((uid) => { nicknameByUid[uid] = profiles[uid]?.nickname || uid; });
+        if (!cancelled) setStatsRows(computeEtapaStatsRows(scoreRows, nicknameByUid));
+      } catch (err) {
+        console.error("Eroare la încărcarea Statisticilor etapei:", err);
+        if (!cancelled) setStatsError("Eroare la încărcare — vezi consola.");
+      } finally {
+        if (!cancelled) setStatsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [tab, statsGameweekId]);
+
+  // ── Selector DEDICAT Regenerate Feed — izolat, la fel ca la
+  // Statistici etape mai sus. Default de sezon o singură dată, apoi
+  // lista de etape a sezonului ales, doar cât timp ești pe tab-ul Feed. ──
+  useEffect(() => {
+    if (tab !== "feed" || regenerateSeasonId || seasons.length === 0) return;
+    setRegenerateSeasonId(selectedSeasonId || seasons[0].id);
+  }, [tab, regenerateSeasonId, seasons, selectedSeasonId]);
+
+  useEffect(() => {
+    if (tab !== "feed" || !regenerateSeasonId) return;
+    listGameweeks(regenerateSeasonId)
+      .then((gws) => {
+        setRegenerateGameweeks(gws);
+        setRegenerateGameweekId((prev) => prev || gws[gws.length - 1]?.id || "");
+      })
+      .catch((err) => console.error("Eroare la încărcarea etapelor pentru Regenerate:", err));
+  }, [tab, regenerateSeasonId]);
+
+  // Aceeași sursă ca în Clasament — un singur card, indiferent de unde
+  // e deschis (Live preview din Admin, sau oricare din cele 3 taburi).
+  async function handleOpenPreviewPlayer(uid, rank) {
+    setOpenPlayerUid(uid);
+    setOpenPlayerStats(null);
+    setOpenPlayerLoading(true);
+    try {
+      const stats = await getPlayerCardStats(uid, selectedSeasonId, selectedGameweekId);
+      setOpenPlayerStats({ ...stats, rank });
+    } catch (err) {
+      console.error("Eroare la încărcarea cardului:", err);
+    } finally {
+      setOpenPlayerLoading(false);
+    }
+  }
+
+  // ── Speciale ── Specialele NU depind de sezonul Play League selectat
+  // (rămân valabile pe toată ediția) — folosim SPECIALS_EDITION_ID fix,
+  // nu selectedSeasonId. Gardul de mai jos (tab==="speciale") rămâne
+  // neschimbat, doar valoarea interogării s-a decuplat de sezon.
+  useEffect(() => {
+    if (tab !== "speciale") return;
+    listSpecialPhases(SPECIALS_EDITION_ID)
+      .then(setSpecialPhasesForSeason)
+      .catch((err) => console.error("Eroare la încărcarea fazelor speciale:", err));
+    listAllUsers()
+      .then((users) => setCompletionActiveUsers(users.filter((u) => getPlayerStatus(u) === "active")))
+      .catch((err) => console.error("Eroare la lista de useri activi (overview Speciale):", err));
+  }, [tab, openMsg, resolveMsg, closeMsg]);
+
+  // ── Overview agregat: cine a completat Specialele — peste TOATE
+  // fazele deschise deja (nu cele blocate), recalculat ori de câte ori
+  // se schimbă lista de faze sau se deschide/rezolvă ceva. ──
+  useEffect(() => {
+    if (tab !== "speciale" || specialPhasesForSeason.length === 0) { setCompletionPicksByPhase({}); return; }
+    setCompletionLoading(true);
+    const phaseIds = specialPhasesForSeason.map((p) => p.phaseId);
+    listAllSpecialPicksForPhases(phaseIds)
+      .then(setCompletionPicksByPhase)
+      .catch((err) => console.error("Eroare la overview-ul de completare Speciale:", err))
+      .finally(() => setCompletionLoading(false));
+  }, [tab, specialPhasesForSeason]);
+
+  const specialCompetitions = listAllSpecialCompetitions();
+  const specialComp = specialCompetitions.find((c) => c.id === specialCompId) || null;
+  const specialPhaseDef = specialComp?.phases.find((p) => p.id === specialPhaseId) || null;
+  const specialPhaseState = specialPhasesForSeason.find((p) => p.phaseId === specialPhaseId) || null;
+  const availableSpecialPhases = specialPhasesForSeason.map((p) => ({ id: p.phaseId, label: getPhaseDefinition(p.phaseId)?.phase?.label || p.phaseId }));
+
+  function slugifyOption(label) {
+    return label.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  }
+
+  async function handleOpenSpecialPhase() {
+    if (!specialPhaseDef) return;
+    const labels = optionsText.split("\n").map((l) => l.trim()).filter(Boolean);
+    if (labels.length === 0) { setOpenMsg("Introdu cel puțin o opțiune."); return; }
+    if (!closesAtInput) { setOpenMsg("Setează data de închidere."); return; }
+    const options = labels.map((label) => ({ id: slugifyOption(label), label }));
+    setOpenSaving(true);
+    setOpenMsg("");
+    try {
+      await openSpecialPhase({
+        seasonId: SPECIALS_EDITION_ID,
+        phaseId: specialPhaseDef.id,
+        competitionId: specialComp.id,
+        closesAt: new Date(closesAtInput),
+        options,
+      });
+      setOpenMsg("Fază deschisă.");
+      setOptionsText("");
+      setClosesAtInput("");
+    } catch (err) {
+      console.error(err);
+      setOpenMsg("Eroare: " + err.message);
+    } finally {
+      setOpenSaving(false);
+    }
+  }
+
+  async function handleCloseSpecialPhase() {
+    if (!specialPhaseDef || !specialPhaseId) return;
+    setCloseSaving(true);
+    setCloseMsg("");
+    try {
+      await closeSpecialPhase(specialPhaseId);
+      setCloseMsg("Fază închisă — alegerile tuturor sunt acum vizibile jucătorilor.");
+    } catch (err) {
+      console.error(err);
+      setCloseMsg("Eroare: " + err.message);
+    } finally {
+      setCloseSaving(false);
+    }
+  }
+
+  async function handleResolveSpecialPhase() {
+    if (!specialPhaseDef || !specialPhaseState) return;
+    const isComplete = specialPhaseDef.type === PICK_TYPES.SINGLE
+      ? Boolean(resolveSelection)
+      : Array.isArray(resolveSelection) && resolveSelection.length === (specialPhaseDef.type === PICK_TYPES.RANKED ? specialPhaseDef.rankedSize : specialPhaseDef.groupSize);
+    if (!isComplete) { setResolveMsg("Completează rezultatul întâi."); return; }
+    setResolveSaving(true);
+    setResolveMsg("");
+    try {
+      const result = await resolveSpecialPhase(specialPhaseDef.id, resolveSelection);
+      setResolveMsg(result.alreadyResolved ? "Era deja rezolvată." : `Rezolvat — ${result.scoredUsers} useri scorați.`);
+      setResolveSelection(null);
+    } catch (err) {
+      console.error(err);
+      setResolveMsg("Eroare: " + err.message);
+    } finally {
+      setResolveSaving(false);
+    }
+  }
+
+  async function handleSetUserAvatar() {
+    setAvatarSaving(true);
+    setAvatarSaveMsg("");
+    try {
+      await updateOwnAvatar(avatarUserUid, avatarIdInput.trim());
+      setAvatarSaveMsg("Salvat.");
+      setAllUsers((prev) => prev.map((u) => (u.uid === avatarUserUid ? { ...u, avatarId: avatarIdInput.trim() } : u)));
+      setAvatarUserUid("");
+      setAvatarIdInput("");
+    } catch (err) {
+      console.error(err);
+      setAvatarSaveMsg("Eroare: " + err.message);
+    } finally {
+      setAvatarSaving(false);
+    }
+  }
+
+  // Refolosește claimNickname (aceeași validare + verificare de
+  // disponibilitate ca la userul care-și alege singur nickname-ul) — doar
+  // că aici e admin-ul care o declanșează, pentru cineva blocat cu numele
+  // real din Google, fără nicio cale să se corecteze singur.
+  async function handleSetUserNickname() {
+    setNicknameSaving(true);
+    setNicknameSaveMsg("");
+    try {
+      await claimNickname(nicknameUserUid, nicknameInput.trim());
+      setNicknameSaveMsg("Salvat.");
+      setAllUsers((prev) => prev.map((u) => (u.uid === nicknameUserUid ? { ...u, nickname: nicknameInput.trim() } : u)));
+      setNicknameUserUid("");
+      setNicknameInput("");
+    } catch (err) {
+      console.error(err);
+      setNicknameSaveMsg("Eroare: " + err.message);
+    } finally {
+      setNicknameSaving(false);
+    }
+  }
+
+  async function handleGenerateBackup() {
+    if (backupRunning) return; // fara double-click / doua exporturi simultane
+    if (!window.confirm("Generezi backup-ul complet PLAY LEAGUE? Recomandat când nu sunt meciuri LIVE.")) return;
+    setBackupRunning(true);
+    setBackupIsError(false);
+    setBackupStatus("Se generează backup-ul…");
+    try {
+      const backup = await generatePlayLeagueBackup((label) => setBackupStatus(`Se generează backup-ul… (${label})`));
+      downloadBackupJson(backup);
+      const failed = backup.metadata.failedSections || [];
+      if (failed.length === 0) {
+        setBackupStatus(`✓ Backup complet — ${backup.metadata.totalDocuments} documente`);
+        setBackupIsError(false);
+      } else {
+        const list = failed.map((f) => f.label).join(", ");
+        setBackupStatus(`⚠️ Backup PARȚIAL — ${backup.metadata.totalDocuments} documente salvate. Lipsesc (permisiuni): ${list}`);
+        setBackupIsError(true); // culoare de atentionare, dar fisierul TOT s-a descarcat
+      }
+    } catch (err) {
+      console.error("Backup PLAY LEAGUE eșuat complet:", err);
+      setBackupStatus(`❌ Backup eșuat complet — nu s-a generat niciun fișier. ${err.message || err}`);
+      setBackupIsError(true);
+    } finally {
+      setBackupRunning(false);
+    }
+  }
+
+  async function handleImportMatches(e) {
+    e.preventDefault();
+    if (!selectedGameweekId || !matchesText.trim()) return;
+    setLoading(true);
+    setMessage("");
+    try {
+      const { created, warnings } = await bulkCreateMatches(selectedGameweekId, matchesText);
+      setMatchesText("");
+      await refreshMatches(selectedGameweekId);
+      const warnText = warnings.length ? ` ⚠️ ${warnings.length} avertismente:\n${warnings.join("\n")}` : "";
+      setMessage(`${created} meciuri importate.${warnText}`);
+    } catch (err) {
+      console.error(err);
+      setMessage("Eroare la import: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleReset() {
+    const typed = window.prompt(
+      'ATENȚIE — instrument doar de TEST. Șterge TOATE sezoanele, etapele, meciurile, predicțiile, jokerii, Feed-ul, toate Surprizele (Mystery Box/Duel/Sabotaj/Ruletă/Trivia/Zaruri/Penalty) ȘI RESETEAZĂ CLASAMENTUL (punctele fiecărui cont la 0) — ireversibil. Conturile userilor (nickname/avatar/status) și Specialele (Câștigătoare CL/Golgheter/etc.) NU se șterg.\n\nScrie exact "RESET" ca să confirmi:'
+    );
+    if (typed !== "RESET") {
+      if (typed !== null) setMessage('Resetare anulată — trebuia scris exact "RESET".');
+      return;
+    }
+    setLoading(true);
+    setMessage("");
+    try {
+      const count = await resetAllTestData();
+      setSeasons([]);
+      setGameweeks([]);
+      setMatches([]);
+      setSelectedSeasonId("");
+      setSelectedGameweekId("");
+      setMessage(`Resetat — ${count} documente șterse.`);
+    } catch (err) {
+      console.error(err);
+      setMessage("Eroare la resetare: " + (err.message || err.code));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const currentGameweek = gameweeks.find((g) => g.id === selectedGameweekId);
+  const filteredMatches = matches.filter((m) => matchesSearch(m, searchTerm));
+  const resultsOrderedMatches = sortForResults(filteredMatches);
 
   return (
-    <div style={{ padding:'0 12px 24px' }}>
+    <div style={layout.page}>
+      <div style={layout.wrap}>
+        <PageHeader
+          eyebrow="Panou Admin"
+          title={currentGameweek ? currentGameweek.title : "Fără etapă selectată"}
+          subtitle={autoDetecting ? "Se detectează…" : autoDetectedLabel}
+          onBack={onBack}
+          right={
+            <button style={s.resetBtn} onClick={handleReset} disabled={loading} type="button">⚠️ Reset</button>
+          }
+        />
 
-      {/* Mode banner */}
-      <div style={{ margin:'10px 0 10px', padding:'8px 12px', background:REALTIME_MODE?'rgba(0,229,160,0.06)':'rgba(245,158,11,0.07)', border:`1px solid ${REALTIME_MODE?'rgba(0,229,160,0.18)':'rgba(245,158,11,0.18)'}`, borderRadius:10, display:'flex', alignItems:'center', gap:8 }}>
-        <span style={{ fontSize:14 }}>{REALTIME_MODE ? '🔥' : '🧪'}</span>
-        <div>
-          <div style={{ fontSize:11, fontWeight:800, color:REALTIME_MODE?'rgba(0,229,160,0.9)':'rgba(245,158,11,0.8)' }}>
-            {REALTIME_MODE ? 'Firestore activ — sync în timp real' : 'Demo Mode — rezultatele se salvează local'}
-          </div>
-          <div style={{ fontSize:10, color:REALTIME_MODE?'rgba(0,229,160,0.45)':'rgba(245,158,11,0.45)' }}>
-            {REALTIME_MODE ? 'Toți utilizatorii văd rezultatele instant' : 'Configurează VITE_FIREBASE_* pentru multiplayer real'}
-          </div>
-        </div>
-      </div>
+        <button
+          type="button"
+          style={s.migrateSpecialBtn}
+          disabled={loading}
+          onClick={async () => {
+            if (!window.confirm('Recalculează punctele din Speciale (specialPoints) pentru toți userii, din specialScores existente. Sigur de rulat oricând — nu inventează puncte, doar le pune la locul corect. Continui?')) return;
+            setLoading(true);
+            try {
+              const { usersUpdated } = await migrateSpecialPointsFromScores();
+              setMessage(`Migrare Speciale — specialPoints recalculat pentru ${usersUpdated} useri.`);
+            } catch (err) {
+              console.error(err);
+              setMessage("Eroare la migrarea Specialelor: " + (err.message || err.code));
+            } finally {
+              setLoading(false);
+            }
+          }}
+        >
+          🔄 Recalculează puncte Speciale
+        </button>
 
-      <AdminHelp open={showHelp} onToggle={() => setShowHelp(p => !p)}/>
+        {message && <div style={s.message}>{message}</div>}
 
-      {/* Stats */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:5, marginBottom:10 }}>
-        {statsRow.map(s => (
-          <div key={s.label} style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'7px 6px', textAlign:'center' }}>
-            <div style={{ fontSize:16, fontWeight:800, color:s.color, fontFamily:"'DM Mono',monospace" }}>{s.count}</div>
-            <div style={{ fontSize:8, color:'rgba(255,255,255,0.22)', letterSpacing:'0.06em', textTransform:'uppercase', marginTop:1 }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
+        <button style={s.linkBtn} onClick={() => setShowManualSelectors((v) => !v)} type="button">
+          {showManualSelectors ? "Ascunde selecția manuală" : "Schimbă sezon / etapă manual"}
+        </button>
 
-      {/* Group filter */}
-      <div style={{ display:'flex', gap:4, overflowX:'auto', marginBottom:6 }}>
-        {['all', ...ALL_GROUPS].map(g => (
-          <button key={g} onClick={() => setGroupF(g)} style={{ flexShrink:0, padding:'4px 9px', borderRadius:20, background:groupF===g?'rgba(239,68,68,0.15)':'rgba(255,255,255,0.03)', border:`1px solid ${groupF===g?'rgba(239,68,68,0.28)':'rgba(255,255,255,0.07)'}`, color:groupF===g?'#EF4444':'rgba(255,255,255,0.38)', fontSize:10, fontWeight:700, cursor:'pointer' }}>
-            {g === 'all' ? 'Toate' : `Gr.${g}`}
-          </button>
-        ))}
-      </div>
+        {showManualSelectors && (
+          <SectionCard style={{ marginTop: 8 }}>
+            <select style={s.select} value={selectedSeasonId} onChange={(e) => setSelectedSeasonId(e.target.value)}>
+              <option value="">— alege un sezon —</option>
+              {seasons.map((s2) => (
+                <option key={s2.id} value={s2.id}>{s2.name}</option>
+              ))}
+            </select>
 
-      {/* Status filter */}
-      <div style={{ display:'flex', gap:4, overflowX:'auto', marginBottom:8 }}>
-        {[{v:'all',l:'Toate'}, ...STATUS_OPTIONS.map(o=>({v:o.value,l:o.label}))].map(o => (
-          <button key={o.v} onClick={() => setStatusF(o.v)} style={{ flexShrink:0, padding:'3px 9px', borderRadius:20, background:statusF===o.v?'rgba(255,255,255,0.1)':'rgba(255,255,255,0.03)', border:`1px solid ${statusF===o.v?'rgba(255,255,255,0.2)':'rgba(255,255,255,0.06)'}`, color:statusF===o.v?'#fff':'rgba(255,255,255,0.35)', fontSize:10, cursor:'pointer' }}>
-            {o.l}
-          </button>
-        ))}
-      </div>
+            {selectedSeasonId && (
+              <select style={s.select} value={selectedGameweekId} onChange={(e) => setSelectedGameweekId(e.target.value)}>
+                <option value="">— alege o etapă —</option>
+                {gameweeks.map((g) => (
+                  <option key={g.id} value={g.id}>{g.title}</option>
+                ))}
+              </select>
+            )}
 
-      {/* Search */}
-      <input
-        value={search} onChange={e => setSearch(e.target.value)}
-        placeholder="Caută echipă, stadion..."
-        style={{ width:'100%', padding:'9px 13px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:10, color:'#fff', fontSize:12, fontFamily:'inherit', outline:'none', boxSizing:'border-box', marginBottom:8 }}
-      />
+            {selectedSeasonId && (
+              <button style={s.btn} disabled={loading} onClick={handleCreateNextGameweek} type="button">
+                Creează / deschide etapa săptămânii
+              </button>
+            )}
 
-      {/* Match list */}
-      <div style={{ maxHeight:230, overflowY:'auto', marginBottom:10 }}>
-        {filtered.length === 0 && <div style={{ textAlign:'center', padding:'20px', color:'rgba(255,255,255,0.2)', fontSize:12 }}>Niciun meci</div>}
-        {filtered.map(m => {
-          const ms = getStatus(m);
-          const fr = finishedResults?.[m.id];
-          return (
-            <div key={m.id} onClick={() => selectMatch(m)} style={{
-              padding:'9px 11px', borderRadius:10, marginBottom:4, cursor:'pointer',
-              background:sel?.id===m.id?'rgba(239,68,68,0.07)':'rgba(255,255,255,0.025)',
-              border:`1px solid ${sel?.id===m.id?'rgba(239,68,68,0.22)':'rgba(255,255,255,0.05)'}`,
-              transition:'all 0.12s',
-            }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <span style={{ color:'#fff', fontWeight:600, fontSize:12 }}>{m.flagA} {m.teamA} – {m.teamB} {m.flagB}</span>
-                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  {(fr || m.isFinished) && <span style={{ fontSize:11, fontWeight:700, color:'#fff', fontFamily:"'DM Mono',monospace" }}>{fr?.realScoreA??m.realScoreA??'?'}–{fr?.realScoreB??m.realScoreB??'?'}</span>}
-                  <div style={{ width:6, height:6, borderRadius:'50%', background:getColor(ms) }}/>
-                </div>
+            <form onSubmit={handleCreateSeason} style={{ ...s.form, marginTop: 14 }}>
+              <p style={s.hint}>+ Sezon nou</p>
+              <input style={s.input} placeholder="Nume sezon (ex: Sezon 2026/27)" value={seasonName} onChange={(e) => setSeasonName(e.target.value)} />
+              <div style={s.row}>
+                <input style={s.input} type="text" inputMode="numeric" autoComplete="off" maxLength={10} placeholder="Început ZZ.LL.AAAA" value={seasonStart} onChange={(e) => setSeasonStart(formatRoDateTyping(e.target.value))} />
+                <input style={s.input} type="text" inputMode="numeric" autoComplete="off" maxLength={10} placeholder="Sfârșit ZZ.LL.AAAA" value={seasonEnd} onChange={(e) => setSeasonEnd(formatRoDateTyping(e.target.value))} />
               </div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.2)', marginTop:2 }}>Gr.{m.group} · {formatKickoffRO(m.time)} · {m.venue}</div>
-            </div>
-          );
-        })}
-      </div>
+              <p style={s.hint}>Scrie doar cifrele: 08102026 devine 08.10.2026.</p>
+              <button style={s.btn} disabled={loading} type="submit">+ Sezon nou</button>
+            </form>
+          </SectionCard>
+        )}
 
-      {/* Edit panel */}
-      {sel && (
-        <div style={{ background:'rgba(255,255,255,0.025)', borderRadius:13, padding:'14px 14px', border:'1px solid rgba(255,255,255,0.07)', animation:'fadeUp 0.18s ease' }}>
-          <div style={{ fontSize:12, color:'rgba(255,255,255,0.55)', marginBottom:12, fontWeight:700 }}>
-            {sel.flagA} {sel.teamA} vs {sel.teamB} {sel.flagB}
-            <span style={{ fontSize:10, color:'rgba(255,255,255,0.2)', marginLeft:6, fontWeight:400 }}>Gr.{sel.group}</span>
-          </div>
-
-          {/* Status */}
-          <div style={{ marginBottom:12 }}>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.25)', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:6, fontWeight:600 }}>Status</div>
-            <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-              {STATUS_OPTIONS.map(s => (
-                <button key={s.value} onClick={() => setStatus(s.value)} style={{
-                  padding:'5px 10px', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer',
-                  background:status===s.value?`${s.color}18`:'rgba(255,255,255,0.03)',
-                  border:`1px solid ${status===s.value?s.color+'44':'rgba(255,255,255,0.07)'}`,
-                  color:status===s.value?s.color:'rgba(255,255,255,0.35)',
-                }}>{s.label}</button>
+        {selectedGameweekId && (
+          <>
+            <div style={s.tabRow}>
+              {TABS.map((t) => (
+                <button
+                  key={t.id}
+                  style={{ ...s.tabBtn, ...(tab === t.id ? s.tabBtnActive : {}) }}
+                  onClick={() => setTab(t.id)}
+                  type="button"
+                >
+                  {t.label}
+                </button>
               ))}
             </div>
-          </div>
 
-          {/* Live minute */}
-          {(status === 'live' || status === 'ht') && (
-            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.25)', letterSpacing:'0.1em', textTransform:'uppercase', fontWeight:600 }}>Minutul</div>
-              <div style={{ display:'flex', alignItems:'center', gap:7 }}>
-                <button onClick={() => setMinute(m => Math.max(0,m-1))} style={{ width:30,height:30,borderRadius:8,background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.09)',color:'#fff',fontSize:16,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>−</button>
-                <span style={{ fontSize:20, fontWeight:800, color:'#EF4444', fontFamily:"'DM Mono',monospace", minWidth:38, textAlign:'center' }}>{minute}'</span>
-                <button onClick={() => setMinute(m => Math.min(120,m+1))} style={{ width:30,height:30,borderRadius:8,background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.09)',color:'#fff',fontSize:16,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>+</button>
+            {tab === "results" && (
+              <div style={s.republishBox}>
+                <button type="button" style={s.republishBtn} disabled={republishLoading || !currentGameweek} onClick={handleRepublishMatchPoints}>
+                  {republishLoading ? "Se republică…" : "🔄 Republică punctele pentru toate meciurile Final"}
+                </button>
+                <div style={s.republishHint}>
+                  Apasă O SINGURĂ DATĂ, dacă meciuri deja Final nu apar în Clasament pentru useri obișnuiți. Necesar doar pentru meciuri finalizate ÎNAINTE de acest sistem.
+                </div>
+                {republishMessage && <div style={s.republishMsg}>{republishMessage}</div>}
+                <button
+                  type="button" style={{ ...s.republishBtn, marginTop: 10 }}
+                  disabled={snapshotRegenLoading || !currentGameweek} onClick={handleRegenerateSnapshot}
+                >
+                  {snapshotRegenLoading ? "Se regenerează…" : "🔄 Regenerează snapshot clasament"}
+                </button>
+                <div style={s.republishHint}>
+                  Folosește doar dacă ai văzut avertismentul „actualizarea clasamentului live a eșuat" după o validare — reface exact același calcul, fără risc de dublare.
+                </div>
+                {snapshotRegenMessage && <div style={s.republishMsg}>{snapshotRegenMessage}</div>}
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Live details — optional free-text fields */}
-          <div style={{ marginBottom:12 }}>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.25)', letterSpacing:'0.08em', textTransform:'uppercase', fontWeight:600, marginBottom:8 }}>Detalii live opționale</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              <div>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:3 }}>⚽ Marcatori {sel.flagA} {sel.teamA}</div>
-                <input
-                  type="text"
-                  value={homeScorers}
-                  onChange={e => setHomeScorers(e.target.value)}
-                  placeholder="Jimenez 14', Alvarez 62'"
-                  style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:12, outline:'none', boxSizing:'border-box' }}
-                />
-              </div>
-              <div>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:3 }}>⚽ Marcatori {sel.flagB} {sel.teamB}</div>
-                <input
-                  type="text"
-                  value={awayScorers}
-                  onChange={e => setAwayScorers(e.target.value)}
-                  placeholder="Mokoena 71'"
-                  style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:12, outline:'none', boxSizing:'border-box' }}
-                />
-              </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                <div>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:3 }}>🟨 Cartonașe (ex: 2-1)</div>
+            {tab === "results" && currentGameweek && (
+              <SectionCard title="📖 Story PLAY LEAGUE — Etapa curentă">
+                <p style={s.hint}>
+                  Etapa {currentGameweek.number} · Story: <b>{currentGameweek.storyActive ? `ACTIV (v${currentGameweek.storyVersion || 1})` : "NEPUBLICAT"}</b>
+                  {currentGameweek.storyActive && ` · ${currentGameweek.storySlideCount || 0} slide-uri`}
+                </p>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                  <span style={s.hint}>Slide-uri:</span>
                   <input
-                    type="text"
-                    value={liveCards}
-                    onChange={e => setLiveCards(e.target.value)}
-                    placeholder="2-1"
-                    style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:12, outline:'none', boxSizing:'border-box' }}
+                    type="number" min={1} max={30} style={{ ...s.input, width: 70 }}
+                    value={gwStorySlideCount} onChange={(e) => setGwStorySlideCount(Math.max(1, Number(e.target.value) || 1))}
                   />
                 </div>
-                <div>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:3 }}>🚩 Cornere (ex: 5-3)</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button type="button" style={s.smallBtn} onClick={handlePreviewGwStory}>👁 Preview</button>
+                  <button type="button" style={s.btn} disabled={storyBusy} onClick={handleActivateGwStory}>
+                    ✨ Activează Story Etapa {currentGameweek.number}
+                  </button>
+                  {currentGameweek.storyActive && (
+                    <button type="button" style={s.smallBtn} disabled={storyBusy} onClick={handleDeactivateGwStory}>🚫 Dezactivează</button>
+                  )}
+                </div>
+              </SectionCard>
+            )}
+
+            {tab === "results" && currentSeasonObj && (
+              <SectionCard title="🏆 Story PLAY LEAGUE — Povestea Sezonului">
+                <p style={s.hint}>
+                  Story sezon: <b>{currentSeasonObj.storyActive ? `ACTIV (v${currentSeasonObj.storyVersion || 1})` : "NEPUBLICAT"}</b>
+                  {currentSeasonObj.storyActive && ` · ${currentSeasonObj.storySlideCount || 0} slide-uri`}
+                </p>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                  <span style={s.hint}>Slide-uri:</span>
                   <input
-                    type="text"
-                    value={liveCorners}
-                    onChange={e => setLiveCorners(e.target.value)}
-                    placeholder="5-3"
-                    style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:12, outline:'none', boxSizing:'border-box' }}
+                    type="number" min={1} max={30} style={{ ...s.input, width: 70 }}
+                    value={seasonStorySlideCount} onChange={(e) => setSeasonStorySlideCount(Math.max(1, Number(e.target.value) || 1))}
                   />
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Score */}
-          <div style={{ display:'flex', gap:12, justifyContent:'center', marginBottom:12 }}>
-            <div style={{ textAlign:'center' }}>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.28)', marginBottom:6 }}>{sel.teamA}</div>
-              <ScoreInput value={sA} onChange={setSA}/>
-            </div>
-            <div style={{ display:'flex', alignItems:'center', fontSize:18, color:'rgba(255,255,255,0.18)', fontWeight:300, paddingTop:22 }}>–</div>
-            <div style={{ textAlign:'center' }}>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.28)', marginBottom:6 }}>{sel.teamB}</div>
-              <ScoreInput value={sB} onChange={setSB}/>
-            </div>
-          </div>
-
-          {/* Cartonașe + cornere (FT only, optional) */}
-          {status === 'ft' && (
-            <div style={{ marginBottom:10 }}>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.25)', letterSpacing:'0.08em', textTransform:'uppercase', fontWeight:600, marginBottom:8 }}>Stats opționale</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
-                <div>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:4 }}>Cartonașe totale</div>
-                  <input type="number" min="0" max="20" value={possA} onChange={e=>setPossA(e.target.value)} placeholder="ex: 4" style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:13, fontFamily:"'DM Mono',monospace", outline:'none', boxSizing:'border-box' }}/>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button type="button" style={s.smallBtn} onClick={handlePreviewSeasonStory}>👁 Preview</button>
+                  <button type="button" style={s.btn} disabled={storyBusy} onClick={handleActivateSeasonStory}>✨ Activează Povestea Sezonului</button>
+                  {currentSeasonObj.storyActive && (
+                    <button type="button" style={s.smallBtn} disabled={storyBusy} onClick={handleDeactivateSeasonStory}>🚫 Dezactivează</button>
+                  )}
                 </div>
-                <div>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:4 }}>{sel.flagA} Cornere</div>
-                  <input type="number" min="0" max="30" value={cornA} onChange={e=>setCornA(e.target.value)} placeholder="ex: 6" style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:13, fontFamily:"'DM Mono',monospace", outline:'none', boxSizing:'border-box' }}/>
-                </div>
-                <div style={{ gridColumn:'span 1' }}>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginBottom:4 }}>{sel.flagB} Cornere</div>
-                  <input type="number" min="0" max="30" value={cornB} onChange={e=>setCornB(e.target.value)} placeholder="ex: 3" style={{ width:'100%', padding:'7px 10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:13, fontFamily:"'DM Mono',monospace", outline:'none', boxSizing:'border-box' }}/>
-                </div>
-              </div>
-            </div>
-          )}
+              </SectionCard>
+            )}
 
-          {/* Save */}
-          <button onClick={saveResult} style={{
-            width:'100%', padding:13,
-            background: saved==='ft' ? 'rgba(0,229,160,0.1)' : saved==='noft' ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)',
-            border:`1px solid ${saved==='ft'?'rgba(0,229,160,0.28)':saved==='noft'?'rgba(245,158,11,0.28)':'rgba(239,68,68,0.22)'}`,
-            borderRadius:11, color:saved==='ft'?'#00E5A0':saved==='noft'?'#F59E0B':'#EF4444',
-            fontSize:13, fontWeight:700, cursor:'pointer', transition:'all 0.18s',
-          }}>
-            {saved==='ft'   ? '✓ Salvat! Clasamentul + grupele s-au actualizat.' :
-             saved==='noft' ? 'Salvat. Nu contează în clasament până la status Final.' :
-             'Salvează rezultat'}
-          </button>
+            {(tab === "results" || tab === "featured") && matches.length > 0 && (
+              <input
+                style={s.searchInput}
+                placeholder="Caută echipa…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            )}
 
-          {/* Group standings preview — only for real WC groups, not friendlies */}
-          {sel.group !== 'AMICALE' && (
-          <div style={{ marginTop:12 }}>
-            <div style={{ fontSize:9, color:'rgba(255,255,255,0.2)', letterSpacing:'0.1em', textTransform:'uppercase', fontWeight:600, marginBottom:7 }}>Clasament curent Gr.{sel.group}</div>
-            <StandingsMini group={sel.group} finishedResults={finishedResults}/>
-          </div>
-          )}
-        </div>
-      )}
-
-      {/* Lineup panel */}
-      {sel && (
-        <div style={{ marginTop:10 }}>
-          <button
-            onClick={() => setShowLineupPanel(p => !p)}
-            style={{ width:'100%', padding:'9px 12px', background:'rgba(74,158,255,0.07)', border:'1px solid rgba(74,158,255,0.18)', borderRadius:10, color:'#4A9EFF', fontSize:11, fontWeight:700, cursor:'pointer', textAlign:'left' }}
-          >
-            {showLineupPanel ? 'x Inchide' : '+ Adauga / actualizeaza echipe'}
-          </button>
-          {showLineupPanel && (
-            <div style={{ marginTop:8, padding:'12px 14px', background:'rgba(74,158,255,0.04)', border:'1px solid rgba(74,158,255,0.12)', borderRadius:10, animation:'fadeUp 0.18s ease' }}>
-              <div style={{ fontSize:10, fontWeight:700, color:'rgba(74,158,255,0.7)', marginBottom:10, textTransform:'uppercase', letterSpacing:'0.08em' }}>
-                Echipe meci
-              </div>
-
-              {/* Formation */}
-              <div style={{ marginBottom:8 }}>
-                <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', marginBottom:4 }}>Formatia (ambele echipe)</div>
-                <input
-                  value={lineupFormation}
-                  onChange={e => setLineupFormation(e.target.value.trim())}
-                  placeholder="ex: 4-3-3"
-                  style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
-                />
-              </div>
-
-              {/* Home XI */}
-              <div style={{ marginBottom:8 }}>
-                <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', marginBottom:4 }}>{sel.flagA} {sel.teamA} — XI titular (unul pe linie)</div>
-                <textarea
-                  value={lineupHome}
-                  onChange={e => setLineupHome(e.target.value)}
-                  placeholder={"1. Portarul\n2. Fundas dreapta\n3. Fundas central\n..."}
-                  rows={6}
-                  style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:12, fontFamily:'monospace', outline:'none', boxSizing:'border-box', resize:'vertical' }}
-                />
-              </div>
-
-              {/* Away XI */}
-              <div style={{ marginBottom:8 }}>
-                <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', marginBottom:4 }}>{sel.flagB} {sel.teamB} — XI titular (unul pe linie)</div>
-                <textarea
-                  value={lineupAway}
-                  onChange={e => setLineupAway(e.target.value)}
-                  placeholder={"1. Portarul\n2. Fundas dreapta\n..."}
-                  rows={6}
-                  style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff', fontSize:12, fontFamily:'monospace', outline:'none', boxSizing:'border-box', resize:'vertical' }}
-                />
-              </div>
-
-              {/* Official flag */}
-              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
-                <input
-                  type="checkbox"
-                  id="officialCheck"
-                  checked={lineupOfficial}
-                  onChange={e => setLineupOfficial(e.target.checked)}
-                  style={{ width:16, height:16, cursor:'pointer' }}
-                />
-                <label htmlFor="officialCheck" style={{ fontSize:11, color:lineupOfficial ? '#00E5A0' : 'rgba(255,255,255,0.4)', cursor:'pointer', fontWeight:lineupOfficial ? 700 : 400 }}>
-                  {lineupOfficial ? 'Echipa OFICIALA (FIFA Match Centre)' : 'Echipa prognozata / Bulinews'}
-                </label>
-              </div>
-
-              <button
-                onClick={() => {
-                  const parseXI = (text) => text.split('\n').filter(l => l.trim()).slice(0,11).map((l, i) => {
-                    const m = l.match(/^(\d+)[.\s]+(.+)$/);
-                    return m ? { number:parseInt(m[1]), name:m[2].trim(), position:['GK','RB','CB','CB','LB','CDM','CM','CM','RW','ST','LW'][i] || 'CM' }
-                             : { number:i+1, name:l.trim(), position:['GK','RB','CB','CB','LB','CDM','CM','CM','RW','ST','LW'][i] || 'CM' };
-                  });
-                  const lu = {
-                    matchId:    sel.id,
-                    formation:  lineupFormation,
-                    home:       parseXI(lineupHome),
-                    away:       parseXI(lineupAway),
-                    isOfficial: lineupOfficial,
-                    sourceName: lineupOfficial ? 'FIFA Match Centre' : 'Manual / Bulinews',
-                    updatedAt:  Date.now(),
-                  };
-                  // Save lineup to localStorage under lineups key
-                  const stored = JSON.parse(localStorage.getItem('wc2026_lineups') || '{}');
-                  stored[sel.id] = lu;
-                  localStorage.setItem('wc2026_lineups', JSON.stringify(stored));
-                  onMatchUpdate?.({ _action:'lineup', matchId:sel.id, lineup:lu });
-                  setLineupSaved(true);
-                  setTimeout(() => setLineupSaved(false), 2500);
-                }}
-                style={{ width:'100%', padding:10, background:lineupSaved ? 'rgba(0,229,160,0.1)' : 'rgba(74,158,255,0.1)', border:`1px solid ${lineupSaved ? 'rgba(0,229,160,0.3)' : 'rgba(74,158,255,0.25)'}`, borderRadius:9, color:lineupSaved ? '#00E5A0' : '#4A9EFF', fontSize:12, fontWeight:700, cursor:'pointer' }}
-              >
-                {lineupSaved ? 'Salvat!' : 'Salveaza echipele'}
-              </button>
-              {lineupOfficial && (
-                <div style={{ marginTop:6, fontSize:9, color:'rgba(0,229,160,0.4)' }}>
-                  Echipa oficiala va inlocui prognoza cu 45 min inainte de start.
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Scoring Debug Panel (admin only) */}
-      <div style={{ marginTop:10 }}>
-        <button onClick={() => setShowDebug(p => !p)} style={{ width:'100%', padding:'8px 12px', background:'rgba(6,182,212,0.06)', border:'1px solid rgba(6,182,212,0.18)', borderRadius:10, color:'rgba(6,182,212,0.7)', fontSize:11, fontWeight:700, cursor:'pointer', textAlign:'left' }}>
-          {showDebug ? '× Inchide' : '🔍 Debug predictii + punctaj'}
-        </button>
-        {showDebug && (() => {
-          const ftMatches = buildMatches(finishedResults || {}).filter(m => m.isFinished);
-          if (!ftMatches.length) return (
-            <div style={{ padding:'10px 12px', fontSize:11, color:'rgba(255,255,255,0.25)', fontStyle:'italic' }}>
-              Niciun meci cu status FT. Salveaza un meci cu status Final.
-            </div>
-          );
-          return (
-            <div style={{ marginTop:6, background:'rgba(6,182,212,0.03)', border:'1px solid rgba(6,182,212,0.12)', borderRadius:10, overflow:'hidden' }}>
-              {ftMatches.map(match => {
-                const stored = JSON.parse(localStorage.getItem('wc2026_all_preds') || '{}');
-                const allPreds = Object.entries(stored);
-                return (
-                  <div key={match.id} style={{ borderBottom:'1px solid rgba(255,255,255,0.05)', padding:'10px 12px' }}>
-                    <div style={{ fontSize:11, fontWeight:700, color:'rgba(6,182,212,0.8)', marginBottom:6 }}>
-                      {match.flagA}{match.teamA} {match.realScoreA}–{match.realScoreB} {match.teamB}{match.flagB}
-                      <span style={{ fontSize:9, color:'rgba(255,255,255,0.25)', marginLeft:8 }}>
-                        Poseie: {match.realPossession ?? 'N/A'} · Cornere total: {match.realCorners ?? 'N/A'}
-                      </span>
+            {/* ── Rezultate ─────────────────────────────────────────── */}
+            {tab === "results" && (
+              matches.length === 0 ? (
+                <EmptyState icon="📋" title="Etapa nu are încă meciuri." subtitle="Adaugă-le din tab-ul Import / Config." />
+              ) : (
+                <div style={s.matchList}>
+                  {resultsOrderedMatches.map((m) => (
+                    <div key={m.id}>
+                      <MatchResultCard
+                        match={m}
+                        onSave={(values) => handleSaveResult(m.id, values)}
+                        onChangeStatus={(newStatus) => handleChangeStatus(m.id, newStatus)}
+                        disabled={currentGameweek?.status === "completed"}
+                      />
+                      {m.status === "live" && <LiveEventPanel match={m} />}
+                      <button type="button" style={s.missingPredBtn} onClick={() => toggleMissingPredictions(m.id)}>
+                        {openMissingFor === m.id ? "▲ Ascunde" : "👀 Cine n-a pontat"}
+                      </button>
+                      {openMissingFor === m.id && (
+                        <div style={s.missingPredPanel}>
+                          {missingPredictions[m.id] === "loading" && <span style={s.hint}>Se încarcă…</span>}
+                          {missingPredictions[m.id] === "error" && <span style={s.hint}>Eroare — încearcă din nou.</span>}
+                          {Array.isArray(missingPredictions[m.id]) && (
+                            missingPredictions[m.id].length === 0
+                              ? <span style={s.missingPredAllDone}>✓ Toată lumea a pontat.</span>
+                              : (
+                                <>
+                                  <span style={s.hint}>{missingPredictions[m.id].length} nu au pontat încă:</span>
+                                  <div style={s.missingPredChips}>
+                                    {missingPredictions[m.id].map((u) => (
+                                      <span key={u.uid} style={s.missingPredChip}>{u.nickname}</span>
+                                    ))}
+                                  </div>
+                                </>
+                              )
+                          )}
+                        </div>
+                      )}
                     </div>
-                    {allPreds.length === 0 && (
-                      <div style={{ fontSize:10, color:'rgba(255,255,255,0.2)', fontStyle:'italic' }}>Nicio predictie salvata pentru acest meci.</div>
-                    )}
-                    {allPreds.map(([uid, preds]) => {
-                      const pred = preds[match.id];
-                      if (!pred) return null;
-                      const b = calcBreakdown(pred, match);
-                      if (!b) return null;
-                      return (
-                        <div key={uid} style={{ padding:'5px 8px', background:'rgba(255,255,255,0.02)', borderRadius:6, marginBottom:4 }}>
-                          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
-                            <span style={{ fontSize:11, color:'#fff' }}>{uid.slice(0,12)}…</span>
-                            <span style={{ fontSize:12, fontWeight:800, color:'#00E5A0', fontFamily:"'DM Mono',monospace" }}>{b.total} pct</span>
+                  ))}
+                  {resultsOrderedMatches.length === 0 && (
+                    <EmptyState icon="🔍" title="Niciun meci nu corespunde căutării." />
+                  )}
+                </div>
+              )
+            )}
+
+            {/* ── Clasament live ────────────────────────────────────── */}
+            {tab === "live" && (
+              <SectionCard>
+                {currentGameweek?.status === "completed" ? (
+                  <StatusBadge tone="gold">FINAL — etapă finalizată</StatusBadge>
+                ) : previewRows ? (
+                  <StatusBadge tone="live" dot>LIVE · provizoriu</StatusBadge>
+                ) : null}
+
+                <button style={{ ...s.btn, marginTop: 12 }} disabled={previewLoading} onClick={handlePreview} type="button">
+                  {previewLoading ? "Se calculează…" : "Calculează / Previzualizează clasamentul"}
+                </button>
+
+                {previewMessage && <div style={s.message}>{previewMessage}</div>}
+
+                {previewRows && previewRows.length > 0 && (
+                  <div style={s.previewTable}>
+                    {previewRows.map((r) => (
+                      <PlayerRankRow
+                        key={r.uid}
+                        rank={r.rank}
+                        nickname={previewProfiles[r.uid]?.nickname || r.uid}
+                        avatarId={previewProfiles[r.uid]?.avatarId}
+                        pointsFromMatches={r.pointsFromMatches}
+                        rankingBonus={r.rankingBonus}
+                        totalPoints={r.totalPoints}
+                        top3={r.rank <= 3}
+                        onClick={() => handleOpenPreviewPlayer(r.uid, r.rank)}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {previewRows && currentGameweek?.status !== "completed" && (
+                  <button style={s.finalizeBtn} disabled={finalizing || previewIncomplete > 0} onClick={handleFinalize} type="button">
+                    {finalizing ? "Se finalizează…" : "Finalizează etapa"}
+                  </button>
+                )}
+              </SectionCard>
+            )}
+
+            {/* ── Meciurile Săptămânii ──────────────────────────────── */}
+            {tab === "featured" && (
+              <>
+                {deleteMessage && <div style={s.message}>{deleteMessage}</div>}
+
+                {filteredMatches.length > 0 ? (
+                  <div style={s.matchList}>
+                    {filteredMatches.map((m) => (
+                      <div key={m.id} style={s.matchRowWithDelete}>
+                        <label style={s.featuredRow}>
+                          <input
+                            type="checkbox"
+                            checked={featuredIds.includes(m.id)}
+                            onChange={() => toggleFeatured(m.id)}
+                            disabled={!featuredIds.includes(m.id) && featuredIds.length >= 3}
+                            style={s.featuredCheckbox}
+                          />
+                          <div style={{ flex: 1 }}>
+                            <MatchCard
+                              homeTeam={m.homeTeam}
+                              awayTeam={m.awayTeam}
+                              kickoffAt={m.kickoffAt}
+                              status={m.status}
+                              competitionId={m.competitionId}
+                              competitionName={m.competitionName}
+                              competitionColor={m.competitionColor}
+                            />
                           </div>
-                          <div style={{ fontSize:9, color:'rgba(255,255,255,0.3)', display:'flex', gap:8, flexWrap:'wrap' }}>
-                            <span>Pred: {pred.scoreA}–{pred.scoreB}</span>
-                            {b.exactScore > 0  && <span style={{ color:'#00E5A0' }}>+{b.exactScore} exact</span>}
-                            {b.correctRes > 0  && <span style={{ color:'#4A9EFF' }}>+{b.correctRes} 1X2</span>}
-                            {b.totalGoals > 0  && <span style={{ color:'#FFD700' }}>+{b.totalGoals} totalGM</span>}
-                            {b.possession > 0  && <span style={{ color:'#9B59B6' }}>+{b.possession} cart(diff:{b._debug.possessionDiff})</span>}
-                            {b.corners > 0     && <span style={{ color:'#FF9800' }}>+{b.corners} corn(diff:{b._debug.cornerDiff})</span>}
+                        </label>
+                        <button
+                          type="button"
+                          style={s.deleteBtn}
+                          disabled={deletingMatchId === m.id}
+                          onClick={() => handleDeleteMatch(m)}
+                          title="Șterge meciul"
+                        >
+                          {deletingMatchId === m.id ? "…" : "🗑"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState icon="⭐" title="Niciun meci nu corespunde căutării." />
+                )}
+
+                {matches.length > 0 && (
+                  <SectionCard style={{ marginTop: 4 }}>
+                    <p style={s.hint}>⭐ Meciurile Săptămânii: {featuredIds.length}/3 alese</p>
+                    {featuredMessage && <div style={s.message}>{featuredMessage}</div>}
+                    <button style={s.btn} disabled={featuredSaving || featuredIds.length !== 3} onClick={handleSaveFeatured} type="button">
+                      {featuredSaving ? "Se salvează…" : "Salvează Meciurile Săptămânii"}
+                    </button>
+                  </SectionCard>
+                )}
+              </>
+            )}
+
+            {/* ── Speciale — deschide/rezolvă fazele Specialelor Sezonului ── */}
+            {tab === "speciale" && (
+              <SectionCard title="Specialele Sezonului">
+                <button
+                  type="button"
+                  style={{ ...s.linkBtn, marginBottom: 10 }}
+                  onClick={async () => {
+                    try {
+                      const { migrated, total } = await migrateSpecialPhasesToEdition();
+                      setOpenMsg(`Migrare Speciale — ${migrated}/${total} faze mutate pe ediția Play League 2026/27.`);
+                    } catch (err) {
+                      console.error(err);
+                      setOpenMsg("Eroare la migrare: " + (err.message || err.code));
+                    }
+                  }}
+                >
+                  🔄 Fă vizibile Specialele existente (o singură dată)
+                </button>
+                <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: "#fff", marginBottom: 4 }}>Cine a completat Specialele</div>
+                  <SpecialsCompletionOverview
+                    availablePhases={availableSpecialPhases}
+                    allUsers={completionActiveUsers}
+                    picksByPhase={completionPicksByPhase}
+                    loading={completionLoading}
+                  />
+                </div>
+
+                <select style={s.select} value={specialCompId} onChange={(e) => { setSpecialCompId(e.target.value); setSpecialPhaseId(""); }}>
+                  <option value="">Alege competiția…</option>
+                  {specialCompetitions.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+
+                {/* ── Stare instant, toate fazele deodată — fără să intri
+                    în fiecare una ca să vezi unde ești ── */}
+                {specialComp && (
+                  <div style={s.specialsOverview}>
+                    {specialComp.phases.map((p) => {
+                      const state = specialPhasesForSeason.find((s2) => s2.phaseId === p.id);
+                      const info = specialPhaseStatusInfo(state, now);
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          style={{ ...s.specialsOverviewRow, ...(specialPhaseId === p.id ? s.specialsOverviewRowActive : {}) }}
+                          onClick={() => setSpecialPhaseId(p.id)}
+                        >
+                          <span>{info.dot}</span>
+                          <span style={s.specialsOverviewLabel}>{p.label}</span>
+                          <span style={s.specialsOverviewStatus}>{info.text}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {specialComp && (
+                  <select style={s.select} value={specialPhaseId} onChange={(e) => setSpecialPhaseId(e.target.value)}>
+                    <option value="">Alege faza…</option>
+                    {specialComp.phases.map((p) => {
+                      const state = specialPhasesForSeason.find((s2) => s2.phaseId === p.id);
+                      return (
+                        <option key={p.id} value={p.id}>
+                          {p.label} {state ? `(${state.status})` : "(neîschisă)"}
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
+
+                {specialPhaseDef && !specialPhaseState && (
+                  <>
+                    <p style={s.hint}>
+                      Deschide „{specialPhaseDef.label}" — o linie = o opțiune. Userii aleg STRICT din listă,
+                      nu scriu liber (elimină potriviri greșite la scorare). Poți deschide orice fază, oricând —
+                      nicio ordine impusă.
+                      {specialPhaseDef.requiresPhase && (
+                        <> (De obicei are sens după „{specialComp.phases.find((p) => p.id === specialPhaseDef.requiresPhase)?.label}", dar poți deschide și mai devreme.)</>
+                      )}
+                    </p>
+                    {(() => {
+                      const realOptions = resolveTeamOptions(specialComp.id, specialPhaseDef.id);
+                      if (!realOptions) return null;
+                      return (
+                        <button
+                          type="button" style={s.smallBtn}
+                          onClick={() => setOptionsText(realOptions.map((o) => o.label).join("\n"))}
+                        >
+                          📋 Pre-completează cu lista reală ({realOptions.length})
+                        </button>
+                      );
+                    })()}
+                    <textarea
+                      style={s.textarea}
+                      rows={5}
+                      placeholder={"PSG\nReal Madrid\nBayern\n..."}
+                      value={optionsText}
+                      onChange={(e) => setOptionsText(e.target.value)}
+                    />
+                    <input
+                      style={s.input}
+                      type="datetime-local"
+                      value={closesAtInput}
+                      onChange={(e) => setClosesAtInput(e.target.value)}
+                    />
+                    <button style={s.btn} disabled={openSaving} onClick={handleOpenSpecialPhase} type="button">
+                      {openSaving ? "Se deschide…" : "Deschide faza"}
+                    </button>
+                    {openMsg && <p style={s.hint}>{openMsg}</p>}
+                  </>
+                )}
+
+                {specialPhaseDef && specialPhaseState && specialPhaseState.status !== "resolved" && (
+                  <>
+                    <p style={s.hint}>
+                      Stare: <b>{specialPhaseState.status}</b> · {specialPhaseState.options?.length || 0} opțiuni.
+                      Introdu rezultatul real ca să rezolvi faza — punctele se adaugă automat în Clasamentul General.
+                    </p>
+                    {specialPhaseState.status === "open" && (
+                      <>
+                        <button style={s.smallBtn} disabled={closeSaving} onClick={handleCloseSpecialPhase} type="button">
+                          {closeSaving ? "Se închide…" : "🔒 Închide faza"}
+                        </button>
+                        <p style={s.hint}>
+                          Închide faza pentru pronosticuri — alegerile tuturor devin vizibile jucătorilor imediat, chiar dacă rezultatul real nu e încă disponibil.
+                        </p>
+                        {closeMsg && <p style={s.hint}>{closeMsg}</p>}
+                      </>
+                    )}
+                    <SpecialResolvePicker
+                      phaseDef={specialPhaseDef}
+                      options={specialPhaseState.options || []}
+                      selection={resolveSelection}
+                      onChange={setResolveSelection}
+                    />
+                    <button style={{ ...s.btn, marginTop: 10 }} disabled={resolveSaving} onClick={handleResolveSpecialPhase} type="button">
+                      {resolveSaving ? "Se rezolvă…" : "Rezolvă faza"}
+                    </button>
+                    {resolveMsg && <p style={s.hint}>{resolveMsg}</p>}
+                  </>
+                )}
+
+                {specialPhaseDef && specialPhaseState?.status === "resolved" && (
+                  <p style={s.hint}>Fază deja rezolvată — punctele au fost adăugate în Clasamentul General.</p>
+                )}
+              </SectionCard>
+            )}
+
+            {/* ── Jucători — aprobare conturi noi, dezactivare/reactivare ── */}
+            {tab === "players" && (
+              <>
+                {(() => {
+                  const pending = players.filter((p) => p.status === "pending");
+                  const active = players.filter((p) => p.status === "active");
+                  const disabled = players.filter((p) => p.status === "disabled");
+                  return (
+                    <>
+                      {pending.length > 0 && (
+                        <SectionCard title={`Cereri noi (${pending.length})`}>
+                          <div style={s.feedAdminList}>
+                            {pending.map((p) => (
+                              <div key={p.uid} style={s.playerRow}>
+                                <div style={s.playerInfo}>
+                                  <div style={s.feedAdminTitle}>{p.nickname || "(fără nickname încă)"}</div>
+                                  <div style={s.feedAdminMeta}>{p.email || p.uid}</div>
+                                </div>
+                                <div style={s.playerActions}>
+                                  <button type="button" style={s.approveBtn} disabled={playerActionUid === p.uid} onClick={() => handlePlayerAction(p.uid, "approve")}>
+                                    Aprobă
+                                  </button>
+                                  <button type="button" style={s.rejectBtn} disabled={playerActionUid === p.uid} onClick={() => handlePlayerAction(p.uid, "reject")}>
+                                    Respinge
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </SectionCard>
+                      )}
+
+                      <SectionCard title={`Jucători activi (${active.length})`}>
+                        {playersLoading && <p style={s.hint}>Se încarcă…</p>}
+                        <div style={s.feedAdminList}>
+                          {active.map((p) => (
+                            <div key={p.uid} style={s.playerRow}>
+                              <div style={s.playerInfo}>
+                                <div style={s.feedAdminTitle}>{p.nickname || p.uid}</div>
+                                <div style={s.feedAdminMeta}>
+                                  {p.email ? `${p.email} · ` : ""}{p.seasonPoints ?? 0}p · {p.gameweeksPlayed ?? 0} etape
+                                </div>
+                              </div>
+                              <button type="button" style={s.smallBtn} disabled={playerActionUid === p.uid} onClick={() => handlePlayerAction(p.uid, "deactivate")}>
+                                Elimină din competiție
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </SectionCard>
+
+                      {disabled.length > 0 && (
+                        <SectionCard title={`Dezactivați (${disabled.length})`}>
+                          <div style={s.feedAdminList}>
+                            {disabled.map((p) => (
+                              <div key={p.uid} style={{ ...s.playerRow, opacity: 0.6 }}>
+                                <div style={s.playerInfo}>
+                                  <div style={s.feedAdminTitle}>{p.nickname || p.uid}</div>
+                                  <div style={s.feedAdminMeta}>{p.email || p.uid}</div>
+                                </div>
+                                <button type="button" style={s.smallBtn} disabled={playerActionUid === p.uid} onClick={() => handlePlayerAction(p.uid, "reactivate")}>
+                                  Reactivează
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </SectionCard>
+                      )}
+                    </>
+                  );
+                })()}
+              </>
+            )}
+
+            {/* ── Surprizele Săptămânii ── */}
+            {tab === "surprises" && (
+              <>
+              <SectionCard title="🎭 Surprizele Săptămânii — configurare pe tot sezonul">
+                <p style={s.hint}>
+                  Alege tipul pentru fiecare etapă din timp — userii NU văd tipul până apeși Dezvăluie.
+                  „(în curând)" = mecanica nu e încă implementată, neselectabilă.
+                </p>
+                {surprisesLoading && <p style={s.hint}>Se încarcă…</p>}
+                {gameweeks.length === 0 && <p style={s.hint}>Niciun sezon/etapă selectate — alege din tab-ul Config.</p>}
+
+                {(() => {
+                  // ── Etapa activă = numărul cel mai mare din sezonul selectat.
+                  // Nicio hardcodare — funcționează identic la Etapa 3 ca la
+                  // Etapa 40. Zero citiri noi — `gameweeks` e deja încărcat. ──
+                  const activeGw = gameweeks.reduce((max, g) => (!max || g.number > max.number ? g : max), null);
+                  const previousGws = gameweeks.filter((g) => g.id !== activeGw?.id).sort((a, b) => a.number - b.number);
+                  return previousGws.length > 0 ? (
+                    <div style={s.surprisesArchiveBox}>
+                      <button type="button" style={s.smallBtn} onClick={() => setSurprisesArchiveOpen((v) => !v)}>
+                        {surprisesArchiveOpen ? "▲" : "▾"} Etape anterioare ({previousGws.length})
+                      </button>
+                      {surprisesArchiveOpen && (
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                          {previousGws.map((g) => (
+                            <button
+                              key={g.id} type="button"
+                              style={{ ...s.smallBtn, ...(surprisesArchiveSelectedId === g.id ? { background: color.gold, color: "#12141C" } : {}) }}
+                              onClick={() => setSurprisesArchiveSelectedId((v) => (v === g.id ? null : g.id))}
+                            >
+                              {g.title || `Etapa ${g.number}`}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : null;
+                })()}
+
+                {gameweeks.map((gw) => {
+                  const activeGwId = gameweeks.reduce((max, g) => (!max || g.number > max.number ? g : max), null)?.id;
+                  const isVisible = gw.id === activeGwId || (surprisesArchiveOpen && surprisesArchiveSelectedId === gw.id);
+                  const data = surprisesData[gw.id] || {};
+                  const status = getSurpriseStatus(data.public);
+                  const statusLabel = status === "locked" ? "🔒 BLOCATĂ" : status === "active" ? "⚡ ACTIVĂ" : "✅ REZOLVATĂ";
+                  const mainType = data.secretMain?.type || "";
+                  const bonusType = data.secretBonus?.type || "";
+                  const duelTheme = data.secretMain?.duelTheme || "";
+                  const isDuelType = ["duel-random", "duel-extreme", "duel-rivali", "team-duel-random"].includes(mainType);
+                  const mainRevealed = !!data.public?.mainRevealed;
+                  const bonusRevealed = !!data.public?.bonusRevealed;
+                  const mainResolved = !!data.public?.mainResolved;
+                  const bonusResolved = !!data.public?.bonusResolved;
+
+                  if (!isVisible) return null;
+
+                  return (
+                    <div key={gw.id} style={s.surpriseGwCard}>
+                      <div style={s.surpriseGwHead}>
+                        <span style={s.surpriseGwTitle}>{gw.title || `Etapa ${gw.number}`}</span>
+                        <span style={s.surpriseGwStatus}>{statusLabel}</span>
+                      </div>
+
+                      <div style={s.surpriseRow}>
+                        <label style={s.surpriseLabel}>🏆 MAIN</label>
+                        <select
+                          style={s.surpriseSelect}
+                          value={mainType}
+                          disabled={mainRevealed}
+                          onChange={(e) => handleConfigureSurprise(gw.id, "mainType", e.target.value)}
+                        >
+                          <option value="">— alege —</option>
+                          {MAIN_CATALOG.map((c) => (
+                            <option key={c.id} value={c.id} disabled={!c.active}>{c.label}{!c.active ? " (în curând)" : ""}</option>
+                          ))}
+                        </select>
+                        {!mainRevealed ? (
+                          <button type="button" style={s.smallBtn} disabled={!mainType || surpriseActionKey === `${gw.id}_revealMain`}
+                            onClick={() => handleSurpriseAction(gw.id, "revealMain")}>
+                            🏆 Dezvăluie
+                          </button>
+                        ) : mainType === "sabotaj" && !data.public?.sabotajRevealed ? (
+                          <span style={s.doneTag}>🕵️ alegeri în curs</span>
+                        ) : !mainResolved ? (
+                          <button type="button" style={s.approveBtn} disabled={surpriseActionKey === `${gw.id}_resolveMain`}
+                            onClick={() => handleSurpriseAction(gw.id, "resolveMain")}>
+                            Rezolvă
+                          </button>
+                        ) : (
+                          <span style={s.doneTag}>✓ gata</span>
+                        )}
+                      </div>
+
+                      {isDuelType && (
+                        <div style={s.surpriseRow}>
+                          <label style={s.surpriseLabel}>🥋 TEMĂ DUEL</label>
+                          <select
+                            style={s.surpriseSelect}
+                            value={duelTheme}
+                            disabled={mainRevealed}
+                            onChange={(e) => handleConfigureSurprise(gw.id, "duelTheme", e.target.value)}
+                          >
+                            <option value="">— avatar normal (fără temă) —</option>
+                            {DUEL_THEMES.map((t) => (
+                              <option key={t.id} value={t.id}>{t.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {mainType === "sabotaj" && mainRevealed && (
+                        <div style={s.triviaBox}>
+                          {(() => {
+                            const order = data.secretMain?.config?.order || [];
+                            const prog = sabotajProgress[gw.id] || { chosenPickers: [], takenTargets: [] };
+                            const done = prog.chosenPickers.length;
+                            const total = order.length;
+                            const allDone = total > 0 && done >= total;
+                            return (
+                              <>
+                                <p style={s.hint}>
+                                  Ordinea e înghețată din clasamentul etapei precedente. {done}/{total} agenți și-au ales deja ținta.
+                                </p>
+                                {!data.public?.sabotajRevealed ? (
+                                  <>
+                                    <button
+                                      type="button" style={s.approveBtn}
+                                      disabled={!allDone || surpriseActionKey === `${gw.id}_revealSabotaj`}
+                                      onClick={() => handleSurpriseAction(gw.id, "revealSabotaj")}
+                                    >
+                                      🔥 Dezvăluie Sabotajele
+                                    </button>
+                                    {done > 0 && (
+                                      <button
+                                        type="button" style={s.ghostBtnSmall}
+                                        disabled={surpriseActionKey === `${gw.id}_undoSabotaj`}
+                                        onClick={() => {
+                                          if (window.confirm("Anulezi ultima alegere din secvență? Tura revine la acel jucător.")) {
+                                            handleSurpriseAction(gw.id, "undoSabotaj");
+                                          }
+                                        }}
+                                      >
+                                        ↩️ Anulează ultima alegere
+                                      </button>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span style={s.doneTag}>✓ rețea dezvăluită</span>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      )}
+
+                      {mainType === "betBuilder" && mainRevealed && (
+                        <div style={s.triviaBox}>
+                          {(!betBuilder || betBuilder.gameweekId !== gw.id) ? (
+                            <p style={s.hint}>Se încarcă…</p>
+                          ) : !betBuilder.duels || betBuilder.duels.length === 0 ? (
+                            <>
+                              <p style={s.hint}>
+                                ⭐ {(gw.featuredMatchIds || []).length}/3 Meciurile Săptămânii · 👥 18/18 jucători necesari
+                              </p>
+                              <button
+                                type="button" style={s.approveBtn} disabled={betBuilderBusy}
+                                onClick={() => handleGenerateBetBuilder(gw.id, gw.featuredMatchIds)}
+                              >
+                                🎲 Generează cele 9 dueluri
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <p style={s.hint}>Status: <b>{betBuilder.status === "active" ? "ACTIV" : "NEPUBLICAT (draft)"}</b> · {betBuilder.duels.length} dueluri generate.</p>
+                              {betBuilder.matchGroups.map((g) => {
+                                const match = matches.find((m) => m.id === g.matchId);
+                                const draft = questionDrafts[g.matchId] || { questions: [], tiebreakerText: "" };
+                                const duelsForMatch = betBuilder.duels.filter((d) => d.matchId === g.matchId);
+                                return (
+                                  <div key={g.matchId} style={s.bbMatchBlock}>
+                                    <div style={s.bbMatchTitle}>{match ? `${match.homeTeam} – ${match.awayTeam}` : g.matchId}</div>
+                                    <div style={s.hint}>{duelsForMatch.length} dueluri · {duelsForMatch.flatMap((d) => [d.playerA, d.playerB]).length} jucători repartizați</div>
+
+                                    {g.questions.length === 0 ? (
+                                      <>
+                                        {draft.questions.map((q, qi) => (
+                                          <div key={qi} style={s.bbQuestionEdit}>
+                                            <input
+                                              style={s.input} placeholder={`Selecția ${qi + 1} — text`}
+                                              value={q.text}
+                                              onChange={(e) => setQuestionDrafts((prev) => {
+                                                const next = { ...prev };
+                                                next[g.matchId] = { ...next[g.matchId], questions: next[g.matchId].questions.map((qq, i) => i === qi ? { ...qq, text: e.target.value } : qq) };
+                                                return next;
+                                              })}
+                                            />
+                                            <div style={{ display: "flex", gap: 6 }}>
+                                              <input style={s.input} placeholder="Opțiune A (ex. Peste / DA)" value={q.options[0]}
+                                                onChange={(e) => setQuestionDrafts((prev) => {
+                                                  const next = { ...prev };
+                                                  next[g.matchId] = { ...next[g.matchId], questions: next[g.matchId].questions.map((qq, i) => i === qi ? { ...qq, options: [e.target.value, qq.options[1]] } : qq) };
+                                                  return next;
+                                                })} />
+                                              <input style={s.input} placeholder="Opțiune B (ex. Sub / NU)" value={q.options[1]}
+                                                onChange={(e) => setQuestionDrafts((prev) => {
+                                                  const next = { ...prev };
+                                                  next[g.matchId] = { ...next[g.matchId], questions: next[g.matchId].questions.map((qq, i) => i === qi ? { ...qq, options: [qq.options[0], e.target.value] } : qq) };
+                                                  return next;
+                                                })} />
+                                            </div>
+                                          </div>
+                                        ))}
+                                        <input
+                                          style={s.input} placeholder="Întrebare de baraj (ex. Câte goluri în total în etapă?)"
+                                          value={draft.tiebreakerText}
+                                          onChange={(e) => setQuestionDrafts((prev) => ({ ...prev, [g.matchId]: { ...prev[g.matchId], tiebreakerText: e.target.value } }))}
+                                        />
+                                        <button type="button" style={s.smallBtn} disabled={betBuilderBusy} onClick={() => handleSaveQuestions(gw.id, g.matchId)}>💾 Salvează selecțiile</button>
+                                      </>
+                                    ) : (
+                                      <div style={s.bbResolveList}>
+                                        {g.questions.map((q) => (
+                                          <div key={q.id} style={s.bbResolveRow}>
+                                            <span style={s.bbResolveText}>{q.text} ({q.options[0]} / {q.options[1]})</span>
+                                            <div style={{ display: "flex", gap: 4 }}>
+                                              {["pending", "hit", "miss"].map((r) => (
+                                                <button
+                                                  key={r} type="button" disabled={betBuilderBusy}
+                                                  style={{ ...s.bbResolveBtn, ...((g.results[q.id] || "pending") === r ? s.bbResolveBtnActive : {}) }}
+                                                  onClick={() => handleResolveQuestion(gw.id, g.matchId, q.id, r)}
+                                                >
+                                                  {r === "pending" ? "⏳" : r === "hit" ? "✅" : "❌"}
+                                                </button>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        ))}
+                                        <div style={s.bbResolveRow}>
+                                          <span style={s.bbResolveText}>🎯 Baraj: {g.tiebreakerText}</span>
+                                          <input
+                                            type="number" style={{ ...s.input, width: 90 }} placeholder="Rezultat real"
+                                            defaultValue={g.tiebreakerRealAnswer ?? ""}
+                                            onBlur={(e) => { if (e.target.value !== "") handleResolveTiebreaker(gw.id, g.matchId, e.target.value); }}
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+
+                              {betBuilder.status !== "active" && (
+                                <button type="button" style={s.btn} disabled={betBuilderBusy} onClick={() => handleActivateBetBuilder(gw.id)}>
+                                  ✨ Activează Bet Builder pentru toți jucătorii
+                                </button>
+                              )}
+                              {betBuilder.status === "active" && (
+                                <div style={s.triviaSubmissionSection}>
+                                  <button type="button" style={s.smallBtn} onClick={() => openBetBuilderStatusPanel(gw.id)}>
+                                    {betBuilderStatusOpen === gw.id ? "👥 Ascunde status" : "👥 Cine a trimis biletul"}
+                                  </button>
+                                  {betBuilderStatusOpen === gw.id && (
+                                    <div style={s.triviaSubmissionList}>
+                                      {betBuilderStatusLoading ? <div style={s.hint}>Se încarcă…</div> : (() => {
+                                        const rank = { none: 0, started: 1, confirmed: 2 };
+                                        const rows = betBuilderStatusRows.slice().sort((a, b) => rank[a.status] - rank[b.status] || a.nickname.localeCompare(b.nickname));
+                                        const nConfirmed = rows.filter((r) => r.status === "confirmed").length;
+                                        const nStarted = rows.filter((r) => r.status === "started").length;
+                                        const nNone = rows.filter((r) => r.status === "none").length;
+                                        return (
+                                          <>
+                                            <div style={s.hint}>
+                                              Confirmate {nConfirmed}/{rows.length} · începute, neconfirmate {nStarted} · neîncepute {nNone}
+                                              {betBuilderStatusAt ? ` · actualizat la ${new Date(betBuilderStatusAt).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" })}` : ""}
+                                            </div>
+                                            {rows.map((r) => {
+                                              const m = matches.find((x) => x.id === r.matchId);
+                                              const kickMs = m?.kickoffAt?.toMillis ? m.kickoffAt.toMillis() : null;
+                                              const lockMs = kickMs != null ? kickMs - BET_BUILDER_DEADLINE_HOURS * 3600 * 1000 : null;
+                                              const closed = lockMs != null && Date.now() >= lockMs;
+                                              const lockText = lockMs == null ? "" : closed ? "ÎNCHIS" : `se închide ${new Date(lockMs).toLocaleString("ro-RO", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`;
+                                              const statusText = r.status === "confirmed" ? "✓ confirmat"
+                                                : r.status === "started" ? `✏️ ${r.answered}/${r.total}${r.hasTiebreaker ? " + baraj" : ""}, neconfirmat`
+                                                : "✗ nu a început";
+                                              const statusColor = r.status === "confirmed" ? "#8BD957" : r.status === "started" ? "#F0A94E" : "#F0555A";
+                                              return (
+                                                <div key={r.uid} style={{ ...s.triviaSubmissionRow, alignItems: "flex-start" }}>
+                                                  <span>
+                                                    {r.nickname}
+                                                    <div style={{ ...s.hint, margin: 0 }}>
+                                                      {m ? `${m.homeTeam} – ${m.awayTeam}` : "meci necunoscut"}{lockText ? ` · ${lockText}` : ""}
+                                                    </div>
+                                                  </span>
+                                                  <span style={{ color: statusColor, textAlign: "right" }}>{statusText}</span>
+                                                </div>
+                                              );
+                                            })}
+                                            <button type="button" style={s.smallBtn} disabled={betBuilderStatusLoading} onClick={() => loadBetBuilderStatus(gw.id)}>↻ Actualizează</button>
+                                          </>
+                                        );
+                                      })()}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              {betBuilder.status === "active" && (
+                                <button type="button" style={s.btn} disabled={betBuilderBusy} onClick={() => handleRecomputeAllDuels(gw.id)}>
+                                  🔄 Recalculează toate cele 9 dueluri
+                                </button>
+                              )}
+                            </>
+                          )}
+                          {betBuilderMsg && <p style={s.hint}>{betBuilderMsg}</p>}
+                        </div>
+                      )}
+
+                      {mainType === "higherLower" && mainRevealed && (
+                        <div style={s.triviaBox}>
+                          <p style={s.hint}>📈📉 Mai Mare/Mai Mic — 18 jucători, 9 perechi RANDOM, 6 runde comune.</p>
+                          {(!higherLower || higherLower.matchIds?.length !== 3) ? (
+                            <button
+                              type="button" style={s.approveBtn} disabled={higherLowerBusy}
+                              onClick={() => handleGenerateHigherLower(gw.id, gw.featuredMatchIds)}
+                            >
+                              🎲 Generează 9 perechi RANDOM
+                            </button>
+                          ) : (
+                            <>
+                              <p style={s.hint}>
+                                Status: <b>{higherLower.questions?.length === 6 ? "configurat" : "lipsesc întrebările"}</b> · {Object.keys(higherLower.duels || {}).length} perechi generate.
+                              </p>
+
+                              <div style={s.hlPairsGrid}>
+                                {Object.entries(higherLower.duels || {}).map(([duelId, d]) => (
+                                  <div key={duelId} style={s.hlPairChip}>
+                                    {d.playerA} vs {d.playerB} <span style={s.hint}>(începe: {d.starterUid})</span>
+                                  </div>
+                                ))}
+                              </div>
+
+                              <button type="button" style={s.smallBtn} onClick={() => openHigherLowerSubmissionPanel(gw.id)}>
+                                {higherLowerSubmissionPanel === gw.id ? "▲ Ascunde status" : "👥 Cine a pus și cine n-a pus"}
+                              </button>
+                              {higherLowerSubmissionPanel === gw.id && (
+                                <div style={s.triviaSubmissionList}>
+                                  {higherLowerSubmissionLoading ? <div style={s.hint}>Se încarcă…</div> : (
+                                    higherLowerSubmissionRows.map((r) => (
+                                      <div key={r.uid} style={s.triviaSubmissionRow}>
+                                        <span>{r.nickname}</span>
+                                        <span style={{ color: r.done === r.total ? "#8BD957" : "#F0A94E" }}>
+                                          {r.done}/{r.total}
+                                        </span>
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+                              )}
+
+                              {(!higherLower.questions || higherLower.questions.length !== 6) && (
+                                <>
+                                  <p style={s.hint}>Configurează cele 6 întrebări — exact 2 per meci, praguri X,5 (ex. 2.5).</p>
+                                  {Array.from({ length: 6 }, (_, i) => hlQuestionDrafts[i] || { matchId: gw.featuredMatchIds?.[Math.floor(i / 2)] || "", criteria: "", threshold: "", unit: "" }).map((q, i) => (
+                                    <div key={i} style={s.hlQuestionRow}>
+                                      <span style={s.hint}>Runda {i + 1} (meci {Math.floor(i / 2) + 1})</span>
+                                      <input
+                                        style={s.input} placeholder="Criteriu (ex. Total cornere)" value={q.criteria}
+                                        onChange={(e) => setHlQuestionDrafts((prev) => {
+                                          const next = [...prev]; next[i] = { ...q, criteria: e.target.value, matchId: gw.featuredMatchIds?.[Math.floor(i / 2)] }; return next;
+                                        })}
+                                      />
+                                      <input
+                                        style={s.input} placeholder="Prag (ex. 9.5)" value={q.threshold}
+                                        onChange={(e) => setHlQuestionDrafts((prev) => {
+                                          const next = [...prev]; next[i] = { ...q, threshold: e.target.value, matchId: gw.featuredMatchIds?.[Math.floor(i / 2)] }; return next;
+                                        })}
+                                      />
+                                      <input
+                                        style={s.input} placeholder="Unitate (ex. cornere)" value={q.unit}
+                                        onChange={(e) => setHlQuestionDrafts((prev) => {
+                                          const next = [...prev]; next[i] = { ...q, unit: e.target.value, matchId: gw.featuredMatchIds?.[Math.floor(i / 2)] }; return next;
+                                        })}
+                                      />
+                                    </div>
+                                  ))}
+                                  <button type="button" style={s.smallBtn} disabled={higherLowerBusy} onClick={() => handleSaveHigherLowerQuestions(gw.id)}>
+                                    💾 Salvează cele 6 întrebări
+                                  </button>
+                                </>
+                              )}
+
+                              {higherLower.questions?.length === 6 && (
+                                <>
+                                  <p style={s.hint}>Rezultate runde (validare comună, folosită de toate cele 9 perechi):</p>
+                                  {higherLower.questions.map((q, i) => (
+                                    <div key={q.id} style={s.hlQuestionRow}>
+                                      <span style={s.hint}>R{i + 1}. {q.criteria} — {q.threshold}</span>
+                                      {["mai_mare", "mai_mic"].map((r) => (
+                                        <button
+                                          key={r} type="button" disabled={higherLowerBusy}
+                                          style={{ ...s.smallBtn, ...(higherLower.results?.[q.id] === r ? { background: color.gold, color: "#12141C" } : {}) }}
+                                          onClick={() => handleResolveHigherLowerQuestion(gw.id, q.id, r)}
+                                        >
+                                          {r === "mai_mare" ? "📈" : "📉"}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  ))}
+
+                                  <button type="button" style={s.smallBtn} disabled={higherLowerBusy} onClick={() => handleRevealHigherLowerTiebreakers(gw.id)}>
+                                    🔓 Dezvăluie barajele
+                                  </button>
+                                  <button type="button" style={s.btn} disabled={higherLowerBusy} onClick={() => handleResolveAllHigherLowerDuels(gw.id)}>
+                                    🔄 Recalculează toate cele 9 dueluri
+                                  </button>
+                                </>
+                              )}
+                            </>
+                          )}
+                          {higherLowerMsg && <p style={s.hint}>{higherLowerMsg}</p>}
+                        </div>
+                      )}
+
+                      {mainType === "trivia" && (
+                        <div style={s.triviaBox}>
+                          <button type="button" style={s.smallBtn} onClick={() => openTriviaEditor(gw.id, data.secretMain?.config?.questions)}>
+                            {triviaEditorOpen === gw.id ? "▲ Închide editorul" : "📝 Configurează întrebările"}
+                          </button>
+
+                          {mainRevealed && (
+                            <div style={s.triviaLockBox}>
+                              <div style={s.triviaLockRow}>
+                                <span style={s.triviaValidateLabel}>Stare răspunsuri</span>
+                                <span style={data.public?.triviaLocked ? s.triviaLockPillLocked : s.triviaLockPillOpen}>
+                                  {data.public?.triviaLocked ? "BLOCATĂ" : "DESCHISĂ"}
+                                </span>
+                              </div>
+                              {data.public?.triviaLocked ? (
+                                <>
+                                {data.public?.triviaAnswersPublishedAt ? (
+                                  <div style={{ ...s.hint, marginBottom: 8 }}>✓ Răspunsurile sunt publicate — adversarii le văd.</div>
+                                ) : (
+                                  <button type="button" style={{ ...s.btn, width: "100%", marginBottom: 8 }} disabled={triviaLockBusy} onClick={() => handlePublishTriviaAnswers(gw.id)}>
+                                    📣 Publică răspunsurile (adversarii le văd)
+                                  </button>
+                                )}
+                                <button type="button" style={{ ...s.btnGhost, width: "100%" }} disabled={triviaLockBusy} onClick={() => handleToggleTriviaLock(gw.id, false)}>
+                                  🔓 Deblochează răspunsurile
+                                </button>
+                                </>
+                              ) : (
+                                <button type="button" style={{ ...s.btn, width: "100%" }} disabled={triviaLockBusy} onClick={() => handleToggleTriviaLock(gw.id, true)}>
+                                  🔒 Blochează răspunsurile
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                          {triviaEditorOpen === gw.id && (
+                            <div style={s.triviaEditor}>
+                              {triviaDraft.map((q, i) => (
+                                <div key={q.id} style={s.triviaQRow}>
+                                  <div style={s.triviaQNum}>#{i + 1}</div>
+                                  <input
+                                    style={s.triviaTextInput}
+                                    placeholder="Textul întrebării…"
+                                    value={q.text}
+                                    onChange={(e) => updateTriviaDraftField(i, "text", e.target.value)}
+                                  />
+                                  <div style={s.triviaOptRow}>
+                                    <input style={s.triviaOptInput} placeholder="Opțiunea A (ex: DA)" value={q.optionALabel}
+                                      onChange={(e) => updateTriviaDraftField(i, "optionALabel", e.target.value)} />
+                                    <input style={s.triviaOptInput} placeholder="Opțiunea B (ex: NU)" value={q.optionBLabel}
+                                      onChange={(e) => updateTriviaDraftField(i, "optionBLabel", e.target.value)} />
+                                  </div>
+                                </div>
+                              ))}
+                              <button type="button" style={s.approveBtn} disabled={triviaSaving} onClick={() => handleSaveTriviaQuestions(gw.id)}>
+                                {triviaSaving ? "Se salvează…" : "💾 Salvează întrebările"}
+                              </button>
+                              {triviaSaveMsg && <div style={s.triviaSaveMsg}>{triviaSaveMsg}</div>}
+                            </div>
+                          )}
+
+                          {mainRevealed && (data.secretMain?.config?.questions?.length > 0) && (
+                            <div style={s.triviaValidate}>
+                              <div style={s.triviaValidateLabel}>✅ Validează răspunsul corect</div>
+                              {data.secretMain.config.questions.map((q) => (
+                                <div key={q.id} style={s.triviaValidateRow}>
+                                  <span style={s.triviaValidateText}>{q.text || "(fără text)"}</span>
+                                  <div style={s.triviaValidateBtns}>
+                                    <button type="button" disabled={triviaMarking === q.id}
+                                      style={{ ...s.triviaValidateBtn, ...(q.correctAnswer === "A" ? s.triviaValidateBtnActive : {}) }}
+                                      onClick={() => handleMarkCorrect(gw.id, q.id, "A")}>
+                                      {q.optionALabel}
+                                    </button>
+                                    <button type="button" disabled={triviaMarking === q.id}
+                                      style={{ ...s.triviaValidateBtn, ...(q.correctAnswer === "B" ? s.triviaValidateBtnActive : {}) }}
+                                      onClick={() => handleMarkCorrect(gw.id, q.id, "B")}>
+                                      {q.optionBLabel}
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {mainRevealed && (
+                            <div style={s.triviaSubmissionSection}>
+                              <button type="button" style={s.smallBtn} onClick={() => openTriviaSubmissionPanel(gw.id, data.secretMain?.config?.questions || [])}>
+                                {triviaSubmissionPanel === gw.id ? "▲ Ascunde status" : "👥 Cine a răspuns"}
+                              </button>
+                              {triviaSubmissionPanel === gw.id && (
+                                <div style={s.triviaSubmissionList}>
+                                  {triviaSubmissionLoading ? <div style={s.hint}>Se încarcă…</div> : (
+                                    triviaSubmissionRows.map((r) => (
+                                      <div key={r.uid} style={s.triviaSubmissionRow}>
+                                        <span>{r.nickname}</span>
+                                        <span style={{ color: r.answeredCount === r.total ? "#8BD957" : "#F0A94E" }}>
+                                          {r.answeredCount}/{r.total}
+                                        </span>
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {mainType === "zaruri" && (
+                        <div style={s.triviaBox}>
+                          <button type="button" style={s.smallBtn} onClick={() => openZaruriEditor(gw.id, data.secretMain?.config?.questions)}>
+                            {zaruriEditorOpen === gw.id ? "▲ Închide editorul" : "🎲 Configurează întrebările"}
+                          </button>
+
+                          {zaruriEditorOpen === gw.id && (
+                            <div style={s.triviaEditor}>
+                              {zaruriDraft.map((q, i) => (
+                                <div key={q.id} style={s.triviaQRow}>
+                                  <div style={s.triviaQNum}>#{i + 1}</div>
+                                  <input
+                                    style={s.triviaTextInput}
+                                    placeholder="Textul întrebării… (ex: Câte cornere în Real-Barca?)"
+                                    value={q.text}
+                                    onChange={(e) => updateZaruriDraftField(i, "text", e.target.value)}
+                                  />
+                                </div>
+                              ))}
+                              <button type="button" style={s.approveBtn} disabled={zaruriSaving} onClick={() => handleSaveZaruriQuestions(gw.id)}>
+                                {zaruriSaving ? "Se salvează…" : "💾 Salvează întrebările"}
+                              </button>
+                              {zaruriSaveMsg && <div style={s.triviaSaveMsg}>{zaruriSaveMsg}</div>}
+                            </div>
+                          )}
+
+                          {mainRevealed && (data.secretMain?.config?.questions?.length > 0) && (
+                            <div style={s.triviaValidate}>
+                              <div style={s.triviaValidateLabel}>✅ Introdu rezultatul real (după etapă)</div>
+                              {data.secretMain.config.questions.map((q) => (
+                                <div key={q.id} style={s.triviaValidateRow}>
+                                  <span style={s.triviaValidateText}>{q.text || "(fără text)"}</span>
+                                  <div style={s.triviaValidateBtns}>
+                                    {q.correctTarget != null ? (
+                                      <span style={s.doneTag}>{q.correctTarget}</span>
+                                    ) : (
+                                      <>
+                                        <input
+                                          style={s.zaruriTargetInput}
+                                          type="number"
+                                          placeholder="valoare"
+                                          value={zaruriTargetDrafts[q.id] ?? ""}
+                                          onChange={(e) => setZaruriTargetDrafts((prev) => ({ ...prev, [q.id]: e.target.value }))}
+                                        />
+                                        <button type="button" style={s.triviaValidateBtn} disabled={zaruriMarking === q.id}
+                                          onClick={() => handleMarkTarget(gw.id, q.id)}>
+                                          ✓
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {mainRevealed && (
+                            <div style={s.triviaSubmissionSection}>
+                              <button type="button" style={s.smallBtn} onClick={() => openZaruriSubmissionPanel(gw.id, data.secretMain?.config?.questions || [])}>
+                                {zaruriSubmissionPanel === gw.id ? "▲ Ascunde status" : "👥 Cine s-a oprit"}
+                              </button>
+                              {zaruriSubmissionPanel === gw.id && (
+                                <div style={s.triviaSubmissionList}>
+                                  {zaruriSubmissionLoading ? <div style={s.hint}>Se încarcă…</div> : (
+                                    zaruriSubmissionRows.map((r) => (
+                                      <div key={r.uid} style={s.triviaSubmissionRow}>
+                                        <span>{r.nickname}</span>
+                                        <span style={{ color: r.answeredCount === r.total ? "#8BD957" : "#F0A94E" }}>
+                                          {r.answeredCount}/{r.total}
+                                        </span>
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div style={s.surpriseRow}>
+                        <label style={s.surpriseLabel}>🎁 BONUS</label>
+                        <select
+                          style={s.surpriseSelect}
+                          value={bonusType}
+                          disabled={bonusRevealed}
+                          onChange={(e) => handleConfigureSurprise(gw.id, "bonusType", e.target.value)}
+                        >
+                          <option value="">— alege —</option>
+                          {BONUS_CATALOG.map((c) => (
+                            <option key={c.id} value={c.id} disabled={!c.active}>{c.label}{!c.active ? " (în curând)" : ""}</option>
+                          ))}
+                        </select>
+                        {!bonusRevealed ? (
+                          <button type="button" style={s.smallBtn} disabled={!bonusType || surpriseActionKey === `${gw.id}_revealBonus`}
+                            onClick={() => handleSurpriseAction(gw.id, "revealBonus")}>
+                            🎁 Dezvăluie
+                          </button>
+                        ) : !bonusResolved ? (
+                          <button type="button" style={s.approveBtn} disabled={surpriseActionKey === `${gw.id}_resolveBonus`}
+                            onClick={() => handleSurpriseAction(gw.id, "resolveBonus")}>
+                            Rezolvă
+                          </button>
+                        ) : (
+                          <span style={s.doneTag}>✓ gata</span>
+                        )}
+                      </div>
+
+                      {bonusType === "penalty-pvp" && bonusRevealed && (
+                        <div style={s.triviaBox}>
+                          <button type="button" style={s.smallBtn} onClick={() => openPenaltySubmissionPanel(gw.id)}>
+                            {penaltySubmissionPanel === gw.id ? "▲ Ascunde status" : "👥 Cine a pus și cine n-a pus"}
+                          </button>
+                          {penaltySubmissionPanel === gw.id && (
+                            <div style={s.triviaSubmissionList}>
+                              {penaltySubmissionLoading ? <div style={s.hint}>Se încarcă…</div> : (
+                                penaltySubmissionRows.map((r) => (
+                                  <div key={r.uid} style={s.triviaSubmissionRow}>
+                                    <span>{r.nickname}</span>
+                                    <span style={{ color: r.done ? "#8BD957" : "#F0A94E" }}>
+                                      {r.done ? "✓ trimis" : "— lipsă"}
+                                    </span>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {bonusType === "mystery-box" && bonusRevealed && (
+                        <div style={s.triviaBox}>
+                          {data.public?.mysteryBoxAllRevealed ? (
+                            <span style={s.doneTag}>✓ cutii rămase dezvăluite</span>
+                          ) : (
+                            <button
+                              type="button" style={s.smallBtn}
+                              disabled={surpriseActionKey === `${gw.id}_revealRemainingMystery`}
+                              onClick={() => handleSurpriseAction(gw.id, "revealRemainingMystery")}
+                            >
+                              🎁 Dezvăluie cutiile rămase
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </SectionCard>
+
+              <SectionCard title="🃏 Joker săptămânal — cine l-a folosit">
+                {!selectedGameweekId ? (
+                  <p style={s.hint}>Alege o etapă (sus, din selector) ca să vezi Jokerii ei.</p>
+                ) : weeklyJokersGwId !== selectedGameweekId || weeklyJokers === null ? (
+                  <p style={s.hint}>Se încarcă…</p>
+                ) : (() => {
+                  const activePlayers = allUsers.filter((u) => !u.status || u.status === "active");
+                  const jokerByUid = Object.fromEntries(weeklyJokers.map((j) => [j.userId, j]));
+                  const matchByIdLocal = Object.fromEntries(matches.map((m) => [m.id, m]));
+                  const used = activePlayers.filter((u) => jokerByUid[u.uid]);
+                  const unused = activePlayers.filter((u) => !jokerByUid[u.uid]);
+                  return (
+                    <>
+                      <p style={s.jokerSummary}>Folosit: <b>{used.length}/{activePlayers.length}</b></p>
+                      {used.length > 0 && (
+                        <div style={s.jokerList}>
+                          {used.map((u) => {
+                            const j = jokerByUid[u.uid];
+                            const m = matchByIdLocal[j.matchId];
+                            return (
+                              <div key={u.uid} style={s.jokerRow}>
+                                <span style={s.jokerName}>{u.nickname || u.uid}</span>
+                                <span style={s.jokerArrow}>→</span>
+                                <span style={s.jokerMatch}>{m ? `${m.homeTeam} – ${m.awayTeam}` : "meci necunoscut"}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <p style={{ ...s.jokerSummary, marginTop: 10 }}>Nefolosit: <b>{unused.length}</b></p>
+                      {unused.length > 0 && (
+                        <div style={s.jokerList}>
+                          {unused.map((u) => (
+                            <div key={u.uid} style={s.jokerRow}>
+                              <span style={s.jokerName}>{u.nickname || u.uid}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </SectionCard>
+
+              <SectionCard title="🎟️ Preview Bet Builder — MOCK · ZERO FIRESTORE">
+                <p style={s.hint}>
+                  Demo izolat, 100% local — nu citește/scrie Firestore, nu schimbă Surpriza activă a etapei,
+                  nu face reveal, nu generează dueluri reale. Disponibil oricând, indiferent ce tip e ales/activ.
+                </p>
+                <button type="button" style={s.smallBtn} onClick={() => setBetBuilderPreviewOpen(true)}>
+                  👁 Preview Bet Builder
+                </button>
+              </SectionCard>
+
+              <SectionCard title="📈📉 Preview Mai Mare/Mai Mic — MOCK · ZERO FIRESTORE">
+                <p style={s.hint}>
+                  Demo izolat, 100% local — nu citește/scrie Firestore, nu generează perechi reale.
+                  Disponibil oricând, indiferent ce tip e ales/activ.
+                </p>
+                <button type="button" style={s.smallBtn} onClick={() => setHigherLowerPreviewOpen(true)}>
+                  👁 Preview Mai Mare/Mai Mic
+                </button>
+              </SectionCard>
+
+              <SectionCard title="🏴‍☠️ Preview Comoara Blestemată — MOCK · ZERO FIRESTORE">
+                <p style={s.hint}>
+                  Runda asta: doar experiența, 100% locală — motorul (pre-shuffle, alegere, reveal, cash-out, final)
+                  rulează integral în React state, nimic scris/citit din Firestore. Joc real + persistență: rundă viitoare.
+                </p>
+                <button type="button" style={s.smallBtn} onClick={() => setTreasureHuntPreviewOpen(true)}>
+                  👁 Preview Comoara Blestemată
+                </button>
+              </SectionCard>
+
+              <SectionCard title="⚽ Preview Penalty PvP — MOCK · ZERO FIRESTORE">
+                <p style={s.hint}>
+                  Jocul REAL de Penalty (motor + animații), doar cu adversar generat local — poți juca
+                  efectiv cele 10 alegeri (5 șuturi + 5 apărări), zero scris/citit din Firestore.
+                </p>
+                <button type="button" style={s.smallBtn} onClick={() => setPenaltyPreviewOpen(true)}>
+                  👁 Preview Penalty PvP
+                </button>
+              </SectionCard>
+
+              <SectionCard title="🥋 Preview Duel — doar în Admin, 100% local">
+                <p style={s.hint}>
+                  Verifică grafica temelor de Duel fără să atingi etapa curentă — nimic de-aici nu se scrie
+                  în Firestore, nu schimbă perechi/rezultate/scoring/reveal. Randează exact componentele
+                  reale (DuelExperience/TeamDuelExperience) — ce vezi aici e ce vor vedea jucătorii.
+                </p>
+
+                <div style={s.surpriseRow}>
+                  <label style={s.surpriseLabel}>Temă</label>
+                  <select style={s.surpriseSelect} value={previewDuelTheme} onChange={(e) => setPreviewDuelTheme(e.target.value)}>
+                    <option value="">— fără temă (avatar normal) —</option>
+                    {DUEL_THEMES.map((t) => (
+                      <option key={t.id} value={t.id}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={s.surpriseRow}>
+                  <label style={s.surpriseLabel}>Mod</label>
+                  <select
+                    style={s.surpriseSelect}
+                    value={previewDuelMode}
+                    onChange={(e) => { setPreviewDuelMode(e.target.value); setPreviewDuelPlayers(["", "", "", ""]); }}
+                  >
+                    <option value="1v1">Duel 1v1</option>
+                    <option value="2v2">Duel de Echipe 2v2</option>
+                  </select>
+                </div>
+
+                {/* ── Grilă de selecție "ca-n joc" — toți jucătorii, apeși pe 2
+                    (sau 4, la 2v2) direct din listă, evidențiați pe loc, exact
+                    ca un ecran de selecție de personaje. Un al doilea tap pe
+                    cineva deja ales îl scoate din nou. Ordinea de umplere:
+                    la 1v1 → tu, apoi adversar; la 2v2 → tu1, tu2, apoi adv1,
+                    adv2. ── */}
+                <div style={s.surpriseRow}>
+                  <label style={s.surpriseLabel}>Jucători</label>
+                  <button
+                    type="button"
+                    style={s.smallBtn}
+                    onClick={() => setPreviewDuelPlayers(["", "", "", ""])}
+                  >
+                    ↺ Golește selecția
+                  </button>
+                </div>
+                <div style={s.previewRoster}>
+                  {allUsers.map((u) => {
+                    const slotIdx = previewDuelPlayers.indexOf(u.uid);
+                    const isMine = slotIdx === 0 || slotIdx === 2;
+                    const isOpp = slotIdx === 1 || slotIdx === 3;
+                    return (
+                      <button
+                        key={u.uid}
+                        type="button"
+                        onClick={() => setPreviewDuelPlayers((prev) => {
+                          const existingIdx = prev.indexOf(u.uid);
+                          if (existingIdx !== -1) { const next = [...prev]; next[existingIdx] = ""; return next; }
+                          const relevantSlots = previewDuelMode === "1v1" ? [0, 1] : [0, 2, 1, 3];
+                          const nextIdx = relevantSlots.find((i) => !prev[i]);
+                          if (nextIdx === undefined) return prev; // toate sloturile pline — ignoră tap-ul
+                          const next = [...prev]; next[nextIdx] = u.uid; return next;
+                        })}
+                        style={{ ...s.rosterCard, ...(isMine ? s.rosterCardMine : {}), ...(isOpp ? s.rosterCardOpp : {}) }}
+                      >
+                        {previewDuelTheme ? (
+                          <DuelFighterPortrait avatarId={u.avatarId} nickname={u.nickname} theme={previewDuelTheme} width={40} height={56} fallbackSize={40} borderRadius={6} />
+                        ) : (
+                          <PlayerAvatar avatarId={u.avatarId} nickname={u.nickname} size={40} />
+                        )}
+                        <span style={s.rosterName}>{u.nickname || u.uid}</span>
+                        {isMine && <span style={s.rosterBadgeMine}>TU</span>}
+                        {isOpp && <span style={s.rosterBadgeOpp}>ADV</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {(() => {
+                  const mineSlots = previewDuelMode === "1v1" ? [0] : [0, 2];
+                  const oppSlots = previewDuelMode === "1v1" ? [1] : [1, 3];
+                  const allSlots = [...mineSlots, ...oppSlots];
+                  const filled = allSlots.every((i) => previewDuelPlayers[i]);
+                  if (!filled) return <p style={s.hint}>Alege toți jucătorii de mai sus ca să vezi preview-ul.</p>;
+
+                  const byUid = Object.fromEntries(allUsers.map((u) => [u.uid, u]));
+                  const profiles = {};
+                  const liveScores = {};
+                  allSlots.forEach((i) => {
+                    const uid = previewDuelPlayers[i];
+                    profiles[uid] = { nickname: byUid[uid]?.nickname || uid, avatarId: byUid[uid]?.avatarId ?? null };
+                    liveScores[uid] = 0;
+                  });
+
+                  // "Fighter lipsă" — verificat cu exact aceeași funcție folosită
+                  // de componentele reale (getFighterUrl) — dacă întoarce null,
+                  // acel jucător cade pe avatarul normal (fallback deja existent,
+                  // neatins) — aici doar semnalăm discret, în Admin, cine anume.
+                  const missing = previewDuelTheme
+                    ? allSlots
+                      .map((i) => previewDuelPlayers[i])
+                      .filter((uid) => !getFighterUrl(previewDuelTheme, byUid[uid]?.avatarId))
+                      .map((uid) => byUid[uid]?.nickname || uid)
+                    : [];
+
+                  return (
+                    <div style={s.previewDuelBox}>
+                      {previewDuelMode === "1v1" ? (
+                        <DuelExperience
+                          myUid={previewDuelPlayers[0]}
+                          opponentUid={previewDuelPlayers[1]}
+                          isBye={false}
+                          profiles={profiles}
+                          liveScores={liveScores}
+                          resolved={false}
+                          myPoints={null}
+                          duelTheme={previewDuelTheme || null}
+                        />
+                      ) : (
+                        <TeamDuelExperience
+                          myUid={previewDuelPlayers[0]}
+                          myTeam={[previewDuelPlayers[0], previewDuelPlayers[2]]}
+                          opponentTeam={[previewDuelPlayers[1], previewDuelPlayers[3]]}
+                          isFallbackDuel={false}
+                          isFallbackBye={false}
+                          profiles={profiles}
+                          liveScores={liveScores}
+                          resolved={false}
+                          myPoints={null}
+                          duelTheme={previewDuelTheme || null}
+                        />
+                      )}
+                      {missing.length > 0 && (
+                        <p style={s.previewDuelMissing}>⚠️ Fighter lipsă pentru „{previewDuelTheme}": {missing.join(", ")} — cad pe avatarul normal.</p>
+                      )}
+                    </div>
+                  );
+                })()}
+              </SectionCard>
+              </>
+            )}
+
+            {/* ── Feed — evenimente automate, articole editoriale, FUN ── */}
+            {tab === "feed" && (
+              <>
+                <SectionCard title="Evenimente recente (automate)">
+                  <button type="button" style={s.smallBtn} disabled={cleaningLiveEvents} onClick={handleCleanupLiveEvents}>
+                    {cleaningLiveEvents ? "Se curăță…" : "🧹 Șterge golurile/cartonașele vechi (text greșit)"}
+                  </button>
+                  <p style={s.hint}>
+                    Selector separat de cel din Rezultate/Live/Speciale — alegerea de aici nu schimbă etapa activă în restul panoului.
+                  </p>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                    {seasons.length > 1 && (
+                      <select
+                        style={s.select}
+                        value={regenerateSeasonId}
+                        onChange={(e) => { setRegenerateSeasonId(e.target.value); setRegenerateGameweekId(""); setRegenerateGameweeks([]); }}
+                      >
+                        {seasons.map((se) => (
+                          <option key={se.id} value={se.id}>{se.name}</option>
+                        ))}
+                      </select>
+                    )}
+                    <select style={s.select} value={regenerateGameweekId} onChange={(e) => setRegenerateGameweekId(e.target.value)}>
+                      <option value="">— alege etapa —</option>
+                      {regenerateGameweeks.map((g) => (
+                        <option key={g.id} value={g.id}>{g.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <p style={s.hint}>
+                    <b>Regenerate Feed pentru: {regenerateGameweeks.find((g) => g.id === regenerateGameweekId)?.title || "— alege o etapă —"}</b>
+                  </p>
+                  <button type="button" style={s.smallBtn} disabled={globalFeedBusy || !selectedGameweekId} onClick={handleRunGlobalFeed}>
+                    {globalFeedBusy ? "Se procesează…" : "🔁 Procesează Feed-ul global (reluare)"}
+                  </button>
+                  {globalFeedMsg && <p style={s.hint}>{globalFeedMsg}</p>}
+                  <button type="button" style={s.smallBtn} disabled={regeneratingFeed || !regenerateGameweekId} onClick={handleRegenerateFeed}>
+                    {regeneratingFeed ? "Se regenerează…" : "🔄 Regenerează Feed"}
+                  </button>
+                  {regenerateMessage && <p style={s.hint}>{regenerateMessage}</p>}
+                  {cleanupMessage && <p style={s.hint}>{cleanupMessage}</p>}
+                  {feedLoading && <p style={s.hint}>Se încarcă…</p>}
+                  {!feedLoading && feedEvents.length === 0 && <p style={s.hint}>Niciun eveniment încă.</p>}
+                  <div style={s.feedAdminList}>
+                    {feedEvents.map((e) => {
+                      const status = e.status || "published"; // fara camp = scris inainte de acest fix, ramane vizibil (istoric pastrat)
+                      return (
+                        <div key={e.id} style={s.feedAdminRow}>
+                          <div style={s.feedAdminRowHead}>
+                            <span style={s.feedAdminCategory}>{e.category}</span>
+                            <span
+                              style={{
+                                ...s.feedAdminPriority,
+                                color: status === "published" ? "#8BD957" : status === "ignored" ? "#F0555A" : "#F0A94E",
+                              }}
+                            >
+                              {status === "published" ? "✓ publicat" : status === "ignored" ? "✗ ignorat" : "◷ candidat"}
+                            </span>
+                          </div>
+                          <div style={s.feedAdminTitle}>{e.title}</div>
+                          <div style={s.feedAdminMeta}>{new Date(e.ts).toLocaleString("ro-RO")} · sursă: automat</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                            <span style={s.hint}>prioritate</span>
+                            <input
+                              type="number" style={{ ...s.input, width: 60 }} defaultValue={e.priority}
+                              onBlur={(ev) => {
+                                const v = Number(ev.target.value);
+                                if (v !== e.priority) handleSetFeedEventPriority(e.id, v);
+                              }}
+                            />
+                            {status !== "published" && (
+                              <button type="button" style={s.smallBtn} onClick={() => handlePublishFeedEvent(e.id)}>📣 Publică</button>
+                            )}
+                            {status !== "ignored" && (
+                              <button type="button" style={s.smallBtn} onClick={() => handleIgnoreFeedEvent(e.id)}>🚫 Ignoră</button>
+                            )}
                           </div>
                         </div>
                       );
                     })}
                   </div>
-                );
-              })}
-            </div>
-          );
-        })()}
-      </div>
+                </SectionCard>
 
-      {/* ── 👤 GESTIONARE CONTURI ─────────────────────────────────────────────── */}
-      <div style={{ marginTop:10, padding:'10px 12px', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:10 }}>
-        <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:8, fontWeight:700 }}>
-          👤 Gestionare Conturi — Resetare Parolă
-        </div>
-        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-          {Object.entries(allUsers).filter(([,u]) => u?.nickname).map(([uid, u]) => {
-            const msg        = resetMsgs[uid] || '';
-            const emailKnown = u.email;
-            const manual     = manualEmails[uid] || '';
-            const emailToUse = emailKnown || manual;
-            return (
-              <div key={uid} style={{ padding:'8px 10px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom: emailKnown ? 0 : 6 }}>
-                  <div>
-                    <div style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{u.nickname}</div>
-                    {emailKnown
-                      ? <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginTop:1 }}>{emailKnown}</div>
-                      : <div style={{ fontSize:10, color:'rgba(255,120,0,0.6)', marginTop:1 }}>email necunoscut</div>
-                    }
+                <SectionCard title="📰 Adaugă știre în Feed">
+                  <p style={s.hint}>Plasă de siguranță — dacă generatorul automat nu prinde ceva important, publici tu direct.</p>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                    {[
+                      { key: "clasament", label: "🏆 Clasament" }, { key: "meci", label: "⚽ Meci" },
+                      { key: "pronostic", label: "🎯 Pronostic" }, { key: "breaking", label: "🔥 Breaking" },
+                      { key: "funny", label: "😄 Funny" }, { key: "general", label: "📰 General" },
+                    ].map((t) => (
+                      <button
+                        key={t.key} type="button" onClick={() => setManualNewsType(t.key)}
+                        style={{ ...s.smallBtn, ...(manualNewsType === t.key ? { background: color.gold, color: "#12141C", borderColor: color.gold } : {}) }}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
                   </div>
-                  {emailKnown && (
-                    <button
-                      disabled={!!msg}
-                      onClick={async () => {
-                        setResetMsgs(p => ({...p, [uid]:'Se trimite...'}));
-                        const res = await sendPasswordReset(emailKnown);
-                        setResetMsgs(p => ({...p, [uid]: res.success ? '✅ Trimis!' : '❌ ' + res.error}));
-                        setTimeout(() => setResetMsgs(p => ({...p, [uid]:''})), 5000);
-                      }}
-                      style={{
-                        padding:'5px 10px', fontSize:10, fontWeight:700, borderRadius:7, whiteSpace:'nowrap',
-                        cursor: msg ? 'default' : 'pointer',
-                        background: msg?.startsWith('✅') ? 'rgba(0,229,160,0.1)' : msg?.startsWith('❌') ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.07)',
-                        border: `1px solid ${msg?.startsWith('✅') ? 'rgba(0,229,160,0.3)' : msg?.startsWith('❌') ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.12)'}`,
-                        color: msg?.startsWith('✅') ? '#00E5A0' : msg?.startsWith('❌') ? '#EF4444' : 'rgba(255,255,255,0.7)',
-                      }}>
-                      {msg || '🔑 Reset parolă'}
-                    </button>
-                  )}
-                </div>
-                {/* For users without email in Firestore — manual input */}
-                {!emailKnown && (
-                  <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-                    <input
-                      type="email" value={manual} placeholder="introdu emailul lui..."
-                      onChange={e => setManualEmails(p => ({...p, [uid]: e.target.value}))}
-                      style={{ flex:1, padding:'6px 10px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:7, color:'#fff', fontSize:11, fontFamily:'inherit', outline:'none' }}
-                    />
-                    <button
-                      disabled={!manual.includes('@') || !!msg}
-                      onClick={async () => {
-                        if (!manual.includes('@')) return;
-                        setResetMsgs(p => ({...p, [uid]:'Se trimite...'}));
-                        const res = await sendPasswordReset(manual);
-                        setResetMsgs(p => ({...p, [uid]: res.success ? '✅ Trimis!' : '❌ ' + res.error}));
-                        setTimeout(() => setResetMsgs(p => ({...p, [uid]:''})), 5000);
-                      }}
-                      style={{
-                        padding:'5px 10px', fontSize:10, fontWeight:700, borderRadius:7, whiteSpace:'nowrap',
-                        cursor: manual.includes('@') && !msg ? 'pointer' : 'default',
-                        background: msg?.startsWith('✅') ? 'rgba(0,229,160,0.1)' : msg?.startsWith('❌') ? 'rgba(239,68,68,0.1)' : manual.includes('@') ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.03)',
-                        border: `1px solid ${msg?.startsWith('✅') ? 'rgba(0,229,160,0.3)' : msg?.startsWith('❌') ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.1)'}`,
-                        color: msg?.startsWith('✅') ? '#00E5A0' : msg?.startsWith('❌') ? '#EF4444' : manual.includes('@') ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.25)',
-                      }}>
-                      {msg || '🔑 Reset'}
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+                  <input style={s.input} placeholder="Titlu (obligatoriu)" value={manualNewsTitle} onChange={(e) => setManualNewsTitle(e.target.value)} />
+                  <textarea style={s.textarea} rows={2} placeholder="Text (opțional)" value={manualNewsText} onChange={(e) => setManualNewsText(e.target.value)} />
+                  <button type="button" style={s.btn} disabled={manualNewsPublishing} onClick={handlePublishManualNews}>
+                    {manualNewsPublishing ? "Se publică…" : "Publică în Feed"}
+                  </button>
+                  {manualNewsMessage && <p style={s.hint}>{manualNewsMessage}</p>}
 
-      {/* ── 🔥 AUDIT JOKER (read-only) ──────────────────────────────────────── */}
-      {/* Pure display panel — no buttons, no reset, no manual editing, no
-          Firestore writes. Everything below is derived from allPredictions
-          (already loaded) and the static MATCHES list (team names). */}
-      <div style={{ marginTop:10, padding:'10px 12px', background:'rgba(255,107,0,0.04)', border:'1px solid rgba(255,107,0,0.16)', borderRadius:10 }}>
-        <div style={{ fontSize:10, color:'rgba(255,107,0,0.7)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:8, fontWeight:700 }}>
-          🔥 Audit Joker
-        </div>
-        {jokerAudit.length === 0 ? (
-          <div style={{ fontSize:11, color:'rgba(255,255,255,0.25)', fontStyle:'italic' }}>
-            Niciun jucător înregistrat încă.
-          </div>
-        ) : (
-          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-            {jokerAudit.map(row => {
-              const overLimit = row.count > 2;
-              return (
-                <div key={row.uid} style={{ padding:'7px 9px', background:'rgba(255,255,255,0.02)', borderRadius:8, border: overLimit ? '1px solid rgba(239,68,68,0.35)' : '1px solid rgba(255,255,255,0.04)' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                    <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{row.nickname}</span>
-                    <span style={{ fontSize:11, fontWeight:800, color: overLimit ? '#EF4444' : row.count > 0 ? '#FF6B00' : 'rgba(255,255,255,0.25)', fontFamily:"'DM Mono',monospace" }}>
-                      {row.count}/2 Joker-e
-                    </span>
-                  </div>
-                  {overLimit && (
-                    <div style={{ fontSize:10, color:'#EF4444', fontWeight:700, marginTop:3 }}>
-                      ⚠️ DEPĂȘIRE LIMITĂ: {row.count}/2
-                    </div>
-                  )}
-                  {row.matches.length > 0 && (
-                    <div style={{ marginTop:4, display:'flex', flexDirection:'column', gap:2 }}>
-                      {row.matches.map(m => (
-                        <div key={m.matchId} style={{ fontSize:10, color:'rgba(255,255,255,0.4)' }}>
-                          • {m.label}
+                  {manualNewsList.length > 0 && (
+                    <div style={{ ...s.feedAdminList, marginTop: 10 }}>
+                      {manualNewsList.map((n) => (
+                        <div key={n.id} style={s.feedAdminRowBetween}>
+                          <div>
+                            <div style={s.feedAdminTitle}>{n.title}</div>
+                            <div style={s.feedAdminMeta}>{new Date(n.ts).toLocaleString("ro-RO")} · manual</div>
+                          </div>
+                          <button
+                            type="button" style={s.smallBtn} disabled={manualNewsDeletingId === n.id}
+                            onClick={() => handleDeleteManualNews(n.id, n.title)}
+                          >
+                            {manualNewsDeletingId === n.id ? "…" : "Șterge"}
+                          </button>
                         </div>
                       ))}
                     </div>
                   )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                </SectionCard>
 
-      {/* ── 🏆 AUDIT CALIFICATE ÎN SFERTURI ──────────────────────────────────── */}
-      <div style={{ marginTop:10, padding:'10px 12px', background:'rgba(0,229,160,0.03)', border:'1px solid rgba(0,229,160,0.12)', borderRadius:10 }}>
-        <div style={{ fontSize:10, color:'rgba(0,229,160,0.7)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:8, fontWeight:700 }}>
-          🏆 Audit — Calificate în Sferturi
-        </div>
-        {Object.keys(allSpecialPreds).length === 0 ? (
-          <div style={{ fontSize:11, color:'rgba(255,255,255,0.25)', fontStyle:'italic' }}>
-            Niciun jucător nu a salvat încă predicția pentru sferturi.
-          </div>
-        ) : (
-          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-            {Object.entries(allSpecialPreds).map(([uid, pred]) => {
-              const nickname = allUsers[uid]?.nickname || uid;
-              const rawQF    = pred?.quarterFinalists || {};
-              const qf       = repairQFPicks(rawQF);   // repair in memory before display
-              const count    = Object.values(qf).filter(Boolean).length;
-              const realQF   = specialResultsInit?.quarterFinalists || {};
-              const correct  = Object.entries(realQF).filter(([id, w]) => qf[id] === w).length;
-              return (
-                <div key={uid} style={{ padding:'7px 9px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: count > 0 ? 5 : 0 }}>
-                    <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{nickname}</span>
-                    <span style={{ fontSize:11, fontWeight:800, fontFamily:"'DM Mono',monospace",
-                      color: count === 8 ? 'rgba(0,229,160,0.8)' : count > 0 ? 'rgba(255,215,0,0.7)' : 'rgba(255,255,255,0.25)' }}>
-                      {count}/8{Object.keys(realQF).length > 0 ? ` · ${correct} corecte` : ''}
-                    </span>
-                  </div>
-                  {count > 0 && (
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
-                      {R16_MATCHES.map(m => {
-                        const picked  = qf[m.id];
-                        const realWin = realQF[m.id];
-                        const cor     = realWin && picked === realWin;
-                        const wrg     = realWin && picked && picked !== realWin;
-                        const flag    = picked === m.home ? m.homeFlag : picked === m.away ? m.awayFlag : '';
-                        return (
-                          <span key={m.id} style={{
-                            fontSize:10, padding:'2px 6px', borderRadius:5, fontWeight:600,
-                            background: cor?'rgba(0,229,160,0.12)':wrg?'rgba(239,68,68,0.1)':'rgba(255,255,255,0.05)',
-                            color: cor?'#00E5A0':wrg?'#EF4444':picked?'rgba(255,255,255,0.6)':'rgba(255,255,255,0.2)',
-                            border: `1px solid ${cor?'rgba(0,229,160,0.2)':wrg?'rgba(239,68,68,0.2)':'rgba(255,255,255,0.06)'}`,
-                          }}>
-                            {picked ? `${flag} ${picked}` : '—'}
-                          </span>
-                        );
-                      })}
+                <SectionCard title="Bancă de conținut editorial (context)">
+                  <p style={s.hint}>
+                    {EDITORIAL_ARTICLES.length} fragmente, pentru {new Set(EDITORIAL_ARTICLES.map((a) => a.teamId)).size} echipe.
+                    Nu apar de sine stătător — se atașează AUTOMAT doar la meciurile reale, viitoare, ale echipelor
+                    respective (fereastră de 7 zile), și dispar când meciul nu mai e "următor".
+                  </p>
+                </SectionCard>
+
+                <SectionCard title="FUN — adăugat de Admin">
+                  <p style={s.hint}>Astea se adaugă peste lista de bază (nu o înlocuiesc).</p>
+                  <input style={s.input} placeholder="Etichetă (ex: GLUMĂ, PROVERB)" value={newFunLabel} onChange={(e) => setNewFunLabel(e.target.value)} />
+                  <textarea style={s.textarea} rows={2} placeholder="Textul..." value={newFunText} onChange={(e) => setNewFunText(e.target.value)} />
+                  <button style={s.btn} disabled={funSaving} onClick={handleAddFun} type="button">
+                    {funSaving ? "Se salvează…" : "Adaugă"}
+                  </button>
+
+                  {feedAdminFun.length > 0 && (
+                    <div style={{ ...s.feedAdminList, marginTop: 10 }}>
+                      {feedAdminFun.map((f) => (
+                        <div key={f.id} style={s.feedAdminRowBetween}>
+                          <div>
+                            <div style={s.feedAdminCategory}>{f.label}</div>
+                            <div style={s.feedAdminTitle}>{f.text}</div>
+                          </div>
+                          <button type="button" style={s.smallBtn} onClick={() => handleDeleteFun(f.id)}>Șterge</button>
+                        </div>
+                      ))}
                     </div>
                   )}
-                  {count === 0 && (
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.25)', fontStyle:'italic' }}>Nu a salvat predicția.</div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                </SectionCard>
+              </>
+            )}
 
-      {/* ── ⚠️ REPARAȚIE URGENTĂ — UNICĂ, TEMPORARĂ ──────────────────────────── */}
-      {/* One-time emergency fix for the usedJoker-not-persisted bug found in
-          production: BogdanB and Pannnn both activated Joker on match 74
-          before the Firestore write was fixed. This button ONLY flips
-          usedJoker:true on their EXISTING prediction documents — no scoring,
-          no new prediction, no other field touched. Each user is repaired
-          independently so a missing doc for one doesn't block the other.
-          Safe to remove once confirmed working. */}
-      <div style={{ marginTop:10, padding:'10px 12px', background:'rgba(239,68,68,0.05)', border:'1px solid rgba(239,68,68,0.2)', borderRadius:10 }}>
-        <div style={{ fontSize:10, color:'rgba(239,68,68,0.75)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:6, fontWeight:700 }}>
-          ⚠️ Reparație urgentă (unică)
-        </div>
-        <div style={{ fontSize:10.5, color:'rgba(255,255,255,0.4)', marginBottom:8, lineHeight:1.4 }}>
-          BogdanB și Pannnn au activat Joker pe M74 (Brazilia vs Japonia) înainte de fix-ul de salvare. Acest buton marchează manual <code>usedJoker:true</code> pe predicțiile lor deja existente — nu schimbă scorul, nu creează predicție nouă.
-        </div>
-        <button
-          disabled={jokerRepairBusy}
-          onClick={async () => {
-            setJokerRepairBusy(true);
-            setJokerRepairMsg('');
-            const targets = ['bogdanb', 'pannnnn'];
-            const results = [];
-            for (const nick of targets) {
-              try {
-                const found = Object.entries(allUsers).find(([, u]) =>
-                  (u?.nickname || '').toLowerCase() === nick
-                );
-                if (!found) {
-                  results.push(`❌ ${nick}: utilizator negăsit.`);
-                  continue;
-                }
-                const [uid] = found;
-                await adminRepairSetJokerViaSpecialResults(uid, 74);
-                results.push(`✅ ${found[1]?.nickname || nick}: Joker M74 reparat via specialResults.`);
-              } catch (e) {
-                results.push(`❌ ${nick}: ${e?.message || 'eroare necunoscută'}.`);
-              }
-            }
-            setJokerRepairMsg(results.join(' '));
-            setJokerRepairBusy(false);
-          }}
-          style={{
-            width:'100%', padding:'9px 12px', borderRadius:8, border:'1px solid rgba(239,68,68,0.35)',
-            background: jokerRepairBusy ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.14)',
-            color:'#EF4444', fontSize:12, fontWeight:800, cursor: jokerRepairBusy ? 'default' : 'pointer',
-          }}
-        >
-          {jokerRepairBusy ? 'Se repară...' : 'Fix BogdanB + Pannnn Joker M74'}
-        </button>
-        {jokerRepairMsg && (
-          <div style={{ fontSize:10.5, marginTop:7, color: jokerRepairMsg.startsWith('❌') && !jokerRepairMsg.includes('✅') ? '#EF4444' : '#00E5A0', lineHeight:1.4 }}>
-            {jokerRepairMsg}
-            <br/><span style={{opacity:0.6}}>Reîncarcă pagina pentru a vedea Audit Joker actualizat.</span>
-          </div>
-        )}
-      </div>
-
-
-      <div style={{ display:'flex', gap:8, marginTop:10 }}>
-        <button
-          onClick={() => { onMatchUpdate?.({ _action:'recalc' }); setSaved(false); }}
-          style={{ flex:1, padding:'10px 8px', background:'rgba(0,229,160,0.08)', border:'1px solid rgba(0,229,160,0.2)', borderRadius:10, color:'#00E5A0', fontSize:11, fontWeight:700, cursor:'pointer' }}
-        >
-          Recalculeaza clasamente
-        </button>
-        <button
-          onClick={() => {
-            if (!window.confirm('Resetezi toate rezultatele test?')) return;
-            localStorage.removeItem('wc2026_admin_results');
-            onMatchUpdate?.({ _action:'reset' });
-            setSel(null); setHistory([]);
-          }}
-          style={{ flex:1, padding:'10px 8px', background:'rgba(239,68,68,0.07)', border:'1px solid rgba(239,68,68,0.18)', borderRadius:10, color:'#EF4444', fontSize:11, fontWeight:700, cursor:'pointer' }}
-        >
-          Reset rezultate test
-        </button>
-      </div>
-
-      {/* ── EVENIMENTE SPECIALE ─────────────────────────────────────────── */}
-      <div style={{ marginTop:12, padding:'12px', background:'rgba(255,215,0,0.04)', border:'1px solid rgba(255,215,0,0.2)', borderRadius:12 }}>
-        <div style={{ fontSize:10, color:'rgba(255,215,0,0.7)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10, fontWeight:700 }}>⭐ Rezultate Evenimente Speciale</div>
-        <div style={{ marginBottom:8 }}>
-          <div style={{ fontSize:10, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>🏆 Câștigătoarea (500 pts)</div>
-          <select value={specialRes.winner} onChange={e=>setSpecialRes(r=>({...r,winner:e.target.value}))} style={{ width:'100%', padding:'7px 8px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:7, color:'#fff', fontSize:12, outline:'none' }}>
-            <option value="">— Nesetat —</option>
-            {WC_TEAMS.map(t=><option key={t.name} value={t.name}>{t.flag} {t.name}</option>)}
-          </select>
-        </div>
-        <div style={{ marginBottom:8 }}>
-          <div style={{ fontSize:10, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>🥈 Semifinaliste — {specialRes.semifinalists.length}/4</div>
-          <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
-            {WC_TEAMS.map(t=>{ const isSel=specialRes.semifinalists.includes(t.name); const isFull=specialRes.semifinalists.length>=4&&!isSel; return <button key={t.name} onClick={()=>setSpecialRes(r=>{ const arr=r.semifinalists; return {...r,semifinalists:arr.includes(t.name)?arr.filter(x=>x!==t.name):arr.length<4?[...arr,t.name]:arr}; })} disabled={isFull} style={{ padding:'2px 6px', background:isSel?'rgba(0,229,160,0.2)':'rgba(255,255,255,0.05)', border:`1px solid ${isSel?'rgba(0,229,160,0.4)':'rgba(255,255,255,0.08)'}`, borderRadius:5, fontSize:10, color:isFull?'rgba(255,255,255,0.2)':'#fff', cursor:isFull?'default':'pointer' }}>{t.flag} {t.name}</button>; })}
-          </div>
-        </div>
-        <div style={{ marginBottom:10 }}>
-          <div style={{ fontSize:10, color:'rgba(255,255,255,0.4)', marginBottom:4 }}>⚽ Țara golgheterului (300 pts)</div>
-          <select value={specialRes.topScorerCountry} onChange={e=>setSpecialRes(r=>({...r,topScorerCountry:e.target.value}))} style={{ width:'100%', padding:'7px 8px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:7, color:'#fff', fontSize:12, outline:'none' }}>
-            <option value="">— Nesetat —</option>
-            {WC_TEAMS.map(t=><option key={t.name} value={t.name}>{t.flag} {t.name}</option>)}
-          </select>
-        </div>
-        {specialMsg && <div style={{ fontSize:11, color:specialMsg.startsWith('✅')?'rgba(0,229,160,0.8)':'#EF4444', marginBottom:6 }}>{specialMsg}</div>}
-        <button onClick={async()=>{
-          setSpecialMsg('');
-          const res = await saveSpecialResults(currentUser?.uid, specialRes);
-          if(res.success){
-            setSpecialMsg('✅ Salvat! Clasamentul se actualizează.');
-            onMatchUpdate?.({_action:'specialResults'});
-          } else {
-            setSpecialMsg('❌ Eroare: ' + (res.error || 'necunoscută'));
-          }
-        }} style={{ width:'100%', padding:'9px', background:'rgba(255,215,0,0.1)', border:'1px solid rgba(255,215,0,0.25)', borderRadius:9, color:'#FFD700', fontSize:12, fontWeight:800, cursor:'pointer' }}>
-          💾 Salvează rezultate speciale
-        </button>
-      </div>
-
-
-      {/* ── CALIFICATE ÎN SFERTURI — panou admin ─────────────────────────────── */}
-      <div style={{ marginTop:10, padding:'12px 14px', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14 }}>
-        <div style={{ fontSize:11, fontWeight:800, color:'rgba(255,255,255,0.7)', letterSpacing:'0.07em', textTransform:'uppercase', marginBottom:4 }}>
-          🏆 Calificate în Sferturi — rezultate reale
-        </div>
-        <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:14 }}>
-          Poți salva după fiecare meci. Rezultatele anterioare rămân salvate.
-        </div>
-
-        {/* Already-saved indicator */}
-        {(() => {
-          const savedQF = specialResultsInit?.quarterFinalists || {};
-          const savedCount = Object.values(savedQF).filter(Boolean).length;
-          if (savedCount === 0) return null;
-          return (
-            <div style={{ fontSize:10, color:'rgba(0,229,160,0.7)', marginBottom:10,
-              padding:'5px 8px', background:'rgba(0,229,160,0.06)', borderRadius:7,
-              border:'1px solid rgba(0,229,160,0.15)' }}>
-              ✓ {savedCount}/8 rezultate salvate în Firestore
-            </div>
-          );
-        })()}
-
-        <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:12 }}>
-          {R16_MATCHES.map(m => {
-            const picked    = qfSel[m.id];
-            const savedWin  = specialResultsInit?.quarterFinalists?.[m.id];
-            const homesel   = picked === m.home;
-            const awaysel   = picked === m.away;
-            const isSaved   = !!savedWin;
-
-            const teamBtn = (side) => {
-              const sel    = side === 'home' ? homesel : awaysel;
-              const flag   = side === 'home' ? m.homeFlag : m.awayFlag;
-              const team   = side === 'home' ? m.home : m.away;
-              const isReal = savedWin === team;
-              return (
-                <button
-                  key={side}
-                  onClick={() => {
-                    const v = side === 'home' ? m.home : m.away;
-                    setQFSel(prev => ({ ...prev, [m.id]: prev[m.id] === v ? undefined : v }));
-                  }}
-                  style={{
-                    flex:1, padding:'10px 6px', borderRadius:10, border:'none', cursor:'pointer',
-                    display:'flex', flexDirection:'column', alignItems:'center', gap:3,
-                    background: sel ? 'rgba(0,229,160,0.16)' : 'rgba(255,255,255,0.04)',
-                    outline: sel ? '1.5px solid rgba(0,229,160,0.55)' : '1px solid rgba(255,255,255,0.08)',
-                    transition:'background 0.12s',
-                  }}>
-                  <span style={{ fontSize:22, lineHeight:1 }}>{flag}</span>
-                  <span style={{ fontSize:11, fontWeight:700, color: sel ? '#00E5A0' : 'rgba(255,255,255,0.8)', textAlign:'center', lineHeight:1.2 }}>{team}</span>
-                  {isReal && <span style={{ fontSize:9, color:'rgba(0,229,160,0.9)', fontWeight:700 }}>✓ Salvat</span>}
-                  {sel && !isReal && <span style={{ fontSize:9, color:'rgba(255,215,0,0.8)' }}>◎ selectat</span>}
+            {/* ── Health Check — doar detectare + corecție manuală ────── */}
+            {tab === "health" && (
+              <SectionCard title="Health Check — meciuri deja salvate">
+                <p style={s.hint}>
+                  Verifică meciurile deja existente în Firestore (toate etapele) — nu modifică nimic automat, doar
+                  semnalează probleme probabile.
+                </p>
+                <button style={s.btn} disabled={healthLoading} onClick={handleRunHealthCheck} type="button">
+                  {healthLoading ? "Se verifică…" : "Rulează Health Check"}
                 </button>
-              );
-            };
+                {healthError && <div style={{ ...s.message, background: "rgba(240,85,90,0.1)", borderColor: "rgba(240,85,90,0.3)", color: "#F0555A" }}>{healthError}</div>}
+                {editMessage && <div style={s.message}>{editMessage}</div>}
 
-            return (
-              <div key={m.id} style={{
-                display:'flex', gap:6, alignItems:'stretch',
-                opacity: isSaved && !picked ? 0.7 : 1,
-              }}>
-                {teamBtn('home')}
-                <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'0 4px', gap:2 }}>
-                  <span style={{ fontSize:9, fontWeight:800, color:'rgba(255,255,255,0.18)' }}>VS</span>
-                  {isSaved && (
-                    <span style={{ fontSize:8, color:'rgba(0,229,160,0.6)', fontWeight:700, whiteSpace:'nowrap' }}>✓ salvat</span>
-                  )}
-                  {!isSaved && (
-                    <span style={{ fontSize:8, color:'rgba(255,255,255,0.2)', whiteSpace:'nowrap' }}>nesalvat</span>
-                  )}
-                </div>
-                {teamBtn('away')}
-              </div>
-            );
-          })}
-        </div>
+                {healthIssues !== null && (
+                  <p style={{ ...s.hint, marginTop: 12 }}>
+                    {healthIssues.length === 0 ? "Nicio problemă găsită." : `${healthIssues.length} meciuri cu probleme.`}
+                  </p>
+                )}
 
-        <div style={{ fontSize:10, marginBottom:8,
-          color: Object.values(qfSel).filter(Boolean).length > 0 ? 'rgba(0,229,160,0.8)' : 'rgba(255,255,255,0.3)' }}>
-          {Object.values(qfSel).filter(Boolean).length} meci(uri) selectate pentru salvare
-        </div>
-        {qfMsg && <div style={{ fontSize:11, color:qfMsg.startsWith('✅')?'rgba(0,229,160,0.8)':'#EF4444', marginBottom:6 }}>{qfMsg}</div>}
-        <button
-          disabled={Object.values(qfSel).filter(Boolean).length === 0}
-          onClick={async () => {
-            setQFMsg('');
-            const clean = Object.fromEntries(Object.entries(qfSel).filter(([,v]) => v));
-            const res = await saveQFResults(currentUser?.uid, clean);
-            if (res.success) {
-              setQFMsg(`✅ ${Object.keys(clean).length} rezultat(e) salvate! Clasamentul se actualizează.`);
-              onMatchUpdate?.({ _action:'specialResults' });
-            } else {
-              setQFMsg('Eroare: ' + (res.error || 'necunoscută'));
-            }
-          }}
-          style={{
-            width:'100%', padding:'10px', fontSize:13, fontWeight:800, borderRadius:10,
-            cursor: Object.values(qfSel).filter(Boolean).length > 0 ? 'pointer' : 'default',
-            background: Object.values(qfSel).filter(Boolean).length > 0 ? 'rgba(0,229,160,0.12)' : 'rgba(255,255,255,0.03)',
-            border: `1px solid ${Object.values(qfSel).filter(Boolean).length > 0 ? 'rgba(0,229,160,0.35)' : 'rgba(255,255,255,0.07)'}`,
-            color: Object.values(qfSel).filter(Boolean).length > 0 ? '#00E5A0' : 'rgba(255,255,255,0.25)',
-          }}>
-          💾 Salvează rezultatele selectate
-        </button>
-      </div>
+                {healthIssues && healthIssues.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
+                    {healthIssues.map(({ match: m, problems }) => (
+                      <div key={m.id} style={s.healthCard}>
+                        <div style={s.healthTop}>
+                          <span style={s.healthTeams}>{m.homeTeam} - {m.awayTeam}</span>
+                          <span style={s.healthGw}>etapă: {m.gameweekId}</span>
+                        </div>
+                        <ul style={s.healthList}>
+                          {problems.map((p, i) => <li key={i} style={s.healthItem}>{p}</li>)}
+                        </ul>
 
-      {/* ── CALIFICATE ÎN SEMIFINALE — admin panel ────────────────────────────── */}
-      <div style={{ marginTop:10, padding:'12px 14px', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14 }}>
-        <div style={{ fontSize:11, fontWeight:800, color:'rgba(255,255,255,0.7)', letterSpacing:'0.07em', textTransform:'uppercase', marginBottom:4 }}>
-          🏅 Calificate în Semifinale — rezultate reale
-        </div>
-        <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginBottom:12 }}>
-          Alege câștigătorul fiecărui sfert. Salvarea parțială e permisă.
-        </div>
-        {(() => {
-          const savedCount = Object.values(sfSel).filter(Boolean).length;
-          return savedCount > 0 ? (
-            <div style={{ fontSize:10, color:'rgba(0,229,160,0.7)', marginBottom:10, padding:'5px 8px', background:'rgba(0,229,160,0.06)', borderRadius:7, border:'1px solid rgba(0,229,160,0.15)' }}>
-              ✓ {savedCount}/4 rezultate salvate
-            </div>
-          ) : null;
-        })()}
-        <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:10 }}>
-          {SF_MATCHES.map(m => {
-            const picked  = sfSel[m.id];
-            const homesel = picked === m.home;
-            const awaysel = picked === m.away;
-            const isSaved = !!(specialResultsInit?.qualifiedToSemis?.[m.id]);
-            const savedWin = specialResultsInit?.qualifiedToSemis?.[m.id];
-            const teamBtn = (side) => {
-              const sel  = side==='home' ? homesel : awaysel;
-              const team = side==='home' ? m.home : m.away;
-              const flag = side==='home' ? m.homeFlag : m.awayFlag;
-              const isReal = savedWin === team;
-              return (
-                <button key={side}
-                  onClick={() => setSFSel(prev => ({...prev, [m.id]: prev[m.id]===team?undefined:team}))}
-                  style={{ flex:1, padding:'10px 6px', borderRadius:10, border:'none', cursor:'pointer',
-                    display:'flex', flexDirection:'column', alignItems:'center', gap:3,
-                    background:sel?'rgba(0,229,160,0.16)':'rgba(255,255,255,0.04)',
-                    outline:sel?'1.5px solid rgba(0,229,160,0.55)':'1px solid rgba(255,255,255,0.08)',
-                    transition:'background 0.12s' }}>
-                  <span style={{ fontSize:22, lineHeight:1 }}>{flag}</span>
-                  <span style={{ fontSize:11, fontWeight:700, color:sel?'#00E5A0':'rgba(255,255,255,0.8)', textAlign:'center', lineHeight:1.2 }}>{team}</span>
-                  {isReal && <span style={{ fontSize:9, color:'rgba(0,229,160,0.9)', fontWeight:700 }}>✓ Salvat</span>}
-                  {sel && !isReal && <span style={{ fontSize:9, color:'rgba(255,215,0,0.8)' }}>◎ selectat</span>}
-                </button>
-              );
-            };
-            return (
-              <div key={m.id} style={{ display:'flex', gap:6, alignItems:'stretch' }}>
-                {teamBtn('home')}
-                <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'0 4px', gap:2 }}>
-                  <span style={{ fontSize:9, fontWeight:800, color:'rgba(255,255,255,0.18)' }}>VS</span>
-                  <span style={{ fontSize:8, color:isSaved?'rgba(0,229,160,0.6)':'rgba(255,255,255,0.2)', whiteSpace:'nowrap' }}>{isSaved?'✓ salvat':'nesalvat'}</span>
-                </div>
-                {teamBtn('away')}
-              </div>
-            );
-          })}
-        </div>
-        <div style={{ fontSize:10, marginBottom:8, color:Object.values(sfSel).filter(Boolean).length>0?'rgba(0,229,160,0.8)':'rgba(255,255,255,0.3)' }}>
-          {Object.values(sfSel).filter(Boolean).length} meci(uri) selectate
-        </div>
-        {sfMsg && <div style={{ fontSize:11, color:sfMsg.startsWith('✅')?'rgba(0,229,160,0.8)':'#EF4444', marginBottom:6 }}>{sfMsg}</div>}
-        <button
-          disabled={Object.values(sfSel).filter(Boolean).length === 0}
-          onClick={async () => {
-            setSFMsg('');
-            const clean = Object.fromEntries(Object.entries(sfSel).filter(([,v])=>v));
-            const res = await saveSFResults(currentUser?.uid, clean);
-            if (res.success) { setSFMsg(`✅ ${Object.keys(clean).length} rezultat(e) salvate! Clasamentul se actualizează.`); onMatchUpdate?.({ _action:'specialResults' }); }
-            else setSFMsg('Eroare: ' + (res.error || 'necunoscută'));
-          }}
-          style={{ width:'100%', padding:'10px', fontSize:13, fontWeight:800, borderRadius:10,
-            cursor:Object.values(sfSel).filter(Boolean).length>0?'pointer':'default',
-            background:Object.values(sfSel).filter(Boolean).length>0?'rgba(0,229,160,0.12)':'rgba(255,255,255,0.03)',
-            border:`1px solid ${Object.values(sfSel).filter(Boolean).length>0?'rgba(0,229,160,0.35)':'rgba(255,255,255,0.07)'}`,
-            color:Object.values(sfSel).filter(Boolean).length>0?'#00E5A0':'rgba(255,255,255,0.25)' }}>
-          💾 Salvează calificatele în semifinale
-        </button>
-      </div>
-
-      {/* ── AUDIT CALIFICATE ÎN SEMIFINALE ───────────────────────────────────── */}
-      <div style={{ marginTop:10, padding:'10px 12px', background:'rgba(100,100,255,0.03)', border:'1px solid rgba(100,100,255,0.12)', borderRadius:10 }}>
-        <div style={{ fontSize:10, color:'rgba(150,150,255,0.7)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:8, fontWeight:700 }}>
-          🏅 Audit — Calificate în Semifinale
-        </div>
-        {Object.keys(allSpecialPreds).length === 0 ? (
-          <div style={{ fontSize:11, color:'rgba(255,255,255,0.25)', fontStyle:'italic' }}>Niciun jucător nu a salvat încă.</div>
-        ) : (
-          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-            {Object.entries(allSpecialPreds).map(([uid, pred]) => {
-              const nickname = allUsers[uid]?.nickname || uid;
-              const sf = pred?.qualifiedToSemis || {};
-              const realSF = specialResultsInit?.qualifiedToSemis || {};
-              const count = Object.values(sf).filter(Boolean).length;
-              const correct = Object.entries(realSF).filter(([id,w]) => sf[id]===w).length;
-              return (
-                <div key={uid} style={{ padding:'6px 9px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:count>0?4:0 }}>
-                    <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{nickname}</span>
-                    <span style={{ fontSize:11, fontWeight:800, fontFamily:"'DM Mono',monospace",
-                      color:count===4?'rgba(0,229,160,0.8)':count>0?'rgba(255,215,0,0.7)':'rgba(255,255,255,0.25)' }}>
-                      {count}/4{Object.keys(realSF).length>0?` · ${correct} ✓`:''}
-                    </span>
+                        {editingMatchId === m.id ? (
+                          <div style={s.editBox}>
+                            <label style={s.editLabel}>Dată/oră (România, YYYY-MM-DD HH:mm)</label>
+                            <input
+                              style={s.editInput}
+                              value={editDraft.kickoffAtWallClock}
+                              onChange={(e) => setEditDraft((d) => ({ ...d, kickoffAtWallClock: e.target.value }))}
+                              placeholder="2026-08-06 21:00"
+                            />
+                            <label style={s.editLabel}>Competiție</label>
+                            <div style={s.compPickerGrid}>
+                              {Object.entries(COMPETITION_THEMES).map(([slug, theme]) => {
+                                const active = editDraft.competitionSlug === slug;
+                                return (
+                                  <button
+                                    key={slug}
+                                    type="button"
+                                    onClick={() => setEditDraft((d) => ({ ...d, competitionSlug: slug }))}
+                                    style={{
+                                      ...s.compPickerItem,
+                                      border: `1px solid ${active ? theme.primaryColor : color.border}`,
+                                      background: active ? `${theme.primaryColor}22` : color.surface,
+                                    }}
+                                  >
+                                    <CompetitionLogo name={slug} size={18} />
+                                    <span style={{ ...s.compPickerLabel, color: active ? theme.primaryColor : color.textMuted }}>{theme.name}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                              <button style={s.btn} disabled={editSaving} onClick={() => handleSaveMatchEdit(m.id)} type="button">
+                                {editSaving ? "Se salvează…" : "Salvează corecția"}
+                              </button>
+                              <button style={s.btnGhost} onClick={() => setEditingMatchId("")} type="button">Anulează</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                            <button style={s.btnGhost} onClick={() => startEditingMatch(m)} type="button">Corectează manual</button>
+                            <button style={{ ...s.btnGhost, color: "#F0555A" }} onClick={() => handleDeleteFromHealthCheck(m)} type="button">Șterge meciul</button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  {count > 0 && (
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
-                      {SF_MATCHES.map(m => {
-                        const picked = sf[m.id];
-                        const realWin = realSF[m.id];
-                        const cor = realWin && picked===realWin;
-                        const wrg = realWin && picked && picked!==realWin;
-                        const flag = picked===m.home?m.homeFlag:picked===m.away?m.awayFlag:'';
+                )}
+              </SectionCard>
+            )}
+
+            {/* ── Import / Config ───────────────────────────────────── */}
+            {tab === "config" && (
+              <>
+              <SectionCard title="📦 Backup PLAY LEAGUE">
+                <p style={s.hint}>
+                  Descarcă un fișier JSON complet — toate datele critice (useri, etape, meciuri, pronosticuri,
+                  Surprize, Speciale, Bet Builder, Feed manual). Rulează STRICT la apăsare, nu afectează aplicația.
+                  Recomandat când nu sunt meciuri LIVE.
+                </p>
+                <button type="button" style={s.btn} disabled={backupRunning} onClick={handleGenerateBackup}>
+                  {backupRunning ? "Se generează…" : "📦 Descarcă backup JSON"}
+                </button>
+                {backupStatus && (
+                  <p style={{ ...s.hint, color: backupIsError ? "#F0555A" : "#8BD957", marginTop: 8 }}>{backupStatus}</p>
+                )}
+              </SectionCard>
+
+              <SectionCard title="Import meciuri">
+                <form onSubmit={handleImportMatches} style={s.form}>
+                  <p style={s.hint}>
+                    Lipește meciurile, un rând pe meci, format: <br />
+                    <code style={s.code}>Echipa Gazdă - Echipa Oaspete | 2026-09-16 21:00</code>
+                  </p>
+                  <textarea
+                    style={s.textarea}
+                    rows={6}
+                    placeholder={"Real Madrid - Arsenal | 2026-09-16 21:00\nInter - Barcelona | 2026-09-16 21:00"}
+                    value={matchesText}
+                    onChange={(e) => setMatchesText(e.target.value)}
+                  />
+                  <button style={s.btn} disabled={loading} type="submit">Importă meciurile</button>
+                </form>
+              </SectionCard>
+
+              <SectionCard title="Avatar utilizator">
+                <p style={s.hint}>
+                  Alege utilizatorul din listă — niciun UID sau email tastat manual. Format avatarId:
+                  „pachet/index" (ex: „adireal/1").
+                </p>
+                <select
+                  style={s.select}
+                  value={avatarUserUid}
+                  onChange={(e) => setAvatarUserUid(e.target.value)}
+                >
+                  <option value="">Alege utilizator…</option>
+                  {allUsers.map((u) => (
+                    <option key={u.uid} value={u.uid}>
+                      {u.nickname || u.uid} {u.avatarId ? `(are deja: ${u.avatarId})` : "(fără avatar)"}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  style={s.input}
+                  placeholder="avatarId (ex: adireal/1)"
+                  value={avatarIdInput}
+                  onChange={(e) => setAvatarIdInput(e.target.value)}
+                />
+                <button style={s.btn} disabled={avatarSaving || !avatarUserUid || !avatarIdInput.trim()} onClick={handleSetUserAvatar} type="button">
+                  {avatarSaving ? "Se salvează…" : "Setează avatarId"}
+                </button>
+                {avatarSaveMsg && <p style={s.hint}>{avatarSaveMsg}</p>}
+              </SectionCard>
+
+              <SectionCard title="Nickname utilizator">
+                <p style={s.hint}>
+                  Pentru useri blocați cu numele real din Google (bug reparat, dar cei deja
+                  afectați nu se corectează singuri) — schimbă direct nickname-ul aici.
+                </p>
+                <select
+                  style={s.select}
+                  value={nicknameUserUid}
+                  onChange={(e) => setNicknameUserUid(e.target.value)}
+                >
+                  <option value="">Alege utilizator…</option>
+                  {allUsers.map((u) => (
+                    <option key={u.uid} value={u.uid}>
+                      {u.nickname || u.uid}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  style={s.input}
+                  placeholder="nickname nou"
+                  value={nicknameInput}
+                  onChange={(e) => setNicknameInput(e.target.value)}
+                />
+                <button style={s.btn} disabled={nicknameSaving || !nicknameUserUid || !nicknameInput.trim()} onClick={handleSetUserNickname} type="button">
+                  {nicknameSaving ? "Se salvează…" : "Setează nickname"}
+                </button>
+                {nicknameSaveMsg && <p style={s.hint}>{nicknameSaveMsg}</p>}
+              </SectionCard>
+              </>
+            )}
+
+            {/* ── 📊 Statistici etape — READ-ONLY, selector propriu, izolat ── */}
+            {tab === "stats" && (
+              <>
+                <SectionCard title="📊 Statistici etape">
+                  <p style={s.hint}>
+                    Selector separat de cel folosit în Rezultate/Live/Speciale — alegerea de aici
+                    nu schimbă etapa activă în restul panoului.
+                  </p>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                    {seasons.length > 1 && (
+                      <select
+                        style={s.select}
+                        value={statsSeasonId}
+                        onChange={(e) => { setStatsSeasonId(e.target.value); setStatsGameweekId(""); setStatsGameweeks([]); }}
+                      >
+                        {seasons.map((se) => (
+                          <option key={se.id} value={se.id}>{se.name}</option>
+                        ))}
+                      </select>
+                    )}
+                    <select
+                      style={s.select}
+                      value={statsGameweekId}
+                      onChange={(e) => setStatsGameweekId(e.target.value)}
+                    >
+                      <option value="">— alege o etapă finalizată —</option>
+                      {statsGameweeks.filter((g) => g.status === "completed").map((g) => (
+                        <option key={g.id} value={g.id}>{g.title}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {!statsGameweekId && (
+                    <EmptyState icon="📊" title="Alege o etapă finalizată" subtitle="Statisticile apar doar după selectare — nimic nu se încarcă înainte." />
+                  )}
+
+                  {statsGameweekId && statsLoading && <p style={s.hint}>Se încarcă…</p>}
+                  {statsGameweekId && statsError && <p style={s.message}>{statsError}</p>}
+
+                  {statsGameweekId && !statsLoading && !statsError && statsRows.length === 0 && (
+                    <EmptyState icon="📊" title="Niciun snapshot găsit pentru etapa asta." subtitle="Etapa a fost finalizată fără jucători evaluați, sau ID-ul nu are gameweekScores." />
+                  )}
+
+                  {statsGameweekId && !statsLoading && !statsError && statsRows.length > 0 && (
+                    <>
+                      {[
+                        { icon: "🏆", label: "Regele scorurilor exacte", key: "exact" },
+                        { icon: "🎯", label: "Cele mai multe 1X2 corecte", key: "oneXTwo" },
+                        { icon: "🚩", label: "Regele cornerelor", key: "cornersExact" },
+                        { icon: "🟨", label: "Regele cartonașelor", key: "cardsExact" },
+                      ].map(({ icon, label, key }) => {
+                        const { max, players } = findEtapaStatsLeaders(statsRows, key);
                         return (
-                          <span key={m.id} style={{ fontSize:10, padding:'2px 6px', borderRadius:5, fontWeight:600,
-                            background:cor?'rgba(0,229,160,0.12)':wrg?'rgba(239,68,68,0.1)':'rgba(255,255,255,0.05)',
-                            color:cor?'#00E5A0':wrg?'#EF4444':picked?'rgba(255,255,255,0.6)':'rgba(255,255,255,0.2)',
-                            border:`1px solid ${cor?'rgba(0,229,160,0.2)':wrg?'rgba(239,68,68,0.2)':'rgba(255,255,255,0.06)'}` }}>
-                            {picked?`${flag} ${picked}`:'—'}
-                          </span>
+                          <p key={key} style={s.hint}>
+                            {icon} {label} — {players.length > 0 ? `${players.join(", ")} — ${max}` : "—"}
+                          </p>
                         );
                       })}
-                    </div>
+
+                      <div style={{ overflowX: "auto", marginTop: 10 }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                          <thead>
+                            <tr>
+                              {[
+                                { key: "nickname", label: "JUCĂTOR" },
+                                { key: "exact", label: "SCORURI EXACTE" },
+                                { key: "oneXTwo", label: "1X2 CORECTE" },
+                                { key: "cornersExact", label: "CORNERE EXACTE" },
+                                { key: "cardsExact", label: "CARTONAȘE EXACTE" },
+                                { key: "evaluated", label: "MECIURI EVALUATE" },
+                              ].map(({ key, label }) => (
+                                <th
+                                  key={key}
+                                  style={{ textAlign: key === "nickname" ? "left" : "center", padding: "6px 8px", cursor: "pointer", color: color.gold, borderBottom: `1px solid ${color.border}`, whiteSpace: "nowrap" }}
+                                  onClick={() => {
+                                    if (statsSortKey === key) setStatsSortDir((d) => -d);
+                                    else { setStatsSortKey(key); setStatsSortDir(key === "nickname" ? 1 : -1); }
+                                  }}
+                                >
+                                  {label}{statsSortKey === key ? (statsSortDir === -1 ? " ▼" : " ▲") : ""}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[...statsRows]
+                              .sort((a, b) => {
+                                if (statsSortKey === "nickname") return a.nickname.localeCompare(b.nickname) * statsSortDir;
+                                return (a[statsSortKey] - b[statsSortKey]) * statsSortDir;
+                              })
+                              .map((r) => (
+                                <tr key={r.uid}>
+                                  <td style={{ padding: "6px 8px", borderBottom: `1px solid ${color.border}` }}>{r.nickname}</td>
+                                  <td style={{ padding: "6px 8px", textAlign: "center", borderBottom: `1px solid ${color.border}` }}>{r.exact}</td>
+                                  <td style={{ padding: "6px 8px", textAlign: "center", borderBottom: `1px solid ${color.border}` }}>{r.oneXTwo}</td>
+                                  <td style={{ padding: "6px 8px", textAlign: "center", borderBottom: `1px solid ${color.border}` }}>{r.cornersExact}</td>
+                                  <td style={{ padding: "6px 8px", textAlign: "center", borderBottom: `1px solid ${color.border}` }}>{r.cardsExact}</td>
+                                  <td style={{ padding: "6px 8px", textAlign: "center", borderBottom: `1px solid ${color.border}` }}>{r.evaluated}</td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
                   )}
-                  {count===0 && <div style={{ fontSize:10, color:'rgba(255,255,255,0.25)', fontStyle:'italic' }}>Nu a salvat.</div>}
-                </div>
-              );
-            })}
-          </div>
+                </SectionCard>
+              </>
+            )}
+          </>
         )}
       </div>
 
-      {/* Reset amicale button removed — test phase complete */}
+      {openPlayerUid && !openPlayerLoading && openPlayerStats && (
+        <PlayerCard
+          uid={openPlayerUid}
+          nickname={previewProfiles[openPlayerUid]?.nickname || openPlayerUid}
+          avatarId={previewProfiles[openPlayerUid]?.avatarId}
+          rank={openPlayerStats.rank}
+          scope="etapa"
+          stats={openPlayerStats}
+          onClose={() => setOpenPlayerUid("")}
+        />
+      )}
+      {storyPreview && (
+        <StoryViewer
+          slideUrls={storyPreview.slideUrls}
+          isSeasonStory={storyPreview.isSeasonStory}
+          onClose={() => setStoryPreview(null)}
+          onComplete={() => {}}
+          onOpenArchive={() => setStoryPreview(null)}
+          onOpenLeaderboard={() => setStoryPreview(null)}
+        />
+      )}
+      {betBuilderPreviewOpen && (
+        <div style={s.bbPreviewOverlay}>
+          <div style={s.bbPreviewBar}>
+            <span style={s.bbPreviewLabel}>👁 PREVIEW — mock, nimic salvat</span>
+            <button type="button" style={s.bbPreviewCloseBtn} onClick={() => setBetBuilderPreviewOpen(false)}>✕ Închide</button>
+          </div>
+          <div style={s.bbPreviewStates}>
+            {[
+              { id: "A", label: "📝 Completare" },
+              { id: "B", label: "🔒 Confirmat/Reveal" },
+              { id: "C", label: "🔴 Live" },
+              { id: "D", label: "🏁 Final" },
+            ].map((st) => (
+              <button
+                key={st.id} type="button"
+                style={{ ...s.bbPreviewStateBtn, ...(betBuilderPreviewState === st.id ? s.bbPreviewStateBtnActive : {}) }}
+                onClick={() => setBetBuilderPreviewState(st.id)}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
+          <div style={s.bbPreviewBody}>
+            <BetBuilderScreen previewMode previewState={betBuilderPreviewState} embedded />
+          </div>
+        </div>
+      )}
 
-      {/* Qualification overview */}
-      <QualificationPanel finishedResults={finishedResults}/>
+      {higherLowerPreviewOpen && (
+        <div style={s.bbPreviewOverlay}>
+          <div style={s.bbPreviewBar}>
+            <span style={s.bbPreviewLabel}>👁 PREVIEW Mai Mare/Mai Mic — mock, nimic salvat</span>
+            <button type="button" style={s.bbPreviewCloseBtn} onClick={() => setHigherLowerPreviewOpen(false)}>✕ Închide</button>
+          </div>
+          <div style={s.bbPreviewStates}>
+            {HIGHER_LOWER_PREVIEW_STATES.map((st) => (
+              <button
+                key={st.id} type="button"
+                style={{ ...s.bbPreviewStateBtn, ...(higherLowerPreviewState === st.id ? s.bbPreviewStateBtnActive : {}) }}
+                onClick={() => setHigherLowerPreviewState(st.id)}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
+          <div style={s.bbPreviewBody}>
+            <HigherLowerScreen previewMode previewState={higherLowerPreviewState} embedded />
+          </div>
+        </div>
+      )}
 
-      {/* Save history */}
-      {history.length > 0 && (
-        <div style={{ marginTop:12 }}>
-          <div style={{ fontSize:9, color:'rgba(255,255,255,0.2)', letterSpacing:'0.1em', textTransform:'uppercase', fontWeight:600, marginBottom:7 }}>Ultimele salvate</div>
-          {history.map((h,i) => (
-            <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 10px', background:'rgba(255,255,255,0.02)', borderRadius:8, marginBottom:4 }}>
-              <span style={{ fontSize:12, color:'rgba(255,255,255,0.5)' }}>{h.label}</span>
-              <span style={{ fontSize:10, color:getColor(h.status), fontWeight:700 }}>{h.status}</span>
-            </div>
-          ))}
+      {treasureHuntPreviewOpen && (
+        <div style={s.bbPreviewOverlay}>
+          <div style={s.bbPreviewBar}>
+            <span style={s.bbPreviewLabel}>👁 PREVIEW Comoara Blestemată — mock, nimic salvat</span>
+            <button type="button" style={s.bbPreviewCloseBtn} onClick={() => setTreasureHuntPreviewOpen(false)}>✕ Închide</button>
+          </div>
+          <div style={s.bbPreviewStates}>
+            {TREASURE_HUNT_PREVIEW_STATES.map((st) => (
+              <button
+                key={st.id} type="button"
+                style={{ ...s.bbPreviewStateBtn, ...(treasureHuntPreviewState === st.id ? s.bbPreviewStateBtnActive : {}) }}
+                onClick={() => setTreasureHuntPreviewState(st.id)}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
+          <div style={s.bbPreviewBody}>
+            <TreasureHuntScreen previewMode previewState={treasureHuntPreviewState} embedded />
+          </div>
+        </div>
+      )}
+
+      {penaltyPreviewOpen && (
+        <div style={s.bbPreviewOverlay}>
+          <div style={s.bbPreviewBar}>
+            <span style={s.bbPreviewLabel}>👁 PREVIEW Penalty PvP — mock, adversar local, nimic salvat</span>
+            <button type="button" style={s.bbPreviewCloseBtn} onClick={() => setPenaltyPreviewOpen(false)}>✕ Închide</button>
+          </div>
+          <div style={s.bbPreviewBody}>
+            <PenaltyPreviewScreen embedded />
+          </div>
         </div>
       )}
     </div>
   );
 }
 
+const s = {
+  resetBtn: {
+    background: color.redBg, border: `1px solid ${color.redBorder}`, color: color.red,
+    borderRadius: radius.sm, padding: "8px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: font.body,
+  },
+  migrateSpecialBtn: {
+    background: "transparent", border: `1px solid ${color.goldBorder}`, color: color.gold,
+    borderRadius: radius.sm, padding: "7px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: font.body,
+    marginTop: 8, marginBottom: 4,
+  },
+  hint: { fontSize: 11.5, color: color.textMuted, lineHeight: 1.5, margin: "0 0 4px" },
+  linkBtn: {
+    background: "none", border: "none", color: color.textMuted, fontSize: 12,
+    textDecoration: "underline", cursor: "pointer", padding: 0, marginBottom: 12, fontFamily: font.body,
+  },
+  code: { color: color.green, fontSize: 11 },
+  textarea: {
+    width: "100%", background: color.surfaceInset, border: `1px solid ${color.border}`, borderRadius: radius.sm,
+    padding: "11px 12px", fontSize: 12.5, color: color.textPrimary, outline: "none", resize: "vertical",
+    fontFamily: "monospace",
+  },
+  message: {
+    background: color.greenBg, border: `1px solid ${color.greenBorder}`,
+    color: color.green, borderRadius: radius.sm, padding: "10px 14px", fontSize: 12.5, marginBottom: 16,
+    whiteSpace: "pre-line",
+  },
+  specialsOverview: { display: "flex", flexDirection: "column", gap: 4, margin: "10px 0" },
+  feedAdminList: { display: "flex", flexDirection: "column", gap: 6, marginTop: 8 },
+  feedAdminRow: {
+    background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "9px 11px",
+  },
+  feedAdminRowHead: { display: "flex", justifyContent: "space-between", marginBottom: 3 },
+  feedAdminRowBetween: {
+    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+    background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "9px 11px",
+  },
+  feedAdminCategory: { fontSize: 9.5, fontWeight: 800, letterSpacing: "0.06em", color: "#D4AF37", textTransform: "uppercase" },
+  feedAdminPriority: { fontSize: 9.5, color: "#6B7385" },
+  feedAdminTitle: { fontSize: 12, fontWeight: 600, color: "#fff", marginTop: 1 },
+  feedAdminMeta: { fontSize: 10, color: "#6B7385", marginTop: 2 },
+  smallBtn: {
+    flexShrink: 0, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6,
+    padding: "6px 10px", fontSize: 10.5, fontWeight: 700, color: "#fff", cursor: "pointer",
+  },
+  bbMatchBlock: { marginTop: 12, marginBottom: 12, padding: 10, background: "rgba(255,255,255,0.03)", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)" },
+  bbMatchTitle: { fontSize: 12.5, fontWeight: 700, color: "#fff", marginBottom: 4 },
+  bbQuestionEdit: { display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 },
+  bbResolveList: { display: "flex", flexDirection: "column", gap: 6, marginTop: 6 },
+  bbResolveRow: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 },
+  bbResolveText: { fontSize: 10.5, color: "#C7CAD4", flex: 1 },
+  fixtureDetail: { fontSize: 9.5, color: "#8A93A6" },
+  bbResolveBtn: { width: 30, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", cursor: "pointer", fontSize: 12 },
+  bbResolveBtnActive: { background: "rgba(212,175,55,0.25)", borderColor: "#D4AF37" },
+  bbPreviewOverlay: {
+    position: "fixed", inset: 0, zIndex: 10000, background: "#0A0D14",
+    display: "flex", flexDirection: "column",
+  },
+  bbPreviewBar: {
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    padding: "10px 14px", background: "rgba(212,175,55,0.12)", borderBottom: "1px solid rgba(212,175,55,0.3)",
+  },
+  bbPreviewLabel: { fontSize: 11, fontWeight: 700, color: "#E8C766" },
+  bbPreviewCloseBtn: {
+    background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6,
+    padding: "5px 10px", fontSize: 10.5, fontWeight: 700, color: "#fff", cursor: "pointer",
+  },
+  bbPreviewStates: { display: "flex", gap: 6, padding: "8px 14px", flexWrap: "wrap" },
+  bbPreviewStateBtn: {
+    flex: 1, minWidth: 70, padding: "8px 4px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.15)",
+    background: "rgba(255,255,255,0.05)", color: "#C7CAD4", fontSize: 10, fontWeight: 700, cursor: "pointer",
+  },
+  bbPreviewStateBtnActive: { background: "rgba(212,175,55,0.25)", borderColor: "#D4AF37", color: "#E8C766" },
+  bbPreviewBody: { flex: 1, overflowY: "auto", padding: "0 16px 24px", maxWidth: 480, margin: "0 auto", width: "100%" },
+  ghostBtnSmall: {
+    display: "block", marginTop: 8, background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 6,
+    padding: "6px 10px", fontSize: 10, fontWeight: 600, color: "#8A93A6", cursor: "pointer",
+  },
+  missingPredBtn: {
+    display: "block", width: "100%", marginTop: 6, background: "rgba(255,255,255,0.04)", border: `1px solid ${color.borderSubtle}`,
+    borderRadius: 8, padding: "8px 10px", fontSize: 11, fontWeight: 700, color: "#B8BECC", cursor: "pointer", textAlign: "left",
+  },
+  missingPredPanel: {
+    marginTop: 6, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: `1px solid ${color.borderSubtle}`, borderRadius: 8,
+  },
+  missingPredAllDone: { fontSize: 11.5, color: color.green || "#8BD957", fontWeight: 600 },
+  missingPredChips: { display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 },
+  missingPredChip: {
+    fontSize: 10.5, fontWeight: 600, color: "#F0B54C", background: "rgba(240,181,76,0.12)",
+    border: "1px solid rgba(240,181,76,0.3)", borderRadius: 999, padding: "3px 9px",
+  },
+  playerRow: {
+    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+    background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "10px 12px",
+  },
+  surpriseGwCard: {
+    background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: 12, marginBottom: 10,
+  },
+  surprisesArchiveBox: {
+    background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: 12, marginBottom: 10,
+  },
+  surpriseGwHead: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  surpriseGwTitle: { fontSize: 12.5, fontWeight: 700, color: "#fff" },
+  surpriseGwStatus: { fontSize: 10.5, fontWeight: 700, color: "#D4AF37" },
+  surpriseRow: { display: "flex", alignItems: "center", gap: 6, marginBottom: 8 },
+  surpriseLabel: { fontSize: 11, fontWeight: 700, color: "#B4BBC7", width: 62, flexShrink: 0 },
+  surpriseSelect: {
+    flex: 1, background: "#12141C", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6,
+    padding: "8px 6px", fontSize: 11, color: "#fff",
+  },
+  doneTag: { fontSize: 10.5, fontWeight: 700, color: "#8BD957", flexShrink: 0 },
 
-// ─── QUALIFICATION PANEL ─────────────────────────────────────────────────────
-// Shows which teams have qualified based on current finishedResults.
-function QualificationPanel({ finishedResults }) {
-  const { standings, qualifiedThirds, groupsCompleted } = buildQualifiedTeams(finishedResults || {});
-  const ALL_G = ['A','B','C','D','E','F','G','H','I','J','K','L'];
+  // ── Joker săptămânal (Admin) ──
+  jokerSummary: { fontSize: 12, color: "#B4BBC7", fontFamily: "inherit" },
+  jokerList: { display: "flex", flexDirection: "column", gap: 4, marginTop: 6 },
+  jokerRow: { display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "#fff", fontFamily: "inherit" },
+  jokerName: { fontWeight: 700 },
+  jokerArrow: { color: "#8B93A8" },
+  jokerMatch: { color: "#D4AF37" },
 
-  const winners    = ALL_G.map(g => ({ g, team:standings[g]?.[0] })).filter(x => x.team);
-  const runnersUp  = ALL_G.map(g => ({ g, team:standings[g]?.[1] })).filter(x => x.team);
+  // ── Preview Duel (Admin) ──
+  previewDuelBox: { marginTop: 12, paddingTop: 12, borderTop: "1px dashed rgba(255,255,255,0.12)" },
+  previewDuelMissing: { marginTop: 8, fontSize: 10.5, color: "#F0930C", fontFamily: "inherit" },
+  previewRoster: { display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8, marginBottom: 4 },
+  rosterCard: {
+    display: "flex", flexDirection: "column", alignItems: "center", gap: 3, width: 62, padding: "6px 4px",
+    borderRadius: 8, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.03)",
+    cursor: "pointer", position: "relative",
+  },
+  rosterCardMine: { border: "1.5px solid rgba(139,217,87,0.8)", background: "rgba(139,217,87,0.1)", boxShadow: "0 0 10px -2px rgba(139,217,87,0.5)" },
+  rosterCardOpp: { border: "1.5px solid rgba(240,85,90,0.8)", background: "rgba(240,85,90,0.1)", boxShadow: "0 0 10px -2px rgba(240,85,90,0.5)" },
+  rosterName: { fontSize: 9, color: "#fff", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" },
+  rosterBadgeMine: { position: "absolute", top: 2, right: 2, fontSize: 7.5, fontWeight: 800, color: "#8BD957", background: "rgba(10,11,16,0.85)", borderRadius: 4, padding: "1px 3px" },
+  rosterBadgeOpp: { position: "absolute", top: 2, right: 2, fontSize: 7.5, fontWeight: 800, color: "#F0555A", background: "rgba(10,11,16,0.85)", borderRadius: 4, padding: "1px 3px" },
 
-  const section = (title, teams, color) => (
-    <div style={{ marginBottom:10 }}>
-      <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', textTransform:'uppercase', letterSpacing:'0.1em', fontWeight:700, marginBottom:6 }}>
-        {title} ({teams.length})
-      </div>
-      <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-        {teams.map((x, i) => (
-          <div key={i} style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 7px', background:'rgba(255,255,255,0.04)', border:`1px solid ${color}22`, borderRadius:6 }}>
-            <span style={{ fontSize:12 }}>{x.team?.flag || x.flag}</span>
-            <span style={{ fontSize:10, color:'#fff', fontWeight:600 }}>{x.team?.team || x.team}</span>
-            {x.g && <span style={{ fontSize:9, color:'rgba(255,255,255,0.25)' }}>Gr.{x.g}</span>}
-            {x.pts !== undefined && (
-              <span style={{ fontSize:9, color:color, fontFamily:"'DM Mono',monospace", marginLeft:2 }}>
-                {x.pts}p {x.gd > 0 ? '+' : ''}{x.gd}gd
-              </span>
-            )}
-          </div>
-        ))}
-        {teams.length === 0 && (
-          <span style={{ fontSize:10, color:'rgba(255,255,255,0.15)', fontStyle:'italic' }}>
-            Nu sunt date inca
-          </span>
-        )}
-      </div>
-    </div>
-  );
+  triviaBox: { marginTop: 4, marginBottom: 8, paddingTop: 8, borderTop: "1px dashed rgba(255,255,255,0.1)" },
+  hlPairsGrid: { display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 },
+  hlPairChip: { fontSize: 11, padding: "4px 8px", borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" },
+  hlQuestionRow: { display: "flex", gap: 6, alignItems: "center", marginBottom: 6, flexWrap: "wrap" },
+  triviaEditor: { marginTop: 8, display: "flex", flexDirection: "column", gap: 8 },
+  triviaQRow: { background: "rgba(255,255,255,0.03)", borderRadius: 8, padding: 8, display: "flex", flexDirection: "column", gap: 6 },
+  triviaQNum: { fontSize: 10, fontWeight: 800, color: "#D4AF37" },
+  triviaTextInput: {
+    width: "100%", background: "#12141C", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6,
+    padding: "7px 8px", fontSize: 11.5, color: "#fff", fontFamily: "inherit",
+  },
+  triviaOptRow: { display: "flex", gap: 6 },
+  triviaOptInput: {
+    flex: 1, background: "#12141C", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6,
+    padding: "6px 8px", fontSize: 10.5, color: "#fff", fontFamily: "inherit",
+  },
+  triviaSaveMsg: { fontSize: 10.5, color: "#8BD957", fontWeight: 700, marginTop: 4 },
 
-  return (
-    <div style={{ background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:12, padding:'12px 14px', marginTop:10 }}>
-      <div style={{ fontSize:10, fontWeight:800, color:'rgba(255,255,255,0.5)', marginBottom:10, letterSpacing:'0.08em', textTransform:'uppercase' }}>
-        Tabloul Calificarilor
-      </div>
-      {section('Castigatori grupe (Locul 1)', winners, '#00E5A0')}
-      {section('Locul 2', runnersUp, '#4A9EFF')}
-      {section('Cele mai bune locuri 3 calificate', qualifiedThirds.map(t => ({ team:t.team, flag:t.flag, g:t.fromGroup, pts:t.pts, gd:t.gd })), '#FFD700')}
-    </div>
-  );
-}
+  triviaValidate: { marginTop: 10, paddingTop: 8, borderTop: "1px dashed rgba(255,255,255,0.1)" },
+  triviaValidateLabel: { fontSize: 10.5, fontWeight: 800, color: "#B4BBC7", marginBottom: 6 },
+  triviaValidateRow: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, padding: "5px 0" },
+  triviaValidateText: { fontSize: 10.5, color: "#fff", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  triviaValidateBtns: { display: "flex", gap: 4, flexShrink: 0 },
+  triviaValidateBtn: {
+    background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6,
+    padding: "4px 8px", fontSize: 9.5, fontWeight: 700, color: "#B4BBC7", cursor: "pointer",
+  },
+  triviaValidateBtnActive: { background: "rgba(139,217,87,0.15)", border: "1px solid rgba(139,217,87,0.4)", color: "#8BD957" },
+  zaruriTargetInput: {
+    width: 56, background: "#12141C", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6,
+    padding: "4px 6px", fontSize: 10.5, color: "#fff",
+  },
 
-function StandingsMini({ group, finishedResults }) {
-  const rows = buildGroupStandings(group, finishedResults || {});
-  if (!rows.length) return null;
-  return (
-    <div style={{ background:'rgba(255,255,255,0.02)', borderRadius:9, overflow:'hidden', border:'1px solid rgba(255,255,255,0.05)' }}>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 20px 20px 20px 28px', padding:'4px 9px', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
-        {['Echipă','J','V','Î','Pct'].map((h,i) => <div key={i} style={{ fontSize:9, color:'rgba(255,255,255,0.2)', fontWeight:700, textAlign:i===0?'left':'center' }}>{h}</div>)}
-      </div>
-      {rows.map((r,i) => (
-        <div key={r.team} style={{ display:'grid', gridTemplateColumns:'1fr 20px 20px 20px 28px', padding:'6px 9px', borderBottom:i<rows.length-1?'1px solid rgba(255,255,255,0.04)':'none', background:i<2?'rgba(0,229,160,0.03)':'transparent' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-            <span style={{ fontSize:9, color:i<2?'rgba(0,229,160,0.5)':'rgba(255,255,255,0.2)', width:8 }}>{i+1}</span>
-            <span style={{ fontSize:11 }}>{r.flag}</span>
-            <span style={{ fontSize:11, color:'#fff', fontWeight:600 }}>{r.team}</span>
-          </div>
-          {[r.p, r.w, r.l].map((v,j) => <div key={j} style={{ fontSize:11, color:'rgba(255,255,255,0.38)', textAlign:'center', fontFamily:"'DM Mono',monospace" }}>{v}</div>)}
-          <div style={{ fontSize:12, fontWeight:800, color:i<2?'#00E5A0':'rgba(255,255,255,0.55)', textAlign:'center', fontFamily:"'DM Mono',monospace" }}>{r.pts}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
+  triviaLockBox: { marginTop: 10, padding: 10, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8 },
+  triviaLockRow: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  triviaLockPillOpen: { fontSize: 10.5, fontWeight: 800, padding: "3px 8px", borderRadius: 6, background: "rgba(139,217,87,0.15)", color: "#8BD957", border: "1px solid rgba(139,217,87,0.4)" },
+  triviaLockPillLocked: { fontSize: 10.5, fontWeight: 800, padding: "3px 8px", borderRadius: 6, background: "rgba(240,85,90,0.15)", color: "#F0555A", border: "1px solid rgba(240,85,90,0.4)" },
+  triviaSubmissionSection: { marginTop: 10, paddingTop: 8, borderTop: "1px dashed rgba(255,255,255,0.1)" },
+  triviaSubmissionList: { marginTop: 8, display: "flex", flexDirection: "column", gap: 4 },
+  triviaSubmissionRow: { display: "flex", justifyContent: "space-between", fontSize: 10.5, color: "#fff", padding: "3px 0" },
+  playerInfo: { minWidth: 0, flex: 1 },
+  playerActions: { display: "flex", gap: 6, flexShrink: 0 },
+  approveBtn: {
+    background: "rgba(52,199,89,0.15)", border: "1px solid rgba(52,199,89,0.4)", color: "#34C759",
+    borderRadius: 6, padding: "6px 12px", fontSize: 10.5, fontWeight: 700, cursor: "pointer",
+  },
+  rejectBtn: {
+    background: "rgba(240,85,90,0.12)", border: "1px solid rgba(240,85,90,0.35)", color: "#F0555A",
+    borderRadius: 6, padding: "6px 12px", fontSize: 10.5, fontWeight: 700, cursor: "pointer",
+  },
+  specialsOverviewRow: {
+    display: "flex", alignItems: "center", gap: 8, width: "100%", background: "rgba(255,255,255,0.03)",
+    border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 10px", cursor: "pointer", textAlign: "left",
+  },
+  specialsOverviewRowActive: { border: "1px solid rgba(212,175,55,0.5)", background: "rgba(212,175,55,0.08)" },
+  specialsOverviewLabel: { flex: 1, fontSize: 11.5, fontWeight: 600, color: "#fff" },
+  specialsOverviewStatus: { fontSize: 10.5, color: "#9099AC" },
+
+  select: {
+    width: "100%", background: color.surfaceInset, border: `1px solid ${color.border}`, borderRadius: radius.sm,
+    padding: "11px 12px", fontSize: 13.5, color: color.textPrimary, marginBottom: 10, fontFamily: font.body,
+  },
+  searchInput: {
+    width: "100%", background: color.surfaceInset, border: `1px solid ${color.border}`, borderRadius: radius.sm,
+    padding: "10px 14px", fontSize: 13.5, color: color.textPrimary, outline: "none", marginBottom: 12, fontFamily: font.body,
+  },
+  republishBox: {
+    background: "rgba(212,175,55,0.06)", border: "1px solid rgba(212,175,55,0.3)", borderRadius: radius.sm,
+    padding: 12, marginBottom: 14,
+  },
+  republishBtn: {
+    width: "100%", background: "linear-gradient(180deg, #F0D875, #C9A227)", border: "none", borderRadius: radius.sm,
+    padding: "11px 0", fontSize: 12.5, fontWeight: 800, color: "#1A1200", cursor: "pointer", fontFamily: font.body,
+  },
+  republishHint: { fontSize: 10.5, color: color.textFaint, fontFamily: font.body, marginTop: 8, lineHeight: 1.4 },
+  republishMsg: { fontSize: 11.5, color: color.textPrimary, fontFamily: font.body, marginTop: 8, fontWeight: 700 },
+  form: { display: "flex", flexDirection: "column", gap: 10 },
+  row: { display: "flex", gap: 10 },
+  input: {
+    flex: 1, background: color.surfaceInset, border: `1px solid ${color.border}`, borderRadius: radius.sm,
+    padding: "11px 12px", fontSize: 13.5, color: color.textPrimary, outline: "none", fontFamily: font.body,
+  },
+  btn: {
+    background: color.goldGradient, color: color.goldOn, border: "none",
+    borderRadius: radius.sm, padding: "11px 0", fontSize: 13.5, fontWeight: 800, cursor: "pointer", fontFamily: font.body,
+  },
+  btnGhost: {
+    background: "none", border: `1px solid ${color.border}`, color: color.textMuted,
+    borderRadius: radius.sm, padding: "8px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: font.body,
+  },
+  healthCard: {
+    background: color.surfaceInset, border: "1px solid rgba(240,147,12,0.3)", borderRadius: radius.sm, padding: 12,
+  },
+  healthTop: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 },
+  healthTeams: { fontSize: 13, fontWeight: 700, color: color.textPrimary, fontFamily: font.body },
+  healthGw: { fontSize: 10, color: color.textFaint, fontFamily: font.body },
+  healthList: { margin: "0 0 0", paddingLeft: 18 },
+  healthItem: { fontSize: 11.5, color: "#F0A94E", fontFamily: font.body, marginBottom: 3, lineHeight: 1.4 },
+  editBox: { marginTop: 8, display: "flex", flexDirection: "column", gap: 6 },
+  editLabel: { fontSize: 10, color: color.textFaint, fontWeight: 700, fontFamily: font.body },
+  editInput: {
+    background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.sm,
+    padding: "8px 10px", fontSize: 12.5, color: color.textPrimary, fontFamily: font.body,
+  },
+  compPickerGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 },
+  compPickerItem: {
+    display: "flex", alignItems: "center", gap: 6, borderRadius: radius.sm, padding: "7px 8px", cursor: "pointer",
+  },
+  compPickerLabel: { fontSize: 10.5, fontWeight: 700, fontFamily: font.body, textAlign: "left" },
+  tabRow: { display: "flex", gap: 6, marginBottom: 14, overflowX: "auto" },
+  tabBtn: {
+    flex: "1 0 auto", background: color.surfaceInset, border: `1px solid ${color.border}`, color: color.textMuted,
+    borderRadius: radius.sm, padding: "9px 10px", fontSize: 11.5, fontWeight: 700, cursor: "pointer",
+    whiteSpace: "nowrap", fontFamily: font.body,
+  },
+  tabBtnActive: { background: color.goldGradient, color: color.goldOn, border: "none" },
+  matchList: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 },
+  featuredRow: { display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", flex: 1, minWidth: 0 },
+  matchRowWithDelete: { display: "flex", alignItems: "flex-start", gap: 8, flexWrap: "nowrap", width: "100%" },
+  deleteBtn: {
+    flexShrink: 0, marginTop: 14, width: 34, height: 34, borderRadius: radius.sm,
+    background: color.redBg, border: `1px solid ${color.redBorder}`,
+    color: color.red, fontSize: 15, cursor: "pointer",
+  },
+  featuredCheckbox: { width: 20, height: 20, marginTop: 14, flexShrink: 0, accentColor: color.gold },
+  previewTable: { display: "flex", flexDirection: "column", gap: 6, marginTop: 12, marginBottom: 12 },
+  finalizeBtn: {
+    width: "100%", background: color.greenBg, border: `1px solid #3FA85C`, color: color.green,
+    borderRadius: radius.sm, padding: "12px 0", fontSize: 13.5, fontWeight: 800, cursor: "pointer", fontFamily: font.body,
+  },
+};
